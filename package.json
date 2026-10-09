@@ -1,0 +1,12 @@
+{
+  "name": "core-breach-zero",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A browser tower defense game with joinable multiplayer rooms",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
