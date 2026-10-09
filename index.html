@@ -54,11 +54,11 @@
         <div class="panel-head"><span><i class="crosshair">+</i> TACTICAL PREVIEW</span><span class="tag" id="preview-tag">DEPLOYMENT</span></div>
         <div class="sector-art" aria-hidden="true"><div class="art-orbit"></div><div class="art-core">09</div><span class="art-coordinate">SECTOR 09 // REACTOR CHAMBER</span><span class="art-warning">BREACH ACTIVITY DETECTED</span></div>
         <h2 id="preview-title">PLAY MENU</h2>
-        <p class="preview-copy" id="preview-desc">Create a room and invite another commander. The defense grid is still under construction.</p>
+        <p class="preview-copy" id="preview-desc">Four deployment bays are online. Claim a bay, set the map protocol &amp; squad size, then launch the mission.</p>
         <div class="intel-stats" id="preview-stats">
-          <div><span>GAMEPLAY</span><b>IN DEVELOPMENT</b></div>
-          <div><span>ROOMS</span><b>2 COMMANDERS</b></div>
-          <div><span>SERVER PORT</span><b id="preview-port">3000</b></div>
+          <div><span>DEPLOYMENT BAYS</span><b>4</b></div>
+          <div><span>MAP PROTOCOLS</span><b>5 DIFFICULTIES</b></div>
+          <div><span>SQUAD SIZE</span><b>2-4 COMMANDERS</b></div>
         </div>
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
       </aside>
@@ -70,6 +70,23 @@
     <div class="dialog-head"><div><div class="eyebrow" id="dialog-kicker">// DEPLOYMENT HUB</div><h2 id="dialog-title">PLAY MENU</h2></div><button class="close-button" id="dialog-close" type="button" aria-label="Close menu">×</button></div>
     <div class="dialog-body" id="dialog-body"></div>
   </dialog>
+
+  <section class="deployment-overlay" id="deployment-overlay" hidden>
+    <div class="deployment-panel" role="dialog" aria-modal="true" aria-labelledby="deployment-title">
+      <header class="deployment-head"><div><div class="eyebrow" id="deployment-kicker">// DEPLOYMENT BAYS</div><h2 id="deployment-title">SELECT DEPLOYMENT BAY</h2></div><button class="close-button" id="deployment-close" type="button" aria-label="Close deployment bay">×</button></header>
+      <div class="deployment-body" id="deployment-body"></div>
+    </div>
+  </section>
+
+  <section class="launch-overlay" id="launch-overlay" hidden aria-live="polite">
+    <div class="launch-inner">
+      <div class="eyebrow">// LAUNCH SEQUENCE</div>
+      <h2 class="launch-title">MISSION LAUNCH</h2>
+      <div class="launch-bar"><i></i></div>
+      <p class="launch-state" id="launch-state">INITIALIZING DEFENSE GRID...</p>
+    </div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
