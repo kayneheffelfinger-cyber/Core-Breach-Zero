@@ -20,11 +20,23 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const sessions = new Map(); // token hash -> { name, expiresAt }
 
+function accountKey(name) {
+  return typeof name === 'string' ? name.trim().toLowerCase() : '';
+}
+
 function loadAccounts() {
   try {
-    return JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+    const stored = JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return Object.create(null);
+    const normalized = Object.create(null);
+    for (const [key, value] of Object.entries(stored)) {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+      const name = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : key.trim();
+      normalized[accountKey(name)] = { ...value, name };
+    }
+    return normalized;
   } catch {
-    return {};
+    return Object.create(null);
   }
 }
 
@@ -53,7 +65,8 @@ function createSession(name) {
   const token = crypto.randomBytes(24).toString('hex');
   const expiresAt = Date.now() + SESSION_MS;
   const tokenDigest = tokenHash(token);
-  const account = accounts[name];
+  const account = accounts[accountKey(name)];
+  if (!account) throw new Error('Cannot create a session for a missing commander account.');
   account.sessions = (account.sessions || []).filter((session) => session.expiresAt > Date.now());
   account.sessions.push({ tokenHash: tokenDigest, expiresAt });
   sessions.set(tokenDigest, { name, expiresAt });
@@ -76,7 +89,7 @@ function revokeSession(token) {
   const session = sessions.get(tokenDigest);
   if (!session) return;
   sessions.delete(tokenDigest);
-  const account = accounts[session.name];
+  const account = accounts[accountKey(session.name)];
   if (account) {
     account.sessions = (account.sessions || []).filter((entry) => entry.tokenHash !== tokenDigest);
     saveAccounts();
@@ -120,12 +133,13 @@ async function handleApi(request, response, pathname) {
     if (!NAME_RE.test(name)) return sendJson(response, 400, { ok: false, error: 'Name must be 3-16 characters (letters, numbers, - or _).' });
     if (!EMAIL_RE.test(email)) return sendJson(response, 400, { ok: false, error: 'Enter a valid email address.' });
     if (passcode.length < 4 || passcode.length > 64) return sendJson(response, 400, { ok: false, error: 'Passcode must be 4-64 characters.' });
-    if (accounts[name]) return sendJson(response, 400, { ok: false, error: 'That commander name is already taken.' });
+    const nameKey = accountKey(name);
+    if (accounts[nameKey]) return sendJson(response, 400, { ok: false, error: 'That commander name is already taken.' });
     if (Object.values(accounts).some((account) => account.email === email)) {
       return sendJson(response, 400, { ok: false, error: 'That email is already registered.' });
     }
     const salt = crypto.randomBytes(16).toString('hex');
-    accounts[name] = { name, email, salt, hash: hashPasscode(passcode, salt), sessions: [], createdAt: new Date().toISOString() };
+    accounts[nameKey] = { name, email, salt, hash: hashPasscode(passcode, salt), sessions: [], createdAt: new Date().toISOString() };
     saveAccounts();
     return sendJson(response, 200, { ok: true, token: createSession(name), name, email });
   }
@@ -136,7 +150,7 @@ async function handleApi(request, response, pathname) {
     const identity = String(body.identity || '').trim();
     const email = identity.toLowerCase();
     const passcode = String(body.passcode || '');
-    const account = accounts[identity] || Object.values(accounts).find((entry) => entry.email === email);
+    const account = accounts[accountKey(identity)] || Object.values(accounts).find((entry) => accountKey(entry.email) === email);
     if (!account) return sendJson(response, 401, { ok: false, error: 'No account found for that name or email.' });
     const attempt = hashPasscode(passcode, account.salt);
     const expected = account.hash;
@@ -150,8 +164,9 @@ async function handleApi(request, response, pathname) {
     const body = await readBody(request);
     const token = body ? String(body.token || '') : '';
     const name = sessionName(token);
-    if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
-    return sendJson(response, 200, { ok: true, name, email: accounts[name].email });
+    const account = name ? accounts[accountKey(name)] : null;
+    if (!account) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
+    return sendJson(response, 200, { ok: true, name, email: account.email });
   }
 
   if (pathname === '/api/logout' && request.method === 'POST') {
@@ -270,7 +285,7 @@ webSockets.on('connection', (socket) => {
       }
       const token = typeof message.token === 'string' ? message.token : '';
       const name = sessionName(token);
-      if (!name || !accounts[name]) {
+      if (!name || !accounts[accountKey(name)]) {
         send(socket, { type: 'auth-error', message: 'Session expired. Log in again.' });
         return socket.close(1008, 'Invalid session');
       }
