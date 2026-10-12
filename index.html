@@ -55,7 +55,7 @@
         <p class="intro">Tactical tower defense protocol // Awaiting commander input</p>
         <nav class="menu-list" aria-label="Main menu">
           <button class="menu-item selected" type="button" data-menu="play">
-            <span class="menu-icon cyan" aria-hidden="true">▶</span><span class="menu-copy"><strong>PLAY MENU</strong><small>Solo map recon &amp; 2-commander rooms</small></span><span class="menu-arrow">›</span>
+            <span class="menu-icon cyan" aria-hidden="true">▶</span><span class="menu-copy"><strong>PLAY MENU</strong><small>Solo map recon &amp; rooms for up to 4 commanders</small></span><span class="menu-arrow">›</span>
           </button>
           <button class="menu-item" type="button" data-menu="perks">
             <span class="menu-icon amber" aria-hidden="true">⌘</span><span class="menu-copy"><strong>TOWER &amp; PERKS</strong><small>Turret upgrades, plasma buffs &amp; tech trees</small></span><span class="menu-arrow">›</span>
@@ -80,7 +80,7 @@
         <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Combat systems come online in a later build.</p>
         <div class="intel-stats" id="preview-stats">
           <div><span>MAP RECON</span><b>5 SECTORS</b></div>
-          <div><span>ROOMS</span><b>2 COMMANDERS</b></div>
+          <div><span>ROOMS</span><b>UP TO 4 COMMANDERS</b></div>
           <div><span>SERVER PORT</span><b id="preview-port">3000</b></div>
         </div>
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
@@ -98,6 +98,15 @@
     </div>
     <div class="board-wrap"><svg id="board" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Battle map recon view"></svg></div>
   </div>
+
+  <section class="loading-overlay" id="loading-overlay" hidden aria-live="polite" aria-busy="true">
+    <div class="loading-card">
+      <div class="eyebrow">// SQUAD DEPLOYMENT</div>
+      <h2>MISSION LOADING</h2>
+      <div class="loading-bar"><i></i></div>
+      <p id="loading-state">SYNCHRONIZING COMMANDERS...</p>
+    </div>
+  </section>
 
   <dialog id="menu-dialog" aria-labelledby="dialog-title">
     <div class="dialog-head"><div><div class="eyebrow" id="dialog-kicker">// DEPLOYMENT HUB</div><h2 id="dialog-title">PLAY MENU</h2></div><button class="close-button" id="dialog-close" type="button" aria-label="Close menu">×</button></div>
