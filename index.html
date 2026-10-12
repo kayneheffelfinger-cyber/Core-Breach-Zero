@@ -12,6 +12,27 @@
   <script src="app.js" defer></script>
 </head>
 <body>
+  <div class="auth-overlay" id="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-brand"><span class="brand-mark" aria-hidden="true">CB</span><div><strong>CORE BREACH<span>: ZERO</span></strong><small>COMMANDER ACCESS TERMINAL</small></div></div>
+      <div class="auth-tabs">
+        <button class="auth-tab on" id="tab-login" type="button">LOG IN</button>
+        <button class="auth-tab" id="tab-register" type="button">REGISTER</button>
+      </div>
+      <form id="auth-form" autocomplete="off">
+        <div class="auth-kicker" id="auth-kicker">// COMMANDER AUTHENTICATION</div>
+        <label class="auth-field" id="auth-identity-field"><span>NAME OR EMAIL</span><input id="auth-identity" maxlength="64" placeholder="NOVA-7 or nova@mail.com" autocomplete="username"></label>
+        <label class="auth-field" id="auth-name-field" hidden><span>COMMANDER NAME</span><input id="auth-name" maxlength="16" placeholder="3-16 letters, numbers, - or _" autocomplete="off"></label>
+        <label class="auth-field" id="auth-email-field" hidden><span>EMAIL</span><input id="auth-email" type="email" maxlength="64" placeholder="you@example.com" autocomplete="email"></label>
+        <label class="auth-field"><span>PASSCODE</span><input id="auth-passcode" type="password" maxlength="64" placeholder="4-64 characters" autocomplete="current-password"></label>
+        <label class="auth-field" id="auth-confirm-field" hidden><span>CONFIRM PASSCODE</span><input id="auth-confirm" type="password" maxlength="64" placeholder="repeat passcode" autocomplete="new-password"></label>
+        <p class="auth-error" id="auth-error" role="alert"></p>
+        <button class="auth-submit" id="auth-submit" type="submit">AUTHENTICATE <span>→</span></button>
+      </form>
+      <p class="auth-note">Accounts are stored on the mission server — your commander profile survives restarts and page reloads.</p>
+    </div>
+  </div>
+
   <div class="scanlines" aria-hidden="true"></div>
   <div class="shell">
     <header class="topbar">
@@ -20,7 +41,9 @@
         <span><strong>CORE BREACH<span>: ZERO</span></strong><small>TACTICAL TOWER DEFENSE PROTOCOL</small></span>
       </a>
       <div class="top-status">
+        <span class="cmdr-chip" id="cmdr-chip" hidden></span>
         <div class="status-chip"><i class="live-dot"></i><span id="server-status">MENU SYSTEM READY</span><b id="server-port">PORT 3000</b></div>
+        <button class="sound-button sign-out-button" id="sign-out" type="button" hidden>SIGN OUT</button>
         <button class="sound-button" id="sound-toggle" type="button" aria-pressed="true">SFX: ON</button>
       </div>
     </header>
@@ -84,6 +107,36 @@
       <h2 class="launch-title">MISSION LAUNCH</h2>
       <div class="launch-bar"><i></i></div>
       <p class="launch-state" id="launch-state">INITIALIZING DEFENSE GRID...</p>
+    </div>
+  </section>
+
+  <section class="battlefield-overlay" id="battlefield-overlay" hidden>
+    <div class="battlefield-panel">
+      <header class="battlefield-bar">
+        <div>
+          <div class="eyebrow" id="field-kicker">// FIELD STATUS</div>
+          <h2 id="field-title">SECTOR 09</h2>
+        </div>
+        <div class="battlefield-hud">
+          <span>WAVE <b id="hud-wave">0 / 0</b></span>
+          <span>CR <b id="hud-credits">0</b></span>
+          <span>CORE <b id="hud-core">100%</b></span>
+        </div>
+      </header>
+      <div class="field-meta">
+        <span class="chip" id="hud-mode">AWAITING VOTE</span>
+        <span class="chip subtle" id="field-status">GRID ONLINE</span>
+      </div>
+      <div class="battlefield-wrap">
+        <svg id="battlefield-svg" viewBox="0 0 120 44" aria-label="Battlefield map"></svg>
+      </div>
+      <div class="field-banner" id="board-banner" hidden></div>
+      <div class="field-end" id="field-end" hidden>
+        <div class="eyebrow" id="end-kicker">// MISSION REPORT</div>
+        <h3 id="end-title">MISSION REPORT</h3>
+        <p id="end-copy">The core remains active.</p>
+        <button class="end-button" id="end-return" type="button">RETURN TO BAY</button>
+      </div>
     </div>
   </section>
 

@@ -1,5 +1,6 @@
 const dialog = document.querySelector('#menu-dialog');
 const body = document.querySelector('#dialog-body');
+const authOverlay = document.querySelector('#auth-overlay');
 const deployment = document.querySelector('#deployment-overlay');
 const deploymentBody = document.querySelector('#deployment-body');
 const deploymentTitle = document.querySelector('#deployment-title');
@@ -15,6 +16,9 @@ let soundEnabled = true;
 let audioContext;
 let toastTimer;
 let launchReturnTimer;
+let authToken = localStorage.getItem('cbz-token') || '';
+let myName = '';
+let authMode = 'login';
 
 document.querySelector('#server-port').textContent = `PORT ${port}`;
 
@@ -41,8 +45,8 @@ const menus = {
   },
   settings: {
     tag: 'SYSTEM CONFIG', title: 'SETTINGS & LOGS',
-    description: 'The menu server is ready for bay connections. Choose a port with the PORT environment variable.',
-    stats: [['MENU SERVER', `PORT ${port}`], ['BAY SIZE', '2-4 COMMANDERS'], ['GAMEPLAY', 'NOT INSTALLED']],
+    description: 'The mission server is live. Choose a port with the PORT environment variable. Commander accounts (name + email) persist in accounts.json beside the server.',
+    stats: [['MENU SERVER', `PORT ${port}`], ['BAY SIZE', '2-4 COMMANDERS'], ['ACCOUNT LEDGER', 'ACTIVE']],
   },
 };
 
@@ -119,6 +123,137 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+// --- Commander authentication -----------------------------------------------
+async function apiRequest(endpoint, payload) {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error('The account service returned an invalid response.');
+  }
+  if (!response.ok || data.ok === false) {
+    const error = new Error(data.error || 'Account service failure.');
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.querySelector('#tab-login').classList.toggle('on', mode === 'login');
+  document.querySelector('#tab-register').classList.toggle('on', mode === 'register');
+  document.querySelector('#auth-identity-field').hidden = mode !== 'login';
+  document.querySelector('#auth-name-field').hidden = mode !== 'register';
+  document.querySelector('#auth-email-field').hidden = mode !== 'register';
+  document.querySelector('#auth-confirm-field').hidden = mode !== 'register';
+  document.querySelector('#auth-kicker').textContent = mode === 'login' ? '// COMMANDER AUTHENTICATION' : '// NEW COMMANDER REGISTRATION';
+  document.querySelector('#auth-submit').firstChild.textContent = mode === 'login' ? 'AUTHENTICATE ' : 'CREATE ACCOUNT ';
+  document.querySelector('#auth-passcode').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  document.querySelector('#auth-error').textContent = '';
+}
+
+function enterDeck(name) {
+  myName = name;
+  const chip = document.querySelector('#cmdr-chip');
+  chip.hidden = false;
+  chip.textContent = `CMDR: ${name}`;
+  document.querySelector('#sign-out').hidden = false;
+  authOverlay.hidden = true;
+  setStatus('ACCOUNT LINKED // MENU SYSTEM READY');
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const errorLine = document.querySelector('#auth-error');
+  const submit = document.querySelector('#auth-submit');
+  errorLine.textContent = '';
+  let payload;
+  if (authMode === 'register') {
+    const passcode = document.querySelector('#auth-passcode').value;
+    if (passcode !== document.querySelector('#auth-confirm').value) {
+      errorLine.textContent = 'Passcodes do not match.';
+      return;
+    }
+    payload = {
+      name: document.querySelector('#auth-name').value.trim(),
+      email: document.querySelector('#auth-email').value.trim(),
+      passcode,
+    };
+  } else {
+    payload = {
+      identity: document.querySelector('#auth-identity').value.trim(),
+      passcode: document.querySelector('#auth-passcode').value,
+    };
+  }
+
+  submit.disabled = true;
+  try {
+    const data = await apiRequest(authMode === 'login' ? '/api/login' : '/api/register', payload);
+    localStorage.setItem('cbz-token', data.token);
+    authToken = data.token;
+    enterDeck(data.name);
+    playSound();
+    showToast(`Welcome, ${data.name}. The grid awaits.`);
+  } catch (error) {
+    errorLine.textContent = error.message;
+    playSound('alarm');
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function restoreSession() {
+  if (!authToken) {
+    authOverlay.hidden = false;
+    return;
+  }
+  try {
+    const data = await apiRequest('/api/session', { token: authToken });
+    enterDeck(data.name);
+  } catch (error) {
+    if (error.status === 401) {
+      authToken = '';
+      localStorage.removeItem('cbz-token');
+    }
+    authOverlay.hidden = false;
+    document.querySelector('#auth-error').textContent = error.status
+      ? error.message
+      : 'Could not connect to the account service. Try again when the server is online.';
+  }
+}
+
+function requireAuthentication(message) {
+  authToken = '';
+  myName = '';
+  myCallsign = '';
+  currentRoom = null;
+  localStorage.removeItem('cbz-token');
+  document.querySelector('#cmdr-chip').hidden = true;
+  document.querySelector('#sign-out').hidden = true;
+  authOverlay.hidden = false;
+  setAuthMode('login');
+  setStatus('AUTHENTICATION REQUIRED');
+  document.querySelector('#auth-error').textContent = message;
+}
+
+async function signOut() {
+  const token = authToken;
+  localStorage.removeItem('cbz-token');
+  if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'Signed out');
+  requireAuthentication('Signed out.');
+  try {
+    await apiRequest('/api/logout', { token });
+  } catch (error) {
+    showToast(`Signed out locally; server session revocation failed: ${error.message}`);
+  }
+}
+
 function setStatus(text) {
   document.querySelector('#server-status').textContent = text;
 }
@@ -158,7 +293,10 @@ function ensureSocket() {
   }
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
   socket = new WebSocket(`${protocol}//${location.host}/rooms`);
-  socket.addEventListener('open', () => setStatus('ROOM SERVICE ONLINE'));
+  socket.addEventListener('open', () => {
+    setStatus('AUTHENTICATING COMMANDER...');
+    socket.send(JSON.stringify({ type: 'authenticate', token: authToken }));
+  });
   socket.addEventListener('message', ({ data }) => {
     let message;
     try { message = JSON.parse(data); } catch { return; }
@@ -180,9 +318,12 @@ function sendToService(payload) {
 }
 
 function handleServiceMessage(message) {
-  if (message.type === 'linked') {
+  if (message.type === 'auth-error') {
+    requireAuthentication(message.message);
+  } else if (message.type === 'linked') {
     myCallsign = message.callsign;
     roomList = message.rooms;
+    setStatus('ROOM SERVICE ONLINE');
     if (!deployment.hidden && !currentRoom) renderBays();
   } else if (message.type === 'rooms') {
     roomList = message.rooms;
@@ -386,3 +527,10 @@ document.querySelector('#sound-toggle').addEventListener('click', (event) => {
   button.textContent = `SFX: ${soundEnabled ? 'ON' : 'OFF'}`;
   if (soundEnabled) playSound();
 });
+document.querySelector('#tab-login').addEventListener('click', () => setAuthMode('login'));
+document.querySelector('#tab-register').addEventListener('click', () => setAuthMode('register'));
+document.querySelector('#auth-form').addEventListener('submit', submitAuth);
+document.querySelector('#sign-out').addEventListener('click', signOut);
+
+setAuthMode('login');
+restoreSession();

@@ -6,6 +6,7 @@ const { WebSocketServer } = require('ws');
 
 const port = Number(process.env.PORT || 3000);
 const root = __dirname;
+const accountsFile = path.join(root, 'accounts.json');
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -13,8 +14,150 @@ const mimeTypes = {
   '.json': 'application/json; charset=utf-8',
 };
 
+// --- Commander accounts ----------------------------------------------------
+const NAME_RE = /^[A-Za-z0-9_-]{3,16}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const sessions = new Map();
+
+function loadAccounts() {
+  try {
+    const data = JSON.parse(fs.readFileSync(accountsFile, 'utf8'));
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('Account store must contain a JSON object.');
+    }
+    return Object.assign(Object.create(null), data);
+  } catch (error) {
+    if (error.code === 'ENOENT') return Object.create(null);
+    throw error;
+  }
+}
+
+const accounts = loadAccounts();
+
+function hashPasscode(passcode, salt) {
+  return crypto.scryptSync(passcode, salt, 32).toString('hex');
+}
+
+function createSession(name) {
+  const token = crypto.randomBytes(24).toString('hex');
+  sessions.set(token, { name, expiresAt: Date.now() + SESSION_MS });
+  return token;
+}
+
+function sessionName(token) {
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(token);
+    return null;
+  }
+  return session.name;
+}
+
+function sendJson(response, status, payload) {
+  response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+  response.end(JSON.stringify(payload));
+}
+
+function readBody(request) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    request.on('data', (chunk) => {
+      size += chunk.length;
+      if (size <= 4096) chunks.push(chunk);
+    });
+    request.on('end', () => {
+      if (!size || size > 4096) return resolve(null);
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch {
+        resolve(null);
+      }
+    });
+    request.on('error', () => resolve(null));
+  });
+}
+
+async function handleApi(request, response, pathname) {
+  if (pathname === '/api/register' && request.method === 'POST') {
+    const body = await readBody(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendJson(response, 400, { ok: false, error: 'Invalid request.' });
+    }
+
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const passcode = typeof body.passcode === 'string' ? body.passcode : '';
+    if (!NAME_RE.test(name)) return sendJson(response, 400, { ok: false, error: 'Name must be 3-16 characters (letters, numbers, - or _).' });
+    if (email.length > 64 || !EMAIL_RE.test(email)) return sendJson(response, 400, { ok: false, error: 'Enter a valid email address.' });
+    if (passcode.length < 4 || passcode.length > 64) return sendJson(response, 400, { ok: false, error: 'Passcode must be 4-64 characters.' });
+    if (accounts[name]) return sendJson(response, 400, { ok: false, error: 'That commander name is already taken.' });
+    if (Object.values(accounts).some((account) => account.email === email)) {
+      return sendJson(response, 400, { ok: false, error: 'That email is already registered.' });
+    }
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    accounts[name] = { name, email, salt, hash: hashPasscode(passcode, salt), createdAt: new Date().toISOString() };
+    try {
+      fs.writeFileSync(accountsFile, JSON.stringify(accounts, null, 2));
+    } catch (error) {
+      delete accounts[name];
+      console.error('Could not save commander account:', error);
+      return sendJson(response, 500, { ok: false, error: 'Could not save the account. Try again later.' });
+    }
+    return sendJson(response, 200, { ok: true, token: createSession(name), name, email });
+  }
+
+  if (pathname === '/api/login' && request.method === 'POST') {
+    const body = await readBody(request);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendJson(response, 400, { ok: false, error: 'Invalid request.' });
+    }
+    const identity = typeof body.identity === 'string' ? body.identity.trim() : '';
+    const passcode = typeof body.passcode === 'string' ? body.passcode : '';
+    const account = accounts[identity] || Object.values(accounts).find((entry) => entry.email === identity.toLowerCase());
+    if (!account || passcode.length < 4 || passcode.length > 64) {
+      return sendJson(response, 401, { ok: false, error: 'Invalid commander name/email or passcode.' });
+    }
+    const attempt = hashPasscode(passcode, account.salt);
+    const expected = account.hash;
+    const attemptBuffer = Buffer.from(attempt, 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    if (attemptBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(attemptBuffer, expectedBuffer)) {
+      return sendJson(response, 401, { ok: false, error: 'Invalid commander name/email or passcode.' });
+    }
+    return sendJson(response, 200, { ok: true, token: createSession(account.name), name: account.name, email: account.email });
+  }
+
+  if (pathname === '/api/session' && request.method === 'POST') {
+    const body = await readBody(request);
+    const token = body && typeof body === 'object' && !Array.isArray(body) ? String(body.token || '') : '';
+    const name = sessionName(token);
+    if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
+    return sendJson(response, 200, { ok: true, name, email: accounts[name].email });
+  }
+
+  if (pathname === '/api/logout' && request.method === 'POST') {
+    const body = await readBody(request);
+    const token = body && typeof body === 'object' && !Array.isArray(body) ? String(body.token || '') : '';
+    sessions.delete(token);
+    return sendJson(response, 200, { ok: true });
+  }
+
+  return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });
+}
+
 const server = http.createServer((request, response) => {
   const pathname = new URL(request.url, `http://${request.headers.host}`).pathname;
+  if (pathname.startsWith('/api/')) {
+    handleApi(request, response, pathname).catch((error) => {
+      console.error('Account API request failed:', error);
+      if (!response.headersSent) sendJson(response, 500, { ok: false, error: 'Account service failure.' });
+    });
+    return;
+  }
   if (pathname === '/health') {
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(JSON.stringify({ status: 'online' }));
@@ -110,19 +253,13 @@ function send(socket, message) {
 }
 
 function scheduleLaunchFailure(room) {
-  setTimeout(() => {
-    if (room.started && room.players.length > 0) {
-      room.started = false;
-      broadcastRoom(room, { type: 'mission-aborted', reason: 'GAMEPLAY MODULE NOT INSTALLED — RETURNING TO COMMAND' });
-      broadcastRooms();
-    }
-  }, LAUNCH_TIMEOUT);
+  // Gameplay is now live; keep the launch window stable without forcing a fake failure.
+  void room;
 }
 
 webSockets.on('connection', (socket) => {
-  socket.callsign = `CMDR-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
   socket.roomId = null;
-  send(socket, { type: 'linked', callsign: socket.callsign, rooms: roomsSnapshot() });
+  socket.authenticated = false;
 
   socket.on('message', (raw) => {
     if (raw.length > 65536) return socket.close(1009, 'Message too large');
@@ -131,6 +268,29 @@ webSockets.on('connection', (socket) => {
       message = JSON.parse(raw.toString());
     } catch {
       return send(socket, { type: 'error', message: 'Invalid message.' });
+    }
+
+    if (!socket.authenticated) {
+      if (message.type !== 'authenticate') {
+        send(socket, { type: 'auth-error', message: 'Authenticate before joining a deployment bay.' });
+        return socket.close(1008, 'Authentication required');
+      }
+      const token = typeof message.token === 'string' ? message.token : '';
+      const name = sessionName(token);
+      if (!name || !accounts[name]) {
+        send(socket, { type: 'auth-error', message: 'Session expired. Log in again.' });
+        return socket.close(1008, 'Invalid session');
+      }
+      socket.authenticated = true;
+      socket.sessionToken = token;
+      socket.callsign = name;
+      send(socket, { type: 'linked', callsign: socket.callsign, rooms: roomsSnapshot() });
+      return;
+    }
+
+    if (!sessionName(socket.sessionToken)) {
+      send(socket, { type: 'auth-error', message: 'Session expired. Log in again.' });
+      return socket.close(1008, 'Session expired');
     }
 
     if (message.type === 'rooms') return send(socket, { type: 'rooms', rooms: roomsSnapshot() });
