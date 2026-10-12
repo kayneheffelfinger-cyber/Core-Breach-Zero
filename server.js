@@ -160,28 +160,63 @@ const server = http.createServer((request, response) => {
   });
 });
 
+const MAP_PROTOCOLS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
 const rooms = new Map();
+for (const [id, name] of [
+  ['room-01', 'ROOM 01 // ALPHA'],
+  ['room-02', 'ROOM 02 // BRAVO'],
+  ['room-03', 'ROOM 03 // CHARLIE'],
+  ['room-04', 'ROOM 04 // DELTA'],
+]) {
+  rooms.set(id, { id, name, players: [], map: null });
+}
+
 const webSockets = new WebSocketServer({ server, path: '/rooms' });
 
 function send(socket, message) {
   if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(message));
 }
 
-function createRoomCode() {
-  let code;
-  do {
-    code = String(Math.floor(100000 + Math.random() * 900000));
-  } while (rooms.has(code));
-  return code;
+function roomSnapshot(room) {
+  return {
+    id: room.id,
+    name: room.name,
+    map: room.map,
+    maxPlayers: 2,
+    commanders: room.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
+  };
 }
 
-function broadcast(room, message, except) {
-  for (const player of room.players) {
-    if (player !== except) send(player, message);
+function roomsSnapshot() {
+  return [...rooms.values()].map(roomSnapshot);
+}
+
+function broadcastRooms() {
+  const message = JSON.stringify({ type: 'rooms', rooms: roomsSnapshot() });
+  for (const client of webSockets.clients) {
+    if (client.readyState === client.OPEN) client.send(message);
   }
 }
 
+function broadcastRoom(room) {
+  const message = { type: 'room-update', room: roomSnapshot(room) };
+  for (const player of room.players) send(player.socket, message);
+}
+
+function removePlayer(room, socket) {
+  const index = room.players.findIndex((player) => player.socket === socket);
+  if (index === -1) return;
+  room.players.splice(index, 1);
+  socket.roomId = null;
+  if (room.players.length === 0) room.map = null;
+  else broadcastRoom(room);
+  broadcastRooms();
+}
+
 webSockets.on('connection', (socket) => {
+  socket.roomId = null;
+  socket.authenticated = false;
+
   socket.on('message', (raw) => {
     if (raw.length > 65536) return socket.close(1009, 'Message too large');
     let message;
@@ -191,40 +226,60 @@ webSockets.on('connection', (socket) => {
       return send(socket, { type: 'error', message: 'Invalid message.' });
     }
 
-    if (message.type === 'create') {
-      if (socket.roomCode) return;
-      const code = createRoomCode();
-      const room = { players: [socket] };
-      rooms.set(code, room);
-      socket.roomCode = code;
-      socket.playerId = 0;
-      send(socket, { type: 'created', code, playerId: 0 });
+    if (!socket.authenticated) {
+      if (message.type !== 'authenticate') {
+        send(socket, { type: 'auth-error', message: 'Authenticate before entering a room.' });
+        return socket.close(1008, 'Authentication required');
+      }
+      const token = typeof message.token === 'string' ? message.token : '';
+      const name = sessionName(token);
+      if (!name || !accounts[name]) {
+        send(socket, { type: 'auth-error', message: 'Session expired. Log in again.' });
+        return socket.close(1008, 'Invalid session');
+      }
+      socket.authenticated = true;
+      socket.sessionToken = token;
+      socket.callsign = name;
+      send(socket, { type: 'linked', callsign: name, rooms: roomsSnapshot() });
       return;
     }
+
+    if (!sessionName(socket.sessionToken)) {
+      send(socket, { type: 'auth-error', message: 'Session expired. Log in again.' });
+      return socket.close(1008, 'Session expired');
+    }
+    if (message.type === 'rooms') return send(socket, { type: 'rooms', rooms: roomsSnapshot() });
 
     if (message.type === 'join') {
-      const code = String(message.code || '').trim();
-      const room = rooms.get(code);
+      const room = rooms.get(String(message.room || ''));
       if (!room) return send(socket, { type: 'error', message: 'Room not found.' });
-      if (room.players.length >= 2) return send(socket, { type: 'error', message: 'Room is full.' });
-      room.players.push(socket);
-      socket.roomCode = code;
-      socket.playerId = 1;
-      send(socket, { type: 'joined', code, playerId: 1 });
-      broadcast(room, { type: 'peer-joined', playerId: 1 }, socket);
-      return;
+      if (socket.roomId) return send(socket, { type: 'error', message: 'Leave your current room before switching.' });
+      if (room.players.length >= 2) return send(socket, { type: 'error', message: 'Room is full. Choose another room.' });
+      room.players.push({ socket, callsign: socket.callsign });
+      socket.roomId = room.id;
+      send(socket, { type: 'joined', you: socket.callsign, room: roomSnapshot(room) });
+      broadcastRoom(room);
+      return broadcastRooms();
     }
 
-    const room = rooms.get(socket.roomCode);
+    const room = rooms.get(socket.roomId);
     if (!room) return;
+    const playerIndex = room.players.findIndex((player) => player.socket === socket);
+    if (playerIndex === -1) return;
+
+    if (message.type === 'leave') return removePlayer(room, socket);
+    if (message.type === 'config') {
+      if (playerIndex !== 0) return send(socket, { type: 'error', message: 'Only the room lead can change the map.' });
+      if (!MAP_PROTOCOLS.includes(message.map)) return send(socket, { type: 'error', message: 'Unknown map protocol.' });
+      room.map = message.map;
+      broadcastRoom(room);
+      return broadcastRooms();
+    }
   });
 
   socket.on('close', () => {
-    const room = rooms.get(socket.roomCode);
-    if (!room) return;
-    room.players = room.players.filter((player) => player !== socket);
-    broadcast(room, { type: 'peer-left' });
-    if (room.players.length === 0) rooms.delete(socket.roomCode);
+    const room = rooms.get(socket.roomId);
+    if (room) removePlayer(room, socket);
   });
 });
 
