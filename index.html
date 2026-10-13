@@ -8,8 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+  <script src="/combat.js" defer></script>
 </head>
 <body>
   <div class="auth-overlay" id="auth-overlay">
@@ -36,7 +37,7 @@
   <div class="scanlines" aria-hidden="true"></div>
   <div class="shell">
     <header class="topbar">
-      <a class="brand" href="./" aria-label="Core Breach Zero main menu">
+      <a class="brand" href="/" aria-label="Core Breach Zero main menu">
         <span class="brand-mark" aria-hidden="true">CB</span>
         <span><strong>CORE BREACH<span>: ZERO</span></strong><small>TACTICAL TOWER DEFENSE PROTOCOL</small></span>
       </a>
@@ -55,7 +56,7 @@
         <p class="intro">Tactical tower defense protocol // Awaiting commander input</p>
         <nav class="menu-list" aria-label="Main menu">
           <button class="menu-item selected" type="button" data-menu="play">
-            <span class="menu-icon cyan" aria-hidden="true">▶</span><span class="menu-copy"><strong>PLAY MENU</strong><small>Campaign sectors, endless waves &amp; crisis raids</small></span><span class="menu-arrow">›</span>
+            <span class="menu-icon cyan" aria-hidden="true">▶</span><span class="menu-copy"><strong>PLAY MENU</strong><small>Solo map recon &amp; rooms for up to 4 commanders</small></span><span class="menu-arrow">›</span>
           </button>
           <button class="menu-item" type="button" data-menu="perks">
             <span class="menu-icon amber" aria-hidden="true">⌘</span><span class="menu-copy"><strong>TOWER &amp; PERKS</strong><small>Turret upgrades, plasma buffs &amp; tech trees</small></span><span class="menu-arrow">›</span>
@@ -77,69 +78,42 @@
         <div class="panel-head"><span><i class="crosshair">+</i> TACTICAL PREVIEW</span><span class="tag" id="preview-tag">DEPLOYMENT</span></div>
         <div class="sector-art" aria-hidden="true"><div class="art-orbit"></div><div class="art-core">09</div><span class="art-coordinate">SECTOR 09 // REACTOR CHAMBER</span><span class="art-warning">BREACH ACTIVITY DETECTED</span></div>
         <h2 id="preview-title">PLAY MENU</h2>
-        <p class="preview-copy" id="preview-desc">Four deployment bays are online. Claim a bay, set the map protocol &amp; squad size, then launch the mission.</p>
+        <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Easy Mode combat protocol: 15 waves, 3 boss encounters, base defense.</p>
         <div class="intel-stats" id="preview-stats">
-          <div><span>DEPLOYMENT BAYS</span><b>4</b></div>
-          <div><span>MAP PROTOCOLS</span><b>5 DIFFICULTIES</b></div>
-          <div><span>SQUAD SIZE</span><b>2-4 COMMANDERS</b></div>
+          <div><span>MAP RECON</span><b>5 SECTORS</b></div>
+          <div><span>ROOMS</span><b>UP TO 4 COMMANDERS</b></div>
+          <div><span>SERVER PORT</span><b id="preview-port">3000</b></div>
         </div>
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
       </aside>
     </main>
-    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>GAMEPLAY MODULE NOT INSTALLED</span></footer>
+    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>MAP RECON ONLINE // EASY MODE LIVE</span></footer>
   </div>
+
+  <div class="battlefield" id="battlefield" hidden>
+    <div class="field-hud">
+      <div class="hud-block hud-mission"><span class="hud-label">MAP</span><strong id="battle-map-name">—</strong></div>
+      <div class="hud-block"><span class="hud-label">SECTOR</span><strong id="battle-map-sector">—</strong></div>
+      <div class="hud-block"><span class="hud-label">MECHANIC</span><strong id="battle-map-mech">—</strong></div>
+      <button class="deploy-button" id="deploy-mission" type="button" hidden>START MISSION</button>
+      <button class="evac-button" id="exit-battle" type="button">EXIT RECON</button>
+    </div>
+    <div class="board-wrap"><svg id="board" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Battle map recon view"></svg></div>
+  </div>
+
+  <section class="loading-overlay" id="loading-overlay" hidden aria-live="polite" aria-busy="true">
+    <div class="loading-card">
+      <div class="eyebrow">// SQUAD DEPLOYMENT</div>
+      <h2>MISSION LOADING</h2>
+      <div class="loading-bar"><i></i></div>
+      <p id="loading-state">SYNCHRONIZING COMMANDERS...</p>
+    </div>
+  </section>
 
   <dialog id="menu-dialog" aria-labelledby="dialog-title">
     <div class="dialog-head"><div><div class="eyebrow" id="dialog-kicker">// DEPLOYMENT HUB</div><h2 id="dialog-title">PLAY MENU</h2></div><button class="close-button" id="dialog-close" type="button" aria-label="Close menu">×</button></div>
     <div class="dialog-body" id="dialog-body"></div>
   </dialog>
-
-  <section class="deployment-overlay" id="deployment-overlay" hidden>
-    <div class="deployment-panel" role="dialog" aria-modal="true" aria-labelledby="deployment-title">
-      <header class="deployment-head"><div><div class="eyebrow" id="deployment-kicker">// DEPLOYMENT BAYS</div><h2 id="deployment-title">SELECT DEPLOYMENT BAY</h2></div><button class="close-button" id="deployment-close" type="button" aria-label="Close deployment bay">×</button></header>
-      <div class="deployment-body" id="deployment-body"></div>
-    </div>
-  </section>
-
-  <section class="launch-overlay" id="launch-overlay" hidden aria-live="polite">
-    <div class="launch-inner">
-      <div class="eyebrow">// LAUNCH SEQUENCE</div>
-      <h2 class="launch-title">MISSION LAUNCH</h2>
-      <div class="launch-bar"><i></i></div>
-      <p class="launch-state" id="launch-state">INITIALIZING DEFENSE GRID...</p>
-    </div>
-  </section>
-
-  <section class="battlefield-overlay" id="battlefield-overlay" hidden>
-    <div class="battlefield-panel">
-      <header class="battlefield-bar">
-        <div>
-          <div class="eyebrow" id="field-kicker">// FIELD STATUS</div>
-          <h2 id="field-title">SECTOR 09</h2>
-        </div>
-        <div class="battlefield-hud">
-          <span>WAVE <b id="hud-wave">0 / 0</b></span>
-          <span>CR <b id="hud-credits">0</b></span>
-          <span>CORE <b id="hud-core">100%</b></span>
-        </div>
-      </header>
-      <div class="field-meta">
-        <span class="chip" id="hud-mode">AWAITING VOTE</span>
-        <span class="chip subtle" id="field-status">GRID ONLINE</span>
-      </div>
-      <div class="battlefield-wrap">
-        <svg id="battlefield-svg" viewBox="0 0 120 44" aria-label="Battlefield map"></svg>
-      </div>
-      <div class="field-banner" id="board-banner" hidden></div>
-      <div class="field-end" id="field-end" hidden>
-        <div class="eyebrow" id="end-kicker">// MISSION REPORT</div>
-        <h3 id="end-title">MISSION REPORT</h3>
-        <p id="end-copy">The core remains active.</p>
-        <button class="end-button" id="end-return" type="button">RETURN TO BAY</button>
-      </div>
-    </div>
-  </section>
-
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
