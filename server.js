@@ -255,6 +255,12 @@ function broadcastRoom(room) {
   for (const player of room.players) send(player.socket, message);
 }
 
+function relayRoomMessage(room, message, sender) {
+  for (const player of room.players) {
+    if (player.socket !== sender) send(player.socket, message);
+  }
+}
+
 function removePlayer(room, socket) {
   const index = room.players.findIndex((player) => player.socket === socket);
   if (index === -1) return;
@@ -333,13 +339,14 @@ webSockets.on('connection', (socket) => {
       if (playerIndex !== 0) return send(socket, { type: 'error', message: 'Only the room lead can start the mission.' });
       if (room.started) return send(socket, { type: 'error', message: 'This room has already started.' });
       if (!room.map) return send(socket, { type: 'error', message: 'Select a map before starting.' });
-      if (room.players.length < 2) return send(socket, { type: 'error', message: 'Wait for at least one other commander before starting.' });
       room.started = true;
       const snapshot = roomSnapshot(room);
       for (const player of room.players) send(player.socket, { type: 'launch', room: snapshot });
       broadcastRooms();
       return;
     }
+
+    relayRoomMessage(room, message, socket);
   });
 
   socket.on('close', () => {

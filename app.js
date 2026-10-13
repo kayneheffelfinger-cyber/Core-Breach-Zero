@@ -7,6 +7,10 @@ const port = window.location.port || (window.location.protocol === 'https:' ? '4
 let socket;
 let myCallsign = '';
 let currentRoom = null;
+let roomCode = '';
+let myPlayerId = 0;
+let roomPlayerCount = 0;
+let peerConnected = false;
 let roomList = [];
 let showingBays = false;
 let soundEnabled = true;
@@ -24,8 +28,8 @@ document.querySelector('#preview-port').textContent = port;
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders and choose a map, or explore any map solo.',
-    stats: [['AVAILABLE ROOMS', '4'], ['MAP RECON', '5 SECTORS'], ['SERVER PORT', port]],
+    description: 'Recon any of the 5 battle maps solo, or deploy EASY MODE — 15 waves, 3 boss encounters, base defense. Rooms support up to 4 commanders.',
+    stats: [['AVAILABLE ROOMS', '4'], ['EASY MODE', '15 WAVES LIVE'], ['SERVER PORT', port]],
   },
   perks: {
     tag: 'SKILL MATRIX', title: 'TOWER & PERKS',
@@ -343,7 +347,7 @@ function renderMapSelect() {
   playSound();
   document.querySelector('#dialog-kicker').textContent = '// MAP RECON';
   document.querySelector('#dialog-title').textContent = 'SELECT A MAP';
-  body.innerHTML = `<p class="dialog-copy">Recon flyovers only — no hostiles, no objectives. Walk each sector's grid before combat systems come online.</p><div class="map-grid">${Object.values(BATTLE_MAPS).map(mapCard).join('')}</div>`;
+  body.innerHTML = `<p class="dialog-copy">Recon any sector, then deploy Easy Mode from the battlefield — 15 waves, 3 boss encounters, and base defense.</p><div class="map-grid">${Object.values(BATTLE_MAPS).map(mapCard).join('')}</div>`;
   body.querySelectorAll('[data-map]').forEach((card) => card.addEventListener('click', () => openBattlefield(card.dataset.map)));
 }
 
@@ -359,14 +363,19 @@ function openBattlefield(mapId) {
   document.querySelector('#battle-map-name').textContent = map.name;
   document.querySelector('#battle-map-sector').textContent = map.sector;
   document.querySelector('#battle-map-mech').textContent = map.mechanic;
+  const deploy = document.querySelector('#deploy-mission');
+  deploy.hidden = false;
+  deploy.onclick = () => window.CBZCombat && CBZCombat.startMission(map);
   buildBoard(map);
   document.querySelector('#battlefield').hidden = false;
   setStatus(`MAP RECON // ${map.name}`);
 }
 
 function exitBattlefield() {
+  if (window.CBZCombat) CBZCombat.abort();
   document.querySelector('#battlefield').hidden = true;
   document.querySelector('#board').innerHTML = '';
+  document.querySelector('#deploy-mission').hidden = true;
   document.querySelector('#exit-battle').textContent = 'EXIT RECON';
   const returnedFromRoom = roomLaunch;
   roomLaunch = false;
@@ -415,11 +424,11 @@ function ensureSocket() {
     handleServiceMessage(message);
   });
   socket.addEventListener('close', () => {
+    const wasInRoom = Boolean(currentRoom);
     setStatus('ROOM SERVICE OFFLINE');
-    if (currentRoom) {
-      currentRoom = null;
-      if (dialog.open && showingBays) renderBays();
-    }
+    if (window.CBZCombat) CBZCombat.peerLeft();
+    syncRoomIdentity(null);
+    if (wasInRoom && dialog.open && showingBays) renderBays();
   });
   socket.addEventListener('error', () => showToast('Could not reach the room service. Check the server port.'));
 }
@@ -429,11 +438,20 @@ function sendToService(message) {
   else showToast('Room service is connecting — try again in a moment.');
 }
 
+function syncRoomIdentity(room) {
+  currentRoom = room;
+  roomCode = room ? room.id : '';
+  roomPlayerCount = room ? room.commanders.length : 0;
+  const playerIndex = room ? room.commanders.findIndex((commander) => commander.callsign === myCallsign) : -1;
+  myPlayerId = playerIndex >= 0 ? playerIndex : 0;
+  peerConnected = roomPlayerCount > 1;
+}
+
 function requireAuthentication(message) {
   authToken = '';
   myName = '';
   myCallsign = '';
-  currentRoom = null;
+  syncRoomIdentity(null);
   localStorage.removeItem('cbz-token');
   document.querySelector('#cmdr-chip').hidden = true;
   document.querySelector('#sign-out').hidden = true;
@@ -444,6 +462,10 @@ function requireAuthentication(message) {
 }
 
 function handleServiceMessage(message) {
+  if (String(message.type).startsWith('game-')) {
+    if (window.CBZCombat) CBZCombat.handleRoomMessage(message);
+    return;
+  }
   if (message.type === 'auth-error') {
     requireAuthentication(message.message);
     return;
@@ -470,7 +492,7 @@ function handleServiceMessage(message) {
   }
   if (message.type === 'joined') {
     myCallsign = message.you;
-    currentRoom = message.room;
+    syncRoomIdentity(message.room);
     setStatus(`ROOM LINKED // ${currentRoom.name}`);
     renderLobby();
     return;
@@ -478,7 +500,9 @@ function handleServiceMessage(message) {
   if (message.type === 'room-update') {
     roomList = roomList.map((room) => room.id === message.room.id ? message.room : room);
     if (currentRoom && currentRoom.id === message.room.id) {
-      currentRoom = message.room;
+      const previousCount = roomPlayerCount;
+      syncRoomIdentity(message.room);
+      if (roomPlayerCount < previousCount && window.CBZCombat) CBZCombat.peerLeft();
       if (dialog.open && !showingBays) renderLobby();
     } else if (dialog.open && showingBays) {
       renderBays();
@@ -486,7 +510,7 @@ function handleServiceMessage(message) {
     return;
   }
   if (message.type === 'launch') {
-    currentRoom = message.room;
+    syncRoomIdentity(message.room);
     showLaunchSequence(currentRoom.map);
   }
 }
@@ -501,7 +525,7 @@ function renderBays() {
     return;
   }
   body.innerHTML = `
-    <p class="dialog-copy">Enter an open room for up to four commanders. Choose a map, wait for at least one teammate, and let the room lead start when ready.</p>
+    <p class="dialog-copy">Enter an open room for up to four commanders. Choose a map and wait for anyone else to join; the room lead starts when ready.</p>
     <button class="action-button bay-recon" id="map-recon" type="button"><b>SOLO MAP RECON</b><small>Open one of the five maps without joining a room</small></button>
     <div class="bays-grid">${roomList.map((room) => {
       const count = room.commanders.length;
@@ -568,16 +592,16 @@ function renderLobby() {
       </section>
       <section class="config-panel">
         <h3>SELECT MAP // ${roomLead ? 'ROOM LEAD CONTROL' : 'ROOM LEAD SELECTS'}</h3>
-        ${roomLead && !room.started ? '<p class="dialog-copy">Choose a map. Your squad waits here until at least one teammate joins and you start.</p>' : ''}
+        ${roomLead && !room.started ? '<p class="dialog-copy">Choose a map, wait for up to three teammates, then start whenever your squad is ready.</p>' : ''}
         <div class="map-grid">${Object.values(BATTLE_MAPS).map((map) => renderRoomMapCard(map, room, roomLead)).join('')}</div>
-        ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map && room.commanders.length >= 2 ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
+        ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
         ${room.started ? '<p class="standby-note">MISSION STARTED // MAP RECON ACTIVE. WAITING SYSTEMS ARE LOCKED.</p>' : !roomLead ? '<p class="standby-note">STANDBY // WAITING FOR THE ROOM LEAD TO START.</p>' : ''}
       </section>
     </div>`;
   document.querySelector('#leave-room').addEventListener('click', () => {
     playSound();
     sendToService({ type: 'leave' });
-    currentRoom = null;
+    syncRoomIdentity(null);
     setStatus('ROOM SERVICE ONLINE');
     renderBays();
   });
