@@ -40,11 +40,6 @@ const menus = {
       ];
     },
   },
-  inventory: {
-    tag: 'COMMAND STORAGE', title: 'INVENTORY',
-    description: 'Your deployment loadout — 5 bays — is managed in the Nexus Shop: equip owned blueprints before a mission. In battle you can only deploy what you brought, anywhere on the grid, as long as clearance boxes do not overlap.',
-    stats: [['LOADOUT BAYS', '5 LIVE'], ['EQUIP SOURCE', 'NEXUS SHOP'], ['PLACEMENT', 'FREE // BOX SPACING']],
-  },
   settings: {
     tag: 'SYSTEM CONFIG', title: 'SETTINGS & LOGS',
     description: 'The mission server is live. Choose a port with the PORT environment variable. Commander accounts (name + email) persist in accounts.json beside the server.',

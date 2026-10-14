@@ -6,16 +6,18 @@ const board = document.querySelector('#board');
 const battlefield = document.querySelector('#battlefield');
 
 // --- Enemy roster (Easy Mode) ---------------------------------------------------
+// Pace pass: speeds trimmed ~10% and every archetype now hits the core for a
+// different amount — leaking a boss should hurt far more than losing one fodder bit.
 const ENEMY_TYPES = {
-  glitched: { name: 'GLITCHED BIT', tag: 'NORMAL', hp: 15, speed: 95, size: 9, bounty: 4, dmg: 1, color: '#70e1d0', ability: 'None — cheap fodder that arrives in numbers.' },
-  runner: { name: 'DATA RUNNER', tag: 'FAST', hp: 10, speed: 140, size: 8, bounty: 6, dmg: 1, color: '#a5d58b', ability: 'Very fast — outruns reaction time.' },
-  file: { name: 'CORRUPTED FILE', tag: 'SWARM', hp: 8, speed: 70, size: 6, bounty: 2, dmg: 1, color: '#c49bef', ability: 'Spawns in dense clusters.' },
-  shielded: { name: 'SHIELDED BYTE', tag: 'ARMORED', hp: 45, speed: 45, size: 11, bounty: 12, dmg: 1, color: '#8fb7c9', armor: 0.2, ability: 'Armor plating absorbs 20% of incoming damage.' },
-  drone: { name: 'OVERCLOCKED DRONE', tag: 'FLYING', hp: 25, speed: 100, size: 10, bounty: 10, dmg: 1, color: '#ffb45a', flying: true, ability: 'Air unit — hovers over ground defenses.' },
-  nullcore: { name: 'NULL CORE', tag: 'TANK', hp: 150, speed: 32, size: 14, bounty: 25, dmg: 2, color: '#7f8fa0', ability: 'Dense hull soaks heavy damage.' },
-  virus: { name: 'SYSTEM VIRUS', tag: 'MINI-BOSS', hp: 600, speed: 55, size: 20, bounty: 150, dmg: 5, color: '#ff5e7a', boss: true, ability: 'Malware Pulse — emits a stunning shockwave every 8s.' },
-  leak: { name: 'MEMORY LEAK', tag: 'MINI-BOSS', hp: 1200, speed: 38, size: 22, bounty: 300, dmg: 5, color: '#ffb45a', boss: true, ability: 'Replication — spills 6 Corrupted Files at 50% HP.' },
-  overseer: { name: 'CORE BREACH: ZERO', tag: 'FINAL BOSS', hp: 3500, speed: 30, size: 26, bounty: 1000, dmg: 20, color: '#ff4d5e', boss: true, shield: 300, ability: 'Overheat — shockwave disables a tower for 4s. Shielding Matrix — gains a 300 HP shield at 25% HP.' },
+  glitched: { name: 'GLITCHED BIT', tag: 'NORMAL', hp: 15, speed: 84, size: 9, bounty: 4, dmg: 1, color: '#70e1d0', ability: 'None — cheap fodder that arrives in numbers.' },
+  runner: { name: 'DATA RUNNER', tag: 'FAST', hp: 10, speed: 124, size: 8, bounty: 6, dmg: 2, color: '#a5d58b', ability: 'Very fast — outruns reaction time.' },
+  file: { name: 'CORRUPTED FILE', tag: 'SWARM', hp: 8, speed: 62, size: 6, bounty: 2, dmg: 1, color: '#c49bef', ability: 'Spawns in dense clusters.' },
+  shielded: { name: 'SHIELDED BYTE', tag: 'ARMORED', hp: 45, speed: 40, size: 11, bounty: 12, dmg: 3, color: '#8fb7c9', armor: 0.2, ability: 'Armor plating absorbs 20% of incoming damage.' },
+  drone: { name: 'OVERCLOCKED DRONE', tag: 'FLYING', hp: 25, speed: 88, size: 10, bounty: 10, dmg: 2, color: '#ffb45a', flying: true, ability: 'Air unit — flies a straight line to the core, ignoring tracks, gates and haste fields.' },
+  nullcore: { name: 'NULL CORE', tag: 'TANK', hp: 150, speed: 28, size: 14, bounty: 25, dmg: 4, color: '#7f8fa0', ability: 'Dense hull soaks heavy damage.' },
+  virus: { name: 'SYSTEM VIRUS', tag: 'MINI-BOSS', hp: 600, speed: 48, size: 20, bounty: 150, dmg: 6, color: '#ff5e7a', boss: true, ability: 'Malware Pulse — emits a stunning shockwave every 8s.' },
+  leak: { name: 'MEMORY LEAK', tag: 'MINI-BOSS', hp: 1200, speed: 34, size: 22, bounty: 300, dmg: 8, color: '#ffb45a', boss: true, ability: 'Replication — spills 6 Corrupted Files at 50% HP.' },
+  overseer: { name: 'CORE BREACH: ZERO', tag: 'FINAL BOSS', hp: 3500, speed: 27, size: 26, bounty: 1000, dmg: 25, color: '#ff4d5e', boss: true, shield: 300, ability: 'Overheat — shockwave disables a tower for 4s. Shielding Matrix — gains a 300 HP shield at 25% HP.' },
 };
 
 // --- Easy Mode: 15 waves, 3 boss encounters --------------------------------------
@@ -36,7 +38,8 @@ const EASY_WAVES = [
   { groups: [['nullcore', 12], ['drone', 20], ['glitched', 25]] },
   { groups: [['shielded', 15], ['nullcore', 8], ['overseer', 1]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
-const SPAWN_GAP = { file: 0.34, glitched: 0.6, runner: 0.5, shielded: 0.8, drone: 0.75, nullcore: 1.5, virus: 2, leak: 2, overseer: 2.2 };
+// Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
+const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75 };
 const BASE_MAX = 100;
 
 // --- Foundry rules: free placement + clearance boxes ---------------------------------
@@ -53,6 +56,17 @@ const TOWER_RULES = {
   cryobeacon: { air: 'yes', aura: true }, nullbeacon: { air: 'yes', aura: true }, gravwell: { air: 'yes', aura: true },
   naniteweb: { aura: true }, scrapforge: { aura: true },
 };
+
+// --- Field modules: temporary per-tower upgrades bought with salvage mid-mission ------
+// Modules live on the placed unit only: scrapped when it is sold, wiped when the
+// mission ends. Nothing here touches the Nexus Shop, the loadout or the wallet.
+const MAX_UP = 3;
+const UPGRADE_TRACKS = {
+  dmg: { label: 'DAMAGE', mult: 0.25, costK: 0.35 },
+  rate: { label: 'FIRE RATE', mult: 0.15, costK: 0.3 },
+  rng: { label: 'RANGE', mult: 0.12, costK: 0.25 },
+};
+const ATTACKER_TOWERS = new Set(['sentinel', 'arclance', 'plasmort', 'railspire', 'stingerpad', 'teslacoil', 'flakstorm', 'pyrewell', 'quantum', 'phasedeca', 'singularity']);
 
 // --- Mission state ----------------------------------------------------------------
 const state = {
@@ -193,7 +207,12 @@ function shapeFor(key, t) {
 function spawnEnemy(key, pathIdx) {
   const t = ENEMY_TYPES[key];
   const g = svgNode('g', { class: `enemy e-${key}${t.boss ? ' e-boss' : ''}` });
-  for (const node of shapeFor(key, t)) g.appendChild(node);
+  // Shapes live in an inner chassis so CSS spawn/death/hover animations can scale or
+  // bob them freely — a CSS transform on this outer group would override the
+  // per-frame position attribute and teleport the unit toward the board corner.
+  const chassis = svgNode('g', { class: 'e-chassis' });
+  for (const node of shapeFor(key, t)) chassis.appendChild(node);
+  g.appendChild(chassis);
   const barY = -(t.size + 13);
   const barW = t.boss ? 34 : 22;
   g.appendChild(svgNode('rect', { class: 'hp-bg', x: -barW / 2, y: barY, width: barW, height: 3.4 }));
@@ -207,12 +226,21 @@ function spawnEnemy(key, pathIdx) {
     pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed, alive: true,
     usedGates: new Set(), pulseTimer: 8, replicated: false, shielded: false, angle: 0,
   };
+  if (t.flying) {
+    // Air units leave the track behind: straight flight plan from spawn gate to core.
+    const [sx, sy] = state.samplers[pathIdx].at(0);
+    const [tx, ty] = corePos();
+    enemy.flight = { sx, sy, tx, ty, total: Math.max(1, Math.hypot(tx - sx, ty - sy)) };
+    enemy.dist = debugFreeze ? Math.min(enemy.flight.total * 0.85, 260 + Math.random() * 480) : 0;
+  }
   g.addEventListener('pointerenter', (event) => showTip(enemy, event));
   g.addEventListener('pointermove', moveTip);
   g.addEventListener('pointerleave', () => hideTip(enemy));
   state.layers.enemies.appendChild(g);
   state.enemies.push(enemy);
-  const [x, y] = state.samplers[pathIdx].at(enemy.dist);
+  const [x, y] = enemy.flight ? flightPos(enemy, enemy.dist) : state.samplers[pathIdx].at(enemy.dist);
+  enemy.fx = x;
+  enemy.fy = y;
   g.setAttribute('transform', `translate(${x} ${y})`);
   g.classList.add('spawn-in');
   setTimeout(() => g.classList.remove('spawn-in'), 420);
@@ -304,11 +332,25 @@ function leakEnemy(enemy) {
 }
 
 function posOf(enemy) {
+  if (enemy.flight) return [enemy.fx, enemy.fy];
   return state.samplers[enemy.pathIdx].at(enemy.dist);
 }
 
 function corePos() {
   return [state.map.core.x, state.map.core.y];
+}
+
+// Flying units cruise straight from their spawn gate to the core with a light
+// sinusoidal weave that fades out near both ends of the flight plan.
+function flightPos(enemy, progress) {
+  const f = enemy.flight;
+  const t = Math.min(1, Math.max(0, progress / f.total));
+  const dx = f.tx - f.sx;
+  const dy = f.ty - f.sy;
+  const nx = -dy / f.total;
+  const ny = dx / f.total;
+  const weave = Math.sin(progress * (Math.PI * 2) / 120) * 8 * Math.sin(t * Math.PI);
+  return [f.sx + dx * t + nx * weave, f.sy + dy * t + ny * weave];
 }
 
 // --- FX -------------------------------------------------------------------------------
@@ -352,6 +394,20 @@ function moveEnemy(enemy, dt) {
     return;
   }
   enemy.node.classList.remove('e-stunned');
+  if (enemy.flight) {
+    // Air route: no tracks, no phase gates, no haste zones — cryo slow and gravity
+    // pull still bite, otherwise flyers would ignore every control tower.
+    enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
+    enemy.dist += enemy.speed * (1 - (enemy.slow || 0)) * dt;
+    if (enemy.dist >= enemy.flight.total) { leakEnemy(enemy); return; }
+    const [fx, fy] = flightPos(enemy, enemy.dist);
+    const [px, py] = flightPos(enemy, enemy.dist - 8);
+    const heading = (Math.atan2(fy - py, fx - px) * 180) / Math.PI;
+    enemy.fx = fx;
+    enemy.fy = fy;
+    enemy.node.setAttribute('transform', `translate(${fx.toFixed(1)} ${fy.toFixed(1)}) rotate(${heading.toFixed(1)})`);
+    return;
+  }
   const haste = inHasteZone(enemy.pathIdx, enemy.dist) ? 1.3 : 1;
   enemy.node.classList.toggle('e-haste', haste > 1);
   if (enemy.t.boss && enemy.key === 'virus') {
@@ -406,7 +462,7 @@ function runWaves(dt) {
     if (cleared >= EASY_WAVES.length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
-    state.intermission = 4.5;
+    state.intermission = 7; // pace pass: a real build/upgrade window between waves
     updateHud();
   }
   if (state.intermission > 0) {
@@ -469,6 +525,7 @@ function updateHud() {
   fill.classList.toggle('crit', state.baseHp <= 30);
   document.querySelector('#base-num').textContent = Math.round(state.baseHp);
   refreshBarAfford();
+  refreshPanelAfford();
 }
 
 function updateBossBar() {
@@ -789,7 +846,7 @@ function ensureLoadoutBar() {
   bar.innerHTML = `
     <div class="lo-head"><span>// DEPLOYMENT LOADOUT</span><b>${loadout.length}/5 BAYS ARMED</b></div>
     <div class="lo-slots">${slots}</div>
-    <div class="lo-hint">PICK A BAY (1-5) → CLICK THE GRID TO DEPLOY · EACH UNIT CLAIMS A CLEARANCE BOX — NO OVERLAPPING · RIGHT-CLICK / ESC TO STOP</div>`;
+    <div class="lo-hint">PICK A BAY (1-5) → CLICK THE GRID TO DEPLOY · CLICK A DEPLOYED UNIT → FIELD MODULES · RIGHT-CLICK / ESC TO STOP</div>`;
   battlefield.appendChild(bar);
   state.bar = bar;
   bar.addEventListener('click', (event) => {
@@ -807,6 +864,18 @@ function refreshBarAfford() {
   });
   const head = state.bar.querySelector('.lo-head b');
   if (head) head.textContent = `${state.towers.length} DEPLOYED`;
+}
+
+function refreshPanelAfford() {
+  if (!state.towerPanel || !state.panelTower) return;
+  state.towerPanel.querySelectorAll('.tp-up').forEach((row) => {
+    const track = row.dataset.track;
+    const maxed = state.panelTower.up[track] >= MAX_UP;
+    const poor = !maxed && state.cash < upCost(state.panelTower, track);
+    row.classList.toggle('poor', poor);
+    const button = row.querySelector('.tp-buy');
+    if (button) button.disabled = maxed || poor;
+  });
 }
 
 function buildingAllowed() {
@@ -919,7 +988,7 @@ function placeTower(entry, x, y) {
   state.cash -= entry.cost;
   const node = towerNode(entry, x, y);
   state.layers.towers.appendChild(node);
-  const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1 };
+  const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, up: { dmg: 0, rate: 0, rng: 0 } };
   state.towers.push(tower);
   node.classList.add('placed');
   setTimeout(() => node.classList.remove('placed'), 620);
@@ -935,41 +1004,115 @@ function towerNode(entry, x, y) {
   g.appendChild(svgNode('rect', { class: 'tw-footprint', x: -FOOT_HALF, y: -FOOT_HALF, width: FOOT_HALF * 2, height: FOOT_HALF * 2 }));
   const AURA_CLASS = { cryobeacon: 'aura-cryo', nullbeacon: 'aura-null', gravwell: 'aura-grav', naniteweb: 'aura-nanite' };
   if (AURA_CLASS[entry.id]) g.appendChild(svgNode('circle', { class: `tw-aura ${AURA_CLASS[entry.id]}`, r: rng }));
-  g.appendChild(svgNode('polygon', { class: 'tw-base', points: hexPoints(0, 0, 16) }));
-  g.appendChild(svgNode('circle', { class: 'tw-ped', r: 9 }));
+  // Chassis keeps CSS placement animation away from this group's position transform.
+  const chassis = svgNode('g', { class: 'tw-chassis' });
+  chassis.appendChild(svgNode('polygon', { class: 'tw-base', points: hexPoints(0, 0, 16) }));
+  chassis.appendChild(svgNode('circle', { class: 'tw-ped', r: 9 }));
   const head = svgNode('g', { class: 'tw-head' });
   head.appendChild(svgNode('rect', { class: 'tw-barrel', x: 4, y: -2.5, width: 16, height: 5 }));
   head.appendChild(svgNode('circle', { class: 'tw-hub', r: 4.5 }));
-  g.appendChild(head);
+  chassis.appendChild(head);
+  g.appendChild(chassis);
   g.appendChild(svgNode('text', { class: 'tw-tag', y: -28, 'text-anchor': 'middle' }, entry.name.split(' ')[0]));
   g.setAttribute('transform', `translate(${x} ${y})`);
   return g;
 }
 
-// --- Tower intel panel (stats + sell) ----------------------------------------------------
+// --- Field modules: buy temporary per-tower upgrades with salvage ----------------------
+function upgradeTracks(tower) {
+  if (ATTACKER_TOWERS.has(tower.id)) return ['dmg', 'rate', 'rng'];
+  // Aura/support units widen their field instead; the Scrap Foundry prints money, full stop.
+  if (tower.entry.stats.rng > 0 && tower.id !== 'scrapforge') return ['rng'];
+  return [];
+}
+
+function upCost(tower, track) {
+  return Math.round(tower.entry.cost * UPGRADE_TRACKS[track].costK * (tower.up[track] + 1));
+}
+
+function effStats(tower) {
+  const s = tower.entry.stats;
+  const up = tower.up || { dmg: 0, rate: 0, rng: 0 };
+  return {
+    dmg: s.dmg * (1 + UPGRADE_TRACKS.dmg.mult * up.dmg),
+    rate: s.rate * (1 + UPGRADE_TRACKS.rate.mult * up.rate),
+    rng: s.rng >= 999 ? s.rng : Math.round(s.rng * (1 + UPGRADE_TRACKS.rng.mult * up.rng)),
+    infinite: s.rng >= 999,
+  };
+}
+
+function paintTowerRange(tower) {
+  const es = effStats(tower);
+  const r = es.infinite ? 300 : es.rng;
+  const range = tower.node.querySelector('.tw-range');
+  if (range) range.setAttribute('r', r);
+  const aura = tower.node.querySelector('.tw-aura');
+  if (aura) aura.setAttribute('r', r);
+}
+
+function buyUpgrade(tower, track) {
+  if (state.mode !== 'waves' && state.mode !== 'countdown') return;
+  if (tower.up[track] >= MAX_UP) return;
+  const cost = upCost(tower, track);
+  if (state.cash < cost) { playSound('alarm'); showToast(`Need $${cost} salvage for that module.`); return; }
+  state.cash -= cost;
+  tower.up[track] += 1;
+  if (track === 'rng') paintTowerRange(tower);
+  floatText(tower.x, tower.y - 42, `${UPGRADE_TRACKS[track].label} LV${tower.up[track]}`, 'up-float');
+  fxRing(tower.x, tower.y, 'fx-ring-white');
+  playSound();
+  updateHud();
+  openTowerPanel(tower); // re-render the panel with the new module installed
+}
+
+// --- Tower intel panel (stats + field modules + sell) ------------------------------------
 function openTowerPanel(tower) {
   closeTowerPanel();
   const entry = tower.entry;
+  const es = effStats(tower);
   const refund = Math.floor(entry.cost * 0.7);
+  const fmt = {
+    dmg: (v) => String(Math.round(v)),
+    rate: (v) => v.toFixed(1),
+    rng: (v) => (entry.stats.rng >= 999 ? 'INF' : String(Math.round(v))),
+  };
+  const pips = (level) => Array.from({ length: MAX_UP }, (unused, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('');
+  const rows = upgradeTracks(tower).map((track) => {
+    const meta = UPGRADE_TRACKS[track];
+    const level = tower.up[track];
+    const maxed = level >= MAX_UP;
+    const next = entry.stats[track] * (1 + meta.mult * (level + 1));
+    const stat = track === 'rng' && es.infinite ? 'INF' : fmt[track](es[track]);
+    return `
+      <div class="tp-up${maxed ? ' maxed' : ''}" data-track="${track}">
+        <div class="tp-up-head"><span>${meta.label}</span><b class="tp-val">${stat}${maxed ? '' : ` <i>→ ${fmt[track](next)}</i>`}</b></div>
+        <div class="tp-pips">${pips(level)}</div>
+        <button class="tp-buy" type="button" data-track="${track}" ${maxed ? 'disabled' : ''}>${maxed ? 'MAXED' : `$${upCost(tower, track)}`}</button>
+      </div>`;
+  }).join('');
   const panel = document.createElement('div');
   panel.className = `tower-panel tw-${entry.cat}`;
   panel.innerHTML = `
     <div class="tp-head"><b>${entry.name}</b><span class="tp-cat">${entry.cat.toUpperCase()}</span></div>
     <div class="tp-stats">
-      <div><span>DMG</span><b>${entry.stats.dmg || '—'}</b></div>
-      <div><span>RATE</span><b>${entry.stats.rate ? `${(entry.stats.rate * tower.boost).toFixed(1)}/s` : '—'}</b></div>
-      <div><span>RNG</span><b>${entry.stats.rng >= 999 ? 'INF' : entry.stats.rng || '—'}</b></div>
+      <div><span>DMG</span><b>${Math.round(es.dmg) || '—'}</b></div>
+      <div><span>RATE</span><b>${es.rate ? `${(es.rate * tower.boost).toFixed(1)}/s` : '—'}</b></div>
+      <div><span>RNG</span><b>${es.infinite ? 'INF' : es.rng || '—'}</b></div>
     </div>
     <p class="tp-special">${entry.special.replace('>> ', '')}</p>
-    <button class="tp-sell" type="button">SALVAGE BACK +$${refund}</button>`;
+    ${rows ? `<div class="tp-ups"><div class="tp-ups-head"><span>// FIELD MODULES</span><b>TEMPORARY · LV ${MAX_UP} MAX</b></div>${rows}</div>` : '<p class="tp-noup">NO FIELD MODULES — ECONOMY UNIT</p>'}
+    <button class="tp-sell" type="button">SALVAGE BACK +$${refund}</button>
+    <p class="tp-note">MODULES ARE SCRAPPED ON SELL &amp; WHEN THE MISSION ENDS</p>`;
   battlefield.appendChild(panel);
   const [sx, sy] = toScreen(tower.x, tower.y);
   panel.style.left = `${Math.max(10, Math.min(window.innerWidth - 238, sx + 26))}px`;
-  panel.style.top = `${Math.max(10, Math.min(window.innerHeight - 220, sy - 90))}px`;
+  panel.style.top = `${Math.max(10, Math.min(window.innerHeight - 330, sy - 120))}px`;
   state.towerPanel = panel;
   state.panelTower = tower;
   tower.node.classList.add('selected');
+  panel.querySelectorAll('.tp-buy').forEach((button) => button.addEventListener('click', () => buyUpgrade(tower, button.dataset.track)));
   panel.querySelector('.tp-sell').addEventListener('click', () => sellTower(tower));
+  refreshPanelAfford();
 }
 
 function closeTowerPanel() {
@@ -994,10 +1137,10 @@ function sellTower(tower) {
 // --- Tower combat brain ------------------------------------------------------------------
 function updateTowers(dt) {
   if (!state.layers || !state.towers.length) return;
-  // Nanite Web: +30% fire rate to towers inside its web.
+  // Nanite Web: +30% fire rate to towers inside its web (web radius scales with modules).
   const webs = state.towers.filter((tower) => tower.id === 'naniteweb');
   for (const tower of state.towers) {
-    tower.boost = webs.some((web) => web !== tower && Math.hypot(web.x - tower.x, web.y - tower.y) <= 120) ? 1.3 : 1;
+    tower.boost = webs.some((web) => web !== tower && Math.hypot(web.x - tower.x, web.y - tower.y) <= effStats(web).rng) ? 1.3 : 1;
   }
   // Enemy-touching auras first: cryo slow, null debuff, gravity pull.
   for (const enemy of state.enemies) {
@@ -1007,7 +1150,8 @@ function updateTowers(dt) {
     enemy.pull = 0;
   }
   for (const tower of state.towers) {
-    const rng = tower.entry.stats.rng >= 999 ? 9999 : tower.entry.stats.rng;
+    const es = effStats(tower);
+    const rng = es.infinite ? 9999 : es.rng;
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
       const [ex, ey] = posOf(enemy);
@@ -1020,7 +1164,7 @@ function updateTowers(dt) {
   for (const enemy of state.enemies) if (!enemy.pull) enemy.node.classList.remove('e-grav');
   // Fire control.
   for (const tower of state.towers) {
-    const rate = tower.entry.stats.rate * tower.boost;
+    const rate = effStats(tower).rate * tower.boost;
     if (rate <= 0) continue;
     tower.cd -= dt;
     if (tower.cd > 0) continue;
@@ -1034,7 +1178,8 @@ function updateTowers(dt) {
 
 function acquireTarget(tower) {
   const rule = TOWER_RULES[tower.id] || {};
-  const rng = tower.entry.stats.rng >= 999 ? 9999 : tower.entry.stats.rng;
+  const es = effStats(tower);
+  const rng = es.infinite ? 9999 : es.rng;
   let pool = state.enemies.filter((enemy) => {
     if (!enemy.alive) return false;
     if (rule.air === 'no' && enemy.t.flying) return false;
@@ -1065,7 +1210,7 @@ function fireLine(tower, target, cls, width = 2) {
 }
 
 function fireTower(tower, target) {
-  const dmg = tower.entry.stats.dmg;
+  const dmg = effStats(tower).dmg;
   const [tx, ty] = posOf(target);
   switch (tower.id) {
     case 'sentinel': {
