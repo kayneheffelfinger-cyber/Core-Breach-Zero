@@ -83,13 +83,248 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 }
 
+// --- Local Nexus fallback --------------------------------------------------------
+// Static hosts (GitHub Pages) cannot run the Node backend: POST /api/* returns a
+// non-JSON 405 page there. When that happens we flip to a fully local Nexus that
+// mirrors server.js — same tables, same rules, same error strings — with accounts,
+// sessions, wallet, purchases, loadouts and mission payouts persisted in
+// localStorage. Progress is per-browser; the real server remains authoritative
+// whenever the site is actually served by `node server.js`.
+const LOCAL = (() => {
+  const ACCOUNTS_KEY = 'cbz-local-accounts';
+  const SESSIONS_KEY = 'cbz-local-sessions';
+  const NAME_RE = /^[A-Za-z0-9_-]{3,16}$/;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const MAX_LEVEL = 30;
+  const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+  const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
+  // Mirrors server.js SHOP — keep in sync (name/unlock/price/currency only).
+  const SHOP = {
+    sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
+    arclance: { name: 'ARC LANCE', unlock: 1, price: 400, currency: 'nc' },
+    plasmort: { name: 'PLASMA MORTAR', unlock: 2, price: 550, currency: 'nc' },
+    cryobeacon: { name: 'CRYO DISRUPTOR', unlock: 3, price: 650, currency: 'nc' },
+    scrapforge: { name: 'SCRAP FOUNDRY', unlock: 5, price: 700, currency: 'nc' },
+    railspire: { name: 'RAIL SPIRE', unlock: 7, price: 950, currency: 'nc' },
+    stingerpad: { name: 'STINGER PAD', unlock: 9, price: 1150, currency: 'nc' },
+    teslacoil: { name: 'TESLA COIL', unlock: 11, price: 1400, currency: 'nc' },
+    flakstorm: { name: 'FLAK STORM', unlock: 13, price: 1600, currency: 'nc' },
+    pyrewell: { name: 'PYRE WELL', unlock: 15, price: 1850, currency: 'nc' },
+    nullbeacon: { name: 'NULL BEACON', unlock: 17, price: 2200, currency: 'nc' },
+    quantum: { name: 'QUANTUM SNIPER', unlock: 19, price: 2600, currency: 'nc' },
+    gravwell: { name: 'GRAVITY WELL', unlock: 21, price: 3000, currency: 'nc' },
+    naniteweb: { name: 'NANITE WEB', unlock: 23, price: 3400, currency: 'nc' },
+    phasedeca: { name: 'PHASE DECIMATOR', unlock: 25, price: 180, currency: 'bt' },
+    singularity: { name: 'SINGULARITY CORE', unlock: 30, price: 400, currency: 'bt' },
+  };
+  const REWARDS = {
+    easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
+  };
+  let down = false;
+
+  function readJson(key, fallback) {
+    try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; }
+  }
+  function writeJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage optional. */ }
+  }
+  const readAccounts = () => readJson(ACCOUNTS_KEY, {});
+  const readSessions = () => readJson(SESSIONS_KEY, {});
+  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] });
+
+  function randomHex(bytes) {
+    const array = new Uint8Array(bytes);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(array);
+    else for (let i = 0; i < array.length; i += 1) array[i] = Math.floor(Math.random() * 256);
+    return [...array].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function hashPasscode(passcode, salt) {
+    const seeded = `${salt}::${passcode}::core-breach-zero`;
+    if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+      try {
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(seeded));
+        return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      } catch { /* fall through to the manual scramble. */ }
+    }
+    // Non-secure-context fallback: deterministic scramble (cosmetic — local saves only).
+    let h1 = 0xdeadbeef;
+    let h2 = 0x41c6ce57;
+    for (let i = 0; i < seeded.length; i += 1) {
+      const ch = seeded.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return `${(h2 >>> 0).toString(16).padStart(8, '0')}${(h1 >>> 0).toString(16).padStart(8, '0')}`;
+  }
+
+  function createSession(name) {
+    const token = randomHex(24);
+    const sessions = readSessions();
+    sessions[token] = { name, expiresAt: Date.now() + SESSION_MS };
+    writeJson(SESSIONS_KEY, sessions);
+    return token;
+  }
+
+  function sessionName(token) {
+    const sessions = readSessions();
+    const entry = sessions[token];
+    if (!entry || Date.now() > entry.expiresAt) {
+      if (entry) { delete sessions[token]; writeJson(SESSIONS_KEY, sessions); }
+      return null;
+    }
+    return entry.name;
+  }
+
+  function profilePayload(account) {
+    const meta = account.meta;
+    return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [] };
+  }
+
+  function requireAccount(body) {
+    const name = sessionName(String((body || {}).token || ''));
+    const account = name ? readAccounts()[name] : null;
+    if (!name || !account) throw new Error('Session expired. Log in again.');
+    return account;
+  }
+
+  async function handle(path, payload) {
+    const body = payload || {};
+    if (path === '/api/register') {
+      const name = String(body.name || '').trim();
+      const email = String(body.email || '').trim().toLowerCase();
+      const passcode = String(body.passcode || '');
+      if (!NAME_RE.test(name)) throw new Error('Name must be 3-16 characters (letters, numbers, - or _).');
+      if (!EMAIL_RE.test(email)) throw new Error('Enter a valid email address.');
+      if (passcode.length < 4 || passcode.length > 64) throw new Error('Passcode must be 4-64 characters.');
+      const accounts = readAccounts();
+      if (accounts[name]) throw new Error('That commander name is already taken.');
+      if (Object.values(accounts).some((entry) => entry.email === email)) throw new Error('That email is already registered.');
+      const salt = randomHex(16);
+      accounts[name] = { name, email, salt, hash: await hashPasscode(passcode, salt), createdAt: new Date().toISOString(), meta: defaultMeta(), local: true };
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, token: createSession(name), name, email };
+    }
+    if (path === '/api/login') {
+      const identity = String(body.identity || '').trim();
+      const email = identity.toLowerCase();
+      const passcode = String(body.passcode || '');
+      const accounts = readAccounts();
+      const account = accounts[identity] || Object.values(accounts).find((entry) => entry.email === email);
+      if (!account) throw new Error('No account found for that name or email.');
+      if ((await hashPasscode(passcode, account.salt)) !== account.hash) throw new Error('Wrong passcode. Try again.');
+      return { ok: true, token: createSession(account.name), name: account.name, email: account.email };
+    }
+    if (path === '/api/session') {
+      const name = sessionName(String(body.token || ''));
+      const account = name ? readAccounts()[name] : null;
+      if (!account) throw new Error('Session expired. Log in again.');
+      return { ok: true, name, email: account.email };
+    }
+    if (path === '/api/profile') {
+      return { ok: true, profile: profilePayload(requireAccount(body)) };
+    }
+    if (path === '/api/shop/purchase') {
+      const account = requireAccount(body);
+      const item = SHOP[String(body.itemId || '')];
+      if (!item) throw new Error('Unknown blueprint.');
+      const meta = account.meta;
+      if (meta.owned.includes(String(body.itemId || ''))) throw new Error('Blueprint already in your armory.');
+      if (meta.level < item.unlock) throw new Error(`Clearance level ${item.unlock} required.`);
+      if (item.price > 0) {
+        const balance = item.currency === 'bt' ? meta.bt : meta.nc;
+        if (balance < item.price) throw new Error(item.currency === 'bt' ? 'Not enough Breach Tokens.' : 'Not enough Nexus Coins.');
+        if (item.currency === 'bt') meta.bt -= item.price;
+        else meta.nc -= item.price;
+      }
+      meta.owned.push(String(body.itemId || ''));
+      const accounts = readAccounts();
+      accounts[account.name] = account;
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, profile: profilePayload(account) };
+    }
+    if (path === '/api/loadout') {
+      const account = requireAccount(body);
+      const meta = account.meta;
+      const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
+      if (!list) throw new Error('Loadout payload must be a list of blueprint ids.');
+      const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
+      if (clean.length !== list.length) throw new Error('Loadouts hold max 5 bays and only blueprints you own.');
+      meta.loadout = clean;
+      const accounts = readAccounts();
+      accounts[account.name] = account;
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, profile: profilePayload(account) };
+    }
+    if (path === '/api/mission/complete') {
+      const account = requireAccount(body);
+      const table = REWARDS[String(body.difficulty)] || REWARDS.easy;
+      const win = body.result === 'win';
+      const waves = Math.max(0, Math.min(15, Number(body.wavesCleared) || 0));
+      const bosses = Math.max(0, Math.min(3, Number(body.bossesKilled) || 0));
+      const flawless = Boolean(win && body.flawless);
+      const bonusNc = Math.max(0, Math.min(600, Math.round(Number(body.bonusNc) || 0))); // Scrap Foundry yield
+      const meta = account.meta;
+      let nc = waves * table.waveNC + bosses * table.bossNC + bonusNc;
+      let bt = bosses * table.bossBT;
+      let xp = waves * table.waveXP + bosses * table.bossXP;
+      if (win) { nc += table.winNC; xp += table.winXP; }
+      if (flawless) { nc += table.flawlessNC; bt += table.flawlessBT; xp += table.flawlessXP; }
+      let firstClear = false;
+      if (win && !meta.firstClear) { meta.firstClear = true; firstClear = true; bt += table.firstClearBT; }
+      const before = meta.level;
+      meta.nc += nc;
+      meta.bt += bt;
+      meta.xp += xp;
+      while (meta.level < MAX_LEVEL && meta.xp >= xpToNext(meta.level)) {
+        meta.xp -= xpToNext(meta.level);
+        meta.level += 1;
+      }
+      if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
+      const accounts = readAccounts();
+      accounts[account.name] = account;
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(account) };
+    }
+    throw new Error('Unknown API endpoint.');
+  }
+
+  function markDown() {
+    if (down) return;
+    down = true;
+    paintNetBadge();
+  }
+
+  return { handle, markDown, down: () => down };
+})();
+
+function paintNetBadge() {
+  const badge = document.querySelector('#net-badge');
+  if (badge) badge.hidden = !LOCAL.down();
+}
+
 // --- Commander authentication ---------------------------------------------------
 async function apiRequest(path, payload) {
-  const response = await fetch(path, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  if (LOCAL.down()) return LOCAL.handle(path, payload);
+  let response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    LOCAL.markDown(); // network failure — no Node backend reachable
+    return LOCAL.handle(path, payload);
+  }
+  const type = response.headers.get('content-type') || '';
+  if (!type.includes('application/json')) {
+    // Static host (GitHub Pages): POST endpoints return an HTML 405 page here.
+    LOCAL.markDown();
+    return LOCAL.handle(path, payload);
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data.ok === false) throw new Error(data.error || 'Auth system failure.');
   return data;
@@ -115,7 +350,7 @@ function enterDeck(name) {
   chip.textContent = `CMDR: ${name}`;
   document.querySelector('#sign-out').hidden = false;
   authOverlay.hidden = true;
-  setStatus('ACCOUNT LINKED // MENU SYSTEM READY');
+  setStatus(LOCAL.down() ? 'LOCAL NEXUS ONLINE // PROGRESS SAVES IN THIS BROWSER' : 'ACCOUNT LINKED // MENU SYSTEM READY');
   loadProfile();
 }
 
@@ -209,7 +444,7 @@ function openMenu(key) {
 
 function renderPlayMenu(message = '') {
   body.innerHTML = `
-    <p class="dialog-copy">Fly any battle map solo, or hit START MISSION on a map to deploy Easy Mode — 15 waves, 3 boss encounters. Server port: <strong>${escapeHtml(port)}</strong>.</p>
+    <p class="dialog-copy">${LOCAL.down() ? 'Local Nexus active — solo missions are fully playable and progress saves in this browser. Multiplayer rooms need the Node server: run <strong>node server.js</strong> locally and open its address.' : `Fly any battle map solo, or hit START MISSION on a map to deploy Easy Mode — 15 waves, 3 boss encounters. Server port: <strong>${escapeHtml(port)}</strong>.`}</p>
     <div class="action-grid">
       <button class="action-button" id="map-recon" type="button"><b>SOLO MAP RECON</b><small>Fly over any of the 5 battle maps</small></button>
       <button class="action-button" id="host-room" type="button"><b>HOST A ROOM</b><small>Create a code for a second commander</small></button>
@@ -431,6 +666,7 @@ function connectRoom() {
 }
 
 function hostRoom() {
+  if (LOCAL.down()) return showToast('Room service needs the Node server — solo missions are fully playable here.');
   document.querySelector('#server-status').textContent = 'CONNECTING...';
   connectRoom();
   socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'create' })), { once: true });
@@ -440,6 +676,7 @@ function hostRoom() {
 function joinRoom(code) {
   const normalized = String(code).trim();
   if (!/^\d{6}$/.test(normalized)) return showToast('Enter a valid 6-digit room code.');
+  if (LOCAL.down()) return showToast('Room service needs the Node server — solo missions are fully playable here.');
   document.querySelector('#server-status').textContent = 'CONNECTING...';
   connectRoom();
   socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'join', code: normalized })), { once: true });
@@ -534,4 +771,5 @@ const roomFromUrl = new URLSearchParams(location.search).get('room');
 if (roomFromUrl) openMenu('play');
 
 setAuthMode('login');
+paintNetBadge();
 restoreSession();

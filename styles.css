@@ -300,6 +300,9 @@ dialog::backdrop { background: rgba(0,0,0,.76); backdrop-filter: blur(4px); }.di
 /* ===================== NEXUS SHOP (meta progression) ===================== */
 .wallet { display: flex; align-items: center; gap: 8px; }
 .wallet[hidden] { display: none; }
+.net-badge { display: inline-flex; align-items: center; padding: 8px 10px; border: 1px dashed rgba(112,225,208,.55); background: rgba(112,225,208,.07); color: var(--cyan); font: 12px var(--mono); letter-spacing: .08em; animation: net-pulse 2.4s ease-in-out infinite; }
+.net-badge[hidden] { display: none; }
+@keyframes net-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
 .wallet-chip { display: inline-flex; align-items: center; padding: 8px 10px; border: 1px solid var(--line); background: var(--panel); font: 12px var(--mono); }
 .wallet-lv { border-color: rgba(112,225,208,.5); color: var(--cyan); }
 .wallet-nc b { color: var(--amber); font-weight: 400; }
