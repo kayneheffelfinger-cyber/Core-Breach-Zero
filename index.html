@@ -78,10 +78,10 @@
         <div class="panel-head"><span><i class="crosshair">+</i> TACTICAL PREVIEW</span><span class="tag" id="preview-tag">DEPLOYMENT</span></div>
         <div class="sector-art" aria-hidden="true"><div class="art-orbit"></div><div class="art-core">09</div><span class="art-coordinate">SECTOR 09 // REACTOR CHAMBER</span><span class="art-warning">BREACH ACTIVITY DETECTED</span></div>
         <h2 id="preview-title">PLAY MENU</h2>
-        <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Easy Mode combat protocol: 15 waves, 3 boss encounters, base defense.</p>
+        <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Easy Mode combat protocol: 20 waves, 6 boss encounters, base defense.</p>
         <div class="intel-stats" id="preview-stats">
           <div><span>MAP RECON</span><b>5 SECTORS</b></div>
-          <div><span>ROOMS</span><b>2 COMMANDERS</b></div>
+          <div><span>ROOMS</span><b>4 BAYS // UP TO 4</b></div>
           <div><span>SERVER PORT</span><b id="preview-port">3000</b></div>
         </div>
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
@@ -100,6 +100,15 @@
     </div>
     <div class="board-wrap"><svg id="board" viewBox="0 0 1000 600" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Battle map recon view"></svg></div>
   </div>
+
+  <section class="loading-overlay" id="loading-overlay" hidden aria-live="polite" aria-busy="true">
+    <div class="loading-card">
+      <div class="eyebrow">// SQUAD DEPLOYMENT</div>
+      <h2>MISSION LOADING</h2>
+      <div class="loading-bar"><i></i></div>
+      <p id="loading-state">SYNCHRONIZING COMMANDERS...</p>
+    </div>
+  </section>
 
   <dialog id="menu-dialog" aria-labelledby="dialog-title">
     <div class="dialog-head"><div><div class="eyebrow" id="dialog-kicker">// DEPLOYMENT HUB</div><h2 id="dialog-title">PLAY MENU</h2></div><button class="close-button" id="dialog-close" type="button" aria-label="Close menu">×</button></div>

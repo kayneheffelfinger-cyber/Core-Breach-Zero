@@ -74,9 +74,9 @@ async function api(path, payload) {
     check('unaffordable+unlocked -> 402 (700 > 635)', poor.status === 402, `status=${poor.status}`);
 
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
-    check('input clamped: nc=210 (no flawless)', again.data.rewards.nc === 210, JSON.stringify(again.data.rewards));
-    check('no second firstClear, bt=3', again.data.rewards.firstClear === false && again.data.rewards.bt === 3, JSON.stringify(again.data.rewards));
-    check('level L5->L6, xp=143 banked', again.data.profile.level === 6 && again.data.profile.xp === 143, JSON.stringify(again.data.profile));
+    check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
+    check('no second firstClear, bt=5 (20-wave caps)', again.data.rewards.firstClear === false && again.data.rewards.bt === 5, JSON.stringify(again.data.rewards));
+    check('levels L5->L7, xp=6 banked (20-wave caps)', again.data.profile.level === 7 && again.data.profile.xp === 6, JSON.stringify(again.data.profile));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

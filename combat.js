@@ -6,37 +6,50 @@ const board = document.querySelector('#board');
 const battlefield = document.querySelector('#battlefield');
 
 // --- Enemy roster (Easy Mode) ---------------------------------------------------
-// Pace pass: speeds trimmed ~10% and every archetype now hits the core for a
-// different amount — leaking a boss should hurt far more than losing one fodder bit.
+// Rebalance pass: bounties roughly doubled so a real defense network is affordable
+// by the mid waves, and every archetype still hits the core for a unique amount.
 const ENEMY_TYPES = {
-  glitched: { name: 'GLITCHED BIT', tag: 'NORMAL', hp: 15, speed: 84, size: 9, bounty: 4, dmg: 1, color: '#70e1d0', ability: 'None — cheap fodder that arrives in numbers.' },
-  runner: { name: 'DATA RUNNER', tag: 'FAST', hp: 10, speed: 124, size: 8, bounty: 6, dmg: 2, color: '#a5d58b', ability: 'Very fast — outruns reaction time.' },
-  file: { name: 'CORRUPTED FILE', tag: 'SWARM', hp: 8, speed: 62, size: 6, bounty: 2, dmg: 1, color: '#c49bef', ability: 'Spawns in dense clusters.' },
-  shielded: { name: 'SHIELDED BYTE', tag: 'ARMORED', hp: 45, speed: 40, size: 11, bounty: 12, dmg: 3, color: '#8fb7c9', armor: 0.2, ability: 'Armor plating absorbs 20% of incoming damage.' },
-  drone: { name: 'OVERCLOCKED DRONE', tag: 'FLYING', hp: 25, speed: 88, size: 10, bounty: 10, dmg: 2, color: '#ffb45a', flying: true, ability: 'Air unit — flies a straight line to the core, ignoring tracks, gates and haste fields.' },
-  nullcore: { name: 'NULL CORE', tag: 'TANK', hp: 150, speed: 28, size: 14, bounty: 25, dmg: 4, color: '#7f8fa0', ability: 'Dense hull soaks heavy damage.' },
-  virus: { name: 'SYSTEM VIRUS', tag: 'MINI-BOSS', hp: 600, speed: 48, size: 20, bounty: 150, dmg: 6, color: '#ff5e7a', boss: true, ability: 'Malware Pulse — emits a stunning shockwave every 8s.' },
-  leak: { name: 'MEMORY LEAK', tag: 'MINI-BOSS', hp: 1200, speed: 34, size: 22, bounty: 300, dmg: 8, color: '#ffb45a', boss: true, ability: 'Replication — spills 6 Corrupted Files at 50% HP.' },
-  overseer: { name: 'CORE BREACH: ZERO', tag: 'FINAL BOSS', hp: 3500, speed: 27, size: 26, bounty: 1000, dmg: 25, color: '#ff4d5e', boss: true, shield: 300, ability: 'Overheat — shockwave disables a tower for 4s. Shielding Matrix — gains a 300 HP shield at 25% HP.' },
+  glitched: { name: 'GLITCHED BIT', tag: 'NORMAL', hp: 15, speed: 84, size: 9, bounty: 6, dmg: 1, color: '#70e1d0', ability: 'None — cheap fodder that arrives in numbers.' },
+  runner: { name: 'DATA RUNNER', tag: 'FAST', hp: 10, speed: 124, size: 8, bounty: 9, dmg: 2, color: '#a5d58b', ability: 'Very fast — outruns reaction time.' },
+  file: { name: 'CORRUPTED FILE', tag: 'SWARM', hp: 8, speed: 62, size: 6, bounty: 3, dmg: 1, color: '#c49bef', ability: 'Spawns in dense clusters.' },
+  shielded: { name: 'SHIELDED BYTE', tag: 'ARMORED', hp: 45, speed: 40, size: 11, bounty: 18, dmg: 3, color: '#8fb7c9', armor: 0.2, ability: 'Armor plating absorbs 20% of incoming damage.' },
+  drone: { name: 'OVERCLOCKED DRONE', tag: 'FLYING', hp: 25, speed: 88, size: 10, bounty: 16, dmg: 2, color: '#ffb45a', flying: true, ability: 'Air unit — flies a straight line to the core, ignoring tracks, gates and haste fields.' },
+  nullcore: { name: 'NULL CORE', tag: 'TANK', hp: 150, speed: 28, size: 14, bounty: 38, dmg: 4, color: '#7f8fa0', ability: 'Dense hull soaks heavy damage.' },
+  virus: { name: 'SYSTEM VIRUS', tag: 'MINI-BOSS', hp: 600, speed: 48, size: 20, bounty: 240, dmg: 6, color: '#ff5e7a', boss: true, ability: 'Malware Pulse — emits a stunning shockwave every 8s.' },
+  leak: { name: 'MEMORY LEAK', tag: 'MINI-BOSS', hp: 1200, speed: 34, size: 22, bounty: 450, dmg: 8, color: '#ffb45a', boss: true, ability: 'Replication — spills 6 Corrupted Files at 50% HP.' },
+  overseer: { name: 'CORE BREACH: ZERO', tag: 'FINAL BOSS', hp: 4200, speed: 27, size: 26, bounty: 1500, dmg: 25, color: '#ff4d5e', boss: true, shield: 400, ability: 'Overheat — shockwave disables a tower for 4s. Shielding Matrix — gains a 400 HP shield at 25% HP.' },
 };
 
-// --- Easy Mode: 15 waves, 3 boss encounters --------------------------------------
+// --- Easy Mode: 20 waves, 6 boss encounters ---------------------------------------
+// Wave pressure compounds: every wave index adds +10% enemy HP on top of the
+// roster, so the same towers that cruised wave 3 start bleeding around wave 8-10
+// unless the defense network grows with it. Surge modifiers stack on top.
+const WAVE_HP_SCALE = 0.1;   // +10% HP per wave index
+const SURGE_MODS = {
+  overclock: { hp: 1, speed: 1.25, label: 'OVERCLOCK SURGE', note: 'HOSTILES RUN 25% FASTER' },
+  hardened: { hp: 1.4, speed: 1, label: 'HARDENED HULLS', note: 'HOSTILES +40% HP' },
+};
 const EASY_WAVES = [
-  { groups: [['glitched', 10]] },
-  { groups: [['glitched', 15], ['runner', 4]] },
-  { groups: [['glitched', 12], ['runner', 8], ['file', 6]] },
-  { groups: [['shielded', 10], ['glitched', 10]] },
-  { groups: [['runner', 20], ['shielded', 8], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
-  { groups: [['drone', 8], ['glitched', 12]], phase: 'AIR DEBUT' },
-  { groups: [['shielded', 15], ['drone', 12]] },
-  { groups: [['nullcore', 3], ['file', 20]] },
-  { groups: [['nullcore', 5], ['drone', 12], ['runner', 15]] },
-  { groups: [['shielded', 8], ['nullcore', 4], ['leak', 1]], phase: 'MINI-BOSS // MEMORY LEAK' },
-  { groups: [['file', 30], ['runner', 10]], phase: 'SWARM SURGE' },
-  { groups: [['nullcore', 8], ['drone', 15]] },
-  { groups: [['virus', 1], ['leak', 1], ['shielded', 10]], phase: 'DOUBLE TROUBLE' },
-  { groups: [['nullcore', 12], ['drone', 20], ['glitched', 25]] },
-  { groups: [['shielded', 15], ['nullcore', 8], ['overseer', 1]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+  { groups: [['glitched', 14]] },
+  { groups: [['glitched', 18], ['runner', 6]] },
+  { groups: [['glitched', 14], ['runner', 10], ['file', 10]] },
+  { groups: [['shielded', 12], ['glitched', 14]] },
+  { groups: [['runner', 24], ['shielded', 10], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 10], ['glitched', 16]], phase: 'AIR DEBUT' },
+  { groups: [['shielded', 18], ['drone', 14]] },
+  { groups: [['nullcore', 4], ['file', 26]] },
+  { groups: [['nullcore', 6], ['drone', 14], ['runner', 18]], mod: 'overclock' },
+  { groups: [['shielded', 10], ['nullcore', 5], ['leak', 1]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 36], ['runner', 14]], phase: 'SWARM SURGE', mod: 'overclock' },
+  { groups: [['nullcore', 10], ['drone', 18]] },
+  { groups: [['virus', 1], ['leak', 1], ['shielded', 12]], phase: 'DOUBLE TROUBLE' },
+  { groups: [['shielded', 20], ['drone', 22], ['glitched', 30]] },
+  { groups: [['runner', 30], ['drone', 16]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 12], ['shielded', 16]], phase: 'ARMOR COLUMN', mod: 'hardened' },
+  { groups: [['drone', 26], ['runner', 20]], phase: 'AIR ARMADA' },
+  { groups: [['virus', 2], ['file', 40], ['glitched', 30]], phase: 'VIRULENT SURGE' },
+  { groups: [['leak', 2], ['nullcore', 10], ['drone', 20]], phase: 'LEAK STORM', mod: 'hardened' },
+  { groups: [['shielded', 20], ['nullcore', 10], ['overseer', 1], ['drone', 16]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
 const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75 };
@@ -47,7 +60,15 @@ const START_SALVAGE = 200;   // mission opening funds — enough to open with 2-
 const FOOT_HALF = 24;        // clearance box is 48x48 around every placed unit
 const SEP = 56;              // min axis distance between two unit centers (box + gap)
 const CORE_CLEAR = 58;       // nothing deploys inside the reactor ring
-const MAX_TOWERS = 30;       // command grid saturation guard
+const TRACK_CLEAR = 36;      // nothing deploys on the convoy lane itself
+// Tower limit scales with the squad: every extra commander brings their own
+// hardware allotment to the shared grid.
+const TOWER_BASE = 15;       // solo ceiling
+const TOWER_PER_ALLY = 9;    // +9 slots per additional commander in the room
+function towerLimit() {
+  const players = (typeof window !== 'undefined' && Number(window.CBZ_ROOM_PLAYERS)) || 1;
+  return TOWER_BASE + TOWER_PER_ALLY * (Math.max(1, Math.min(4, players)) - 1);
+}
 // air: 'no' = ground only, 'prefer' = flying first, 'yes' = anything
 const TOWER_RULES = {
   sentinel: { air: 'no' }, arclance: { air: 'yes' }, plasmort: { air: 'no' }, railspire: { air: 'yes' },
@@ -57,16 +78,98 @@ const TOWER_RULES = {
   naniteweb: { aura: true }, scrapforge: { aura: true },
 };
 
-// --- Field modules: temporary per-tower upgrades bought with salvage mid-mission ------
-// Modules live on the placed unit only: scrapped when it is sold, wiped when the
-// mission ends. Nothing here touches the Nexus Shop, the loadout or the wallet.
-const MAX_UP = 3;
-const UPGRADE_TRACKS = {
-  dmg: { label: 'DAMAGE', mult: 0.25, costK: 0.35 },
-  rate: { label: 'FIRE RATE', mult: 0.15, costK: 0.3 },
-  rng: { label: 'RANGE', mult: 0.12, costK: 0.25 },
+// --- Field modules: unique per-tower upgrades bought with salvage mid-mission ------
+// Every blueprint gets its own trio of modules that push the role the tower was
+// built for — a support gets better at supporting, a DPS gets better at killing,
+// the economy line prints harder. Modules live on the placed unit only: scrapped
+// when it is sold, wiped when the mission ends. Nothing here touches the Nexus
+// Shop, the loadout or the wallet.
+// mult: stat multipliers applied per level. Everything else is a named special
+// handled inside the combat code (chain forks, splash, burn, auras, economy).
+const TOWER_MODULES = {
+  sentinel: [
+    { id: 'hollow', label: 'HOLLOW POINTS', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'servos', label: 'AUTOCANN SERVOS', info: '+15% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.15 } },
+    { id: 'optics', label: 'MARKSMAN OPTICS', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  arclance: [
+    { id: 'cells', label: 'CONDUCTANCE CELLS', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'storm', label: 'STORM CELL ARRAY', info: '+1 chain fork per level', max: 2, costK: 0.45 },
+    { id: 'surge', label: 'SURGE CAPACITORS', info: '+12% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.12 } },
+  ],
+  plasmort: [
+    { id: 'cluster', label: 'CLUSTER WARHEADS', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'shell', label: 'SEISMIC SHELLS', info: '+7 splash radius per level', max: 3, costK: 0.3 },
+    { id: 'autoloader', label: 'MORTAR AUTOLOADER', info: '+15% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.15 } },
+  ],
+  cryobeacon: [
+    { id: 'deepfreeze', label: 'DEEP FREEZE MIX', info: '+7% slow strength per level', max: 3, costK: 0.35 },
+    { id: 'frostbite', label: 'FROSTBITE FIELD', info: 'slowed hostiles take +8% damage per level', max: 3, costK: 0.4 },
+    { id: 'glacial', label: 'GLACIAL SPREAD', info: '+12% field range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  scrapforge: [
+    { id: 'overclock', label: 'FOUNDRY OVERCLOCK', info: '+10 NC banked per cleared wave, per level', max: 3, costK: 0.35 },
+    { id: 'drones', label: 'SALVAGE DRONES', info: '+4% kill bounty per level, squad-wide', max: 2, costK: 0.45 },
+    { id: 'compactor', label: 'WAVE COMPACTOR', info: '+$8 salvage per cleared wave, per level', max: 3, costK: 0.3 },
+  ],
+  railspire: [
+    { id: 'slugs', label: 'DENSE SLUGS', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'bore', label: 'WIDE-BORE RAILS', info: '+4 beam width per level', max: 3, costK: 0.3 },
+    { id: 'bank', label: 'CAPACITOR BANK', info: '+12% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.12 } },
+  ],
+  stingerpad: [
+    { id: 'pods', label: 'TWIN MISSILE PODS', info: '+1 missile per salvo per level', max: 2, costK: 0.45 },
+    { id: 'fuel', label: 'HEXAGE FUEL', info: '+20% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.2 } },
+    { id: 'radar', label: 'RADAR LOCK ARRAY', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  teslacoil: [
+    { id: 'voltage', label: 'HIGH VOLTAGE', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'links', label: 'CHAIN LINKS', info: '+1 arc-stun target per level', max: 2, costK: 0.45 },
+    { id: 'grid', label: 'EXTENDED GRID', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  flakstorm: [
+    { id: 'shred', label: 'SHRAPNEL SHRED', info: '+100% bonus air damage per level', max: 2, costK: 0.4 },
+    { id: 'burst', label: 'WIDE BURSTS', info: '+5 burst radius per level', max: 3, costK: 0.3 },
+    { id: 'loader', label: 'RAPID LOADER', info: '+15% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.15 } },
+  ],
+  pyrewell: [
+    { id: 'incendiary', label: 'INCENDIARY MIX', info: '+3 burn DPS per level', max: 3, costK: 0.35 },
+    { id: 'sustain', label: 'SUSTAINED BURN', info: '+0.75s burn duration per level', max: 3, costK: 0.3 },
+    { id: 'wildfire', label: 'WILDFIRE SPREAD', info: '+15 contagion radius per level', max: 2, costK: 0.4 },
+  ],
+  nullbeacon: [
+    { id: 'resonance', label: 'NULL RESONANCE', info: '+8% damage amp per level', max: 3, costK: 0.35 },
+    { id: 'collapse', label: 'COLLAPSE FIELD', info: 'shreds +15% more armor per level', max: 2, costK: 0.4 },
+    { id: 'broadcast', label: 'WIDE BROADCAST', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  quantum: [
+    { id: 'calibration', label: 'PHASE CALIBRATION', info: '+5% execute threshold per level', max: 2, costK: 0.45 },
+    { id: 'eventhorizon', label: 'EVENT HORIZON', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'cycles', label: 'TACHYON CYCLER', info: '+12% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.12 } },
+  ],
+  gravwell: [
+    { id: 'well', label: 'DEEPER WELL', info: '+12 pull force per level', max: 3, costK: 0.35 },
+    { id: 'tidal', label: 'TIDAL LOCK', info: 'slows hostiles 8% per level inside the well', max: 2, costK: 0.4 },
+    { id: 'lens', label: 'GRAVITON LENS', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  naniteweb: [
+    { id: 'efficiency', label: 'NANITE EFFICIENCY', info: '+10% fire-rate boost per level', max: 3, costK: 0.35 },
+    { id: 'uplink', label: 'TARGETING UPLINK', info: '+10% damage boost per level', max: 3, costK: 0.35 },
+    { id: 'spinners', label: 'WEB SPINNERS', info: '+12% web range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  phasedeca: [
+    { id: 'lance', label: 'PHASE LANCE', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'coils', label: 'TACHYON COILS', info: '+15% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.15 } },
+    { id: 'band', label: 'WIDE-BAND EMITTER', info: '+12% range per level', max: 3, costK: 0.25, mult: { rng: 0.12 } },
+  ],
+  singularity: [
+    { id: 'mass', label: 'MASS DRIVER', info: '+25% damage per level', max: 3, costK: 0.35, mult: { dmg: 0.25 } },
+    { id: 'horizon', label: 'WIDER HORIZON', info: '+12 collapse radius per level', max: 3, costK: 0.3 },
+    { id: 'pulse', label: 'GRAVITON PULSE', info: '+15% fire rate per level', max: 3, costK: 0.3, mult: { rate: 0.15 } },
+  ],
 };
-const ATTACKER_TOWERS = new Set(['sentinel', 'arclance', 'plasmort', 'railspire', 'stingerpad', 'teslacoil', 'flakstorm', 'pyrewell', 'quantum', 'phasedeca', 'singularity']);
+const towerModules = (id) => TOWER_MODULES[id] || [];
+const moduleLevel = (tower, moduleId) => (tower.up && tower.up[moduleId]) || 0;
 
 // --- Mission state ----------------------------------------------------------------
 const state = {
@@ -76,7 +179,7 @@ const state = {
   cash: 0, baseHp: BASE_MAX, enemies: [], kills: 0, bossesKilled: 0, earned: 0, clock: 0,
   towers: [], projectiles: [], building: null, ghost: null, bar: null, towerPanel: null, panelTower: null,
   bonusNc: 0, mouseX: 500, mouseY: 300, mouseOn: false,
-  roomVote: null, raf: 0, last: 0,
+  raf: 0, last: 0,
   hud: null, bossBar: null, tip: null, tipTarget: null, votePanel: null, endPanel: null, banner: null,
   layers: null, deployBtn: null,
 };
@@ -222,8 +325,9 @@ function spawnEnemy(key, pathIdx) {
   g.appendChild(shieldFill);
   const enemy = {
     key, t, node: g, fill, shieldFill,
-    hp: t.hp, maxHp: t.hp, shield: 0, maxShield: t.shield || 0,
-    pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed, alive: true,
+    // Wave pressure: +10% HP per wave index, surge modifiers stack on top.
+    hp: Math.round(t.hp * (state.hpScale || 1)), maxHp: Math.round(t.hp * (state.hpScale || 1)), shield: 0, maxShield: t.shield || 0,
+    pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed * (state.surgeSpeed || 1), alive: true,
     usedGates: new Set(), pulseTimer: 8, replicated: false, shielded: false, angle: 0,
   };
   if (t.flying) {
@@ -251,7 +355,9 @@ function spawnEnemy(key, pathIdx) {
 function damageEnemy(enemy, amount, opts = {}) {
   let left = amount;
   if (!opts.phase) {
-    const armor = (enemy.t.armor || 0) * (enemy.weak ? 0.5 : 1);
+    // Null Beacon collapse modules shred deeper into armor; base weak still halves it.
+    const armorMult = enemy.weak ? Math.max(0.05, 0.5 - 0.15 * (enemy.shredLv || 0)) : 1;
+    const armor = (enemy.t.armor || 0) * armorMult;
     left *= 1 - armor;
     if (enemy.shield > 0) {
       const absorbed = Math.min(enemy.shield, left);
@@ -259,7 +365,9 @@ function damageEnemy(enemy, amount, opts = {}) {
       left -= absorbed;
     }
   }
-  if (enemy.weak) left *= 1.15;
+  if (enemy.weak) left *= 1 + (enemy.weakAmp || 0.15);
+  // Cryo Frostbite: hostiles that are actively slowed take amplified damage.
+  if (enemy.frost && (enemy.slow || 0) > 0) left *= 1 + enemy.frost;
   enemy.hp = Math.max(0, enemy.hp - left);
   if (enemy.key === 'leak' && !enemy.replicated && enemy.hp <= enemy.maxHp / 2) replicateLeak(enemy);
   if (enemy.key === 'overseer' && !enemy.shielded && enemy.hp <= enemy.maxHp * 0.25) {
@@ -283,21 +391,24 @@ function killEnemy(enemy) {
   if (!enemy.alive) return;
   enemy.alive = false;
   hideTip(enemy);
-  state.cash += enemy.t.bounty;
-  state.earned += enemy.t.bounty;
+  // Scrap Foundry salvage drones boost every kill on the grid (capped at +24%).
+  const payout = Math.round(enemy.t.bounty * (state.bountyMult || 1));
+  state.cash += payout;
+  state.earned += payout;
   state.kills += 1;
   if (enemy.t.boss) state.bossesKilled += 1;
   const [x, y] = posOf(enemy);
-  // Pyre Well contagion: anything dying while burning ignites its neighbors.
+  // Pyre Well contagion: anything dying while burning ignites its neighbors —
+  // wildfire modules widen the blast, and re-ignited foes inherit the burn mix.
   if (enemy.burn && enemy.burn.t > 0) {
     fxRing(x, y, 'fx-ring-amber');
     for (const other of state.enemies) {
       if (!other.alive || other === enemy) continue;
       const [ox, oy] = posOf(other);
-      if (Math.hypot(ox - x, oy - y) <= 55) applyBurn(other);
+      if (Math.hypot(ox - x, oy - y) <= (enemy.burn.spread || 55)) applyBurn(other, enemy.burn);
     }
   }
-  floatText(x, y - enemy.t.size - 6, `+$${enemy.t.bounty}`, 'cash-float');
+  floatText(x, y - enemy.t.size - 6, `+$${payout}`, 'cash-float');
   fxRing(x, y, 'fx-ring-red');
   enemy.node.classList.add('dying');
   setTimeout(() => enemy.node.remove(), 300);
@@ -376,7 +487,7 @@ function tick(ts) {
     state.countdown -= dt;
     const n = Math.ceil(state.countdown);
     if (n !== state.lastCount && n > 0) { state.lastCount = n; banner(String(n), '// DEPLOYING', 'banner-count'); playSound(); }
-    if (state.countdown <= 0) beginWave(debugWave > 0 ? Math.min(14, debugWave - 1) : 0);
+    if (state.countdown <= 0) beginWave(debugWave > 0 ? Math.min(EASY_WAVES.length - 1, debugWave - 1) : 0);
   }
   if (state.mode === 'waves') runWaves(dt);
   for (const enemy of state.enemies) if (enemy.alive) moveEnemy(enemy, dt);
@@ -395,10 +506,10 @@ function moveEnemy(enemy, dt) {
   }
   enemy.node.classList.remove('e-stunned');
   if (enemy.flight) {
-    // Air route: no tracks, no phase gates, no haste zones — cryo slow and gravity
-    // pull still bite, otherwise flyers would ignore every control tower.
+    // Air route: no tracks, no phase gates, no haste zones — cryo slow, frostbite
+    // and gravity still bite, otherwise flyers would ignore every control tower.
     enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-    enemy.dist += enemy.speed * (1 - (enemy.slow || 0)) * dt;
+    enemy.dist += enemy.speed * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
     if (enemy.dist >= enemy.flight.total) { leakEnemy(enemy); return; }
     const [fx, fy] = flightPos(enemy, enemy.dist);
     const [px, py] = flightPos(enemy, enemy.dist - 8);
@@ -415,7 +526,7 @@ function moveEnemy(enemy, dt) {
     if (enemy.pulseTimer <= 0) { enemy.pulseTimer = 8; fxRing(...posOf(enemy), 'fx-ring-virus'); }
   }
   enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-  enemy.dist += enemy.speed * haste * (1 - (enemy.slow || 0)) * dt;
+  enemy.dist += enemy.speed * haste * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
   const sampler = state.samplers[enemy.pathIdx];
   for (const event of state.gateEvents) {
     if (enemy.usedGates.has(event.index)) continue;
@@ -448,13 +559,18 @@ function runWaves(dt) {
       paintBars(enemy);
     }
   } else if (!state.enemies.some((enemy) => enemy.alive) && state.intermission <= 0) {
-    const bonus = 25 + (state.waveIndex + 1) * 5;
+    // Income pass: cleared waves pay real build money — plus every Scrap Foundry
+    // overclock and compactor module prints extra salvage on top.
+    const forgeLevels = state.towers
+      .filter((tower) => tower.id === 'scrapforge')
+      .reduce((sum, forge) => sum + moduleLevel(forge, 'compactor'), 0);
+    const bonus = 40 + (state.waveIndex + 1) * 12 + 8 * forgeLevels;
     state.cash += bonus;
     state.earned += bonus;
     // Scrap Foundry: prints bonus Nexus Coins into the commander's wallet per cleared wave.
     const forges = state.towers.filter((tower) => tower.id === 'scrapforge');
     if (forges.length) {
-      const bank = 18 * forges.length;
+      const bank = forges.reduce((sum, forge) => sum + 18 + 10 * moduleLevel(forge, 'overclock'), 0);
       state.bonusNc += bank;
       for (const forge of forges) floatText(forge.x, forge.y - 30, `+${bank} NC BANKED`, 'nc-float');
     }
@@ -475,6 +591,10 @@ function beginWave(index) {
   state.mode = 'waves';
   state.waveIndex = index;
   const wave = EASY_WAVES[index];
+  state.hpScale = 1 + WAVE_HP_SCALE * index;
+  const surge = wave.mod ? SURGE_MODS[wave.mod] : null;
+  state.surgeSpeed = surge ? surge.speed : 1;
+  if (surge && surge.hp !== 1) state.hpScale *= surge.hp;
   const queue = [];
   const bosses = [];
   for (const [key, count] of wave.groups) {
@@ -485,7 +605,7 @@ function beginWave(index) {
   state.queue = queue;
   state.spawnGap = 0;
   state.spawnSide = 0;
-  banner(`WAVE ${String(index + 1).padStart(2, '0')} / ${EASY_WAVES.length}`, wave.phase ? `// ${wave.phase}` : '// HOSTILES INBOUND', 'banner-wave');
+  banner(`WAVE ${String(index + 1).padStart(2, '0')} / ${EASY_WAVES.length}`, surge ? `// ${surge.label} — ${surge.note}` : wave.phase ? `// ${wave.phase}` : '// HOSTILES INBOUND', 'banner-wave');
   updateHud();
 }
 
@@ -600,7 +720,7 @@ function banner(title, sub, cls) {
 
 // --- Mode vote (EASY live, everything else coming soon) ---------------------------------
 const MODES = [
-  { id: 'easy', label: 'EASY', sub: '15 WAVES // 3 BOSSES', ready: true },
+  { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: 'JUNCTION PRESSURE', ready: false },
   { id: 'hard', label: 'HARD', sub: 'DUAL LANE SIEGE', ready: false },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
@@ -610,19 +730,18 @@ const MODES = [
 function showVote(context) {
   closeVote();
   state.mode = 'vote';
-  state.roomVote = context === 'room' ? { votes: {}, myId: myPlayerId } : null;
   const panel = document.createElement('div');
   panel.className = 'vote-overlay';
   panel.innerHTML = `
     <div class="vote-card">
-      <div class="eyebrow">${context === 'room' ? '// SQUAD VOTE — 2 COMMANDERS' : '// SOLO DEPLOYMENT'}</div>
+      <div class="eyebrow">// SOLO DEPLOYMENT</div>
       <h2>CHOOSE COMBAT PROTOCOL</h2>
       <div class="mode-grid">${MODES.map((mode) => `
         <button class="mode-card${mode.ready ? '' : ' locked'}" type="button" data-mode="${mode.id}" ${mode.ready ? '' : 'disabled'}>
           <span class="mode-stamp">${mode.ready ? 'READY' : 'COMING SOON'}</span>
           <b>${mode.label}</b><small>${mode.sub}</small>
         </button>`).join('')}</div>
-      <p class="vote-state" id="vote-state">${context === 'room' ? 'Waiting for both commanders to vote…' : 'Select a protocol to deploy.'}</p>
+      <p class="vote-state" id="vote-state">Select a protocol to deploy.</p>
       <button class="inline-button" id="vote-cancel" type="button">CANCEL</button>
     </div>`;
   battlefield.appendChild(panel);
@@ -635,47 +754,7 @@ function showVote(context) {
 function castVote(mode) {
   playSound();
   state.myVote = mode;
-  if (state.roomVote) {
-    state.roomVote.votes[state.roomVote.myId] = mode;
-    sendToPeer({ type: 'game-vote', voter: state.roomVote.myId, mode });
-    paintVotes();
-    maybeLaunchRoom();
-  } else {
-    launchCombat(mode);
-  }
-}
-
-function lockVote(mode) {
-  const panel = state.votePanel;
-  if (!panel) return;
-  panel.querySelectorAll('.mode-card').forEach((card) => {
-    card.classList.toggle('picked', card.dataset.mode === mode);
-    card.disabled = true;
-  });
-  const line = panel.querySelector('#vote-state');
-  if (line) line.textContent = `PROTOCOL LOCKED: ${mode.toUpperCase()} — DEPLOYING…`;
-  const cancel = panel.querySelector('#vote-cancel');
-  if (cancel) cancel.hidden = true;
-}
-
-function paintVotes() {
-  const panel = state.votePanel;
-  if (!panel || !state.roomVote) return;
-  const line = panel.querySelector('#vote-state');
-  const names = { 0: 'HOST', 1: 'GUEST' };
-  const parts = [0, 1].map((id) => {
-    const vote = state.roomVote.votes[id];
-    return `<span class="vote-chip${vote ? ' voted' : ''}">${names[id]}: ${vote ? vote.toUpperCase() : 'VOTING…'}</span>`;
-  });
-  if (line) line.innerHTML = parts.join('');
-}
-
-function maybeLaunchRoom() {
-  if (!state.roomVote) return;
-  if (state.roomVote.votes[0] && state.roomVote.votes[1]) {
-    const mode = state.roomVote.votes[state.roomVote.myId] || 'easy';
-    launchCombat(mode);
-  }
+  launchCombat(mode);
 }
 
 function closeVote() {
@@ -688,6 +767,8 @@ function startMission(map, skipVote = false) {
   state.map = map;
   state.mode = 'vote';
   state.samplers = buildSamplers(map);
+  // Flat point cloud of every lane — placement checks + drone spawn gates use it.
+  state.trackPts = state.samplers.flatMap((sampler) => sampler.pts);
   prepMechanics(map, state.samplers);
   state.cash = debugCash || START_SALVAGE;
   state.baseHp = BASE_MAX;
@@ -708,7 +789,7 @@ function startMission(map, skipVote = false) {
   updateHud();
   setStatus(`COMBAT PROTOCOL // ${map.name}`);
   if (skipVote) launchCombat('easy');
-  else showVote(typeof myPlayerId === 'number' && (roomCode && peerConnected) ? 'room' : 'solo');
+  else showVote('solo');
 }
 
 function launchCombat(mode) {
@@ -774,7 +855,7 @@ function endMission(win) {
       <div class="eyebrow">${win ? '// PROTOCOL COMPLETE' : '// CORE LOST'}</div>
       <h2>${win ? 'SECTOR CLEARED' : 'CORE BREACHED'}</h2>
       <div class="end-stats">
-        <div><span>OUTCOME</span><b>${win ? 'ALL 15 WAVES REPELLED' : `FELL ON WAVE ${state.waveIndex + 1}`}</b></div>
+        <div><span>OUTCOME</span><b>${win ? `ALL ${EASY_WAVES.length} WAVES REPELLED` : `FELL ON WAVE ${state.waveIndex + 1}`}</b></div>
         <div><span>ELIMINATIONS</span><b>${state.kills}</b></div>
         <div><span>SALVAGE EARNED</span><b>$${state.earned}</b></div>
         <div><span>BASE INTEGRITY</span><b>${Math.round(state.baseHp)}/${BASE_MAX}</b></div>
@@ -800,6 +881,7 @@ function endMission(win) {
   }
   panel.querySelector('#end-redeploy').addEventListener('click', () => { panel.remove(); state.endPanel = null; resetBoard(); startMission(state.map); });
   panel.querySelector('#end-bay').addEventListener('click', () => { resetBoard(); restoreRecon(); openMenu('play'); });
+  notifyRoomEnded();
   banner(win ? 'SECTOR CLEARED' : 'CORE BREACHED', win ? '// VICTORY TOKEN EARNED' : '// EVACUATE', win ? 'banner-green' : 'banner-red');
   playSound();
 }
@@ -863,15 +945,16 @@ function refreshBarAfford() {
     slot.classList.toggle('poor', Boolean(entry && state.cash < entry.cost));
   });
   const head = state.bar.querySelector('.lo-head b');
-  if (head) head.textContent = `${state.towers.length} DEPLOYED`;
+  if (head) head.textContent = `${state.towers.length}/${towerLimit()} DEPLOYED`;
 }
 
 function refreshPanelAfford() {
   if (!state.towerPanel || !state.panelTower) return;
   state.towerPanel.querySelectorAll('.tp-up').forEach((row) => {
-    const track = row.dataset.track;
-    const maxed = state.panelTower.up[track] >= MAX_UP;
-    const poor = !maxed && state.cash < upCost(state.panelTower, track);
+    const mod = towerModules(state.panelTower.id).find((item) => item.id === row.dataset.track);
+    if (!mod) return;
+    const maxed = moduleLevel(state.panelTower, mod.id) >= mod.max;
+    const poor = !maxed && state.cash < upCost(state.panelTower, mod.id);
     row.classList.toggle('poor', poor);
     const button = row.querySelector('.tp-buy');
     if (button) button.disabled = maxed || poor;
@@ -887,7 +970,8 @@ function toggleBuild(id) {
   if (state.building && state.building.id === id) { setBuilding(null); return; }
   const entry = window.CBZShop && CBZShop.TOWERS.find((item) => item.id === id);
   if (!entry) return;
-  if (state.towers.length >= MAX_TOWERS) { playSound('alarm'); showToast(`Command grid saturated — ${MAX_TOWERS} units max.`); return; }
+  const limit = towerLimit();
+  if (state.towers.length >= limit) { playSound('alarm'); showToast(`Command grid saturated — ${limit} units max at ${window.CBZ_ROOM_PLAYERS || 1} commander(s).`); return; }
   if (state.cash < entry.cost) { playSound('alarm'); showToast(`Need $${entry.cost} salvage to deploy ${entry.name}.`); return; }
   setBuilding(entry);
 }
@@ -915,6 +999,12 @@ function setBuilding(entry) {
 function canPlace(x, y) {
   if (x < FOOT_HALF || x > 1000 - FOOT_HALF || y < FOOT_HALF || y > 600 - FOOT_HALF) return { ok: false, reason: 'OUT OF BOUNDS' };
   if (Math.hypot(x - state.map.core.x, y - state.map.core.y) < CORE_CLEAR) return { ok: false, reason: 'KEEP CLEAR OF THE CORE' };
+  // The convoy lane is hostile territory — no building on or across the track.
+  for (const [tx, ty] of state.trackPts) {
+    const dx = tx - x;
+    const dy = ty - y;
+    if (dx * dx + dy * dy < TRACK_CLEAR * TRACK_CLEAR) return { ok: false, reason: 'KEEP OFF THE TRACK' };
+  }
   for (const tower of state.towers) {
     if (Math.abs(tower.x - x) < SEP && Math.abs(tower.y - y) < SEP) return { ok: false, reason: 'TOO CLOSE — CLEARANCE BOX' };
   }
@@ -988,7 +1078,7 @@ function placeTower(entry, x, y) {
   state.cash -= entry.cost;
   const node = towerNode(entry, x, y);
   state.layers.towers.appendChild(node);
-  const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, up: { dmg: 0, rate: 0, rng: 0 } };
+  const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, webDmg: 1, up: Object.fromEntries(towerModules(entry.id).map((mod) => [mod.id, 0])) };
   state.towers.push(tower);
   node.classList.add('placed');
   setTimeout(() => node.classList.remove('placed'), 620);
@@ -1020,25 +1110,28 @@ function towerNode(entry, x, y) {
 
 // --- Field modules: buy temporary per-tower upgrades with salvage ----------------------
 function upgradeTracks(tower) {
-  if (ATTACKER_TOWERS.has(tower.id)) return ['dmg', 'rate', 'rng'];
-  // Aura/support units widen their field instead; the Scrap Foundry prints money, full stop.
-  if (tower.entry.stats.rng > 0 && tower.id !== 'scrapforge') return ['rng'];
-  return [];
+  return towerModules(tower.id);
 }
 
-function upCost(tower, track) {
-  return Math.round(tower.entry.cost * UPGRADE_TRACKS[track].costK * (tower.up[track] + 1));
+function upCost(tower, moduleId) {
+  const mod = towerModules(tower.id).find((item) => item.id === moduleId);
+  return Math.round(tower.entry.cost * mod.costK * (moduleLevel(tower, moduleId) + 1));
 }
 
 function effStats(tower) {
   const s = tower.entry.stats;
-  const up = tower.up || { dmg: 0, rate: 0, rng: 0 };
-  return {
-    dmg: s.dmg * (1 + UPGRADE_TRACKS.dmg.mult * up.dmg),
-    rate: s.rate * (1 + UPGRADE_TRACKS.rate.mult * up.rate),
-    rng: s.rng >= 999 ? s.rng : Math.round(s.rng * (1 + UPGRADE_TRACKS.rng.mult * up.rng)),
-    infinite: s.rng >= 999,
-  };
+  const up = tower.up || {};
+  let dmg = s.dmg;
+  let rate = s.rate;
+  let rng = s.rng;
+  for (const mod of towerModules(tower.id)) {
+    const lv = up[mod.id] || 0;
+    if (!lv || !mod.mult) continue;
+    if (mod.mult.dmg) dmg *= 1 + mod.mult.dmg * lv;
+    if (mod.mult.rate) rate *= 1 + mod.mult.rate * lv;
+    if (mod.mult.rng && rng < 999) rng = Math.round(rng * (1 + mod.mult.rng * lv));
+  }
+  return { dmg, rate, rng, infinite: s.rng >= 999 };
 }
 
 function paintTowerRange(tower) {
@@ -1050,15 +1143,16 @@ function paintTowerRange(tower) {
   if (aura) aura.setAttribute('r', r);
 }
 
-function buyUpgrade(tower, track) {
+function buyUpgrade(tower, moduleId) {
   if (state.mode !== 'waves' && state.mode !== 'countdown') return;
-  if (tower.up[track] >= MAX_UP) return;
-  const cost = upCost(tower, track);
+  const mod = towerModules(tower.id).find((item) => item.id === moduleId);
+  if (!mod || moduleLevel(tower, moduleId) >= mod.max) return;
+  const cost = upCost(tower, moduleId);
   if (state.cash < cost) { playSound('alarm'); showToast(`Need $${cost} salvage for that module.`); return; }
   state.cash -= cost;
-  tower.up[track] += 1;
-  if (track === 'rng') paintTowerRange(tower);
-  floatText(tower.x, tower.y - 42, `${UPGRADE_TRACKS[track].label} LV${tower.up[track]}`, 'up-float');
+  tower.up[moduleId] = moduleLevel(tower, moduleId) + 1;
+  if (mod.mult && mod.mult.rng) paintTowerRange(tower);
+  floatText(tower.x, tower.y - 42, `${mod.label} LV${tower.up[moduleId]}`, 'up-float');
   fxRing(tower.x, tower.y, 'fx-ring-white');
   playSound();
   updateHud();
@@ -1076,18 +1170,22 @@ function openTowerPanel(tower) {
     rate: (v) => v.toFixed(1),
     rng: (v) => (entry.stats.rng >= 999 ? 'INF' : String(Math.round(v))),
   };
-  const pips = (level) => Array.from({ length: MAX_UP }, (unused, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('');
-  const rows = upgradeTracks(tower).map((track) => {
-    const meta = UPGRADE_TRACKS[track];
-    const level = tower.up[track];
-    const maxed = level >= MAX_UP;
-    const next = entry.stats[track] * (1 + meta.mult * (level + 1));
-    const stat = track === 'rng' && es.infinite ? 'INF' : fmt[track](es[track]);
+  const pips = (level, max) => Array.from({ length: max }, (unused, i) => `<i class="${i < level ? 'on' : ''}"></i>`).join('');
+  const rows = upgradeTracks(tower).map((mod) => {
+    const level = moduleLevel(tower, mod.id);
+    const maxed = level >= mod.max;
+    let statCell = `<span class="tp-info">${mod.info}</span>`;
+    if (mod.mult) {
+      const key = Object.keys(mod.mult)[0];
+      const next = entry.stats[key] * (1 + mod.mult[key] * (level + 1));
+      const stat = key === 'rng' && es.infinite ? 'INF' : fmt[key](es[key]);
+      statCell = `<b class="tp-val">${stat}${maxed ? '' : ` <i>→ ${fmt[key](next)}</i>`}</b>`;
+    }
     return `
-      <div class="tp-up${maxed ? ' maxed' : ''}" data-track="${track}">
-        <div class="tp-up-head"><span>${meta.label}</span><b class="tp-val">${stat}${maxed ? '' : ` <i>→ ${fmt[track](next)}</i>`}</b></div>
-        <div class="tp-pips">${pips(level)}</div>
-        <button class="tp-buy" type="button" data-track="${track}" ${maxed ? 'disabled' : ''}>${maxed ? 'MAXED' : `$${upCost(tower, track)}`}</button>
+      <div class="tp-up${maxed ? ' maxed' : ''}" data-track="${mod.id}">
+        <div class="tp-up-head"><span>${mod.label}</span>${statCell}</div>
+        <div class="tp-pips">${pips(level, mod.max)}</div>
+        <button class="tp-buy" type="button" data-track="${mod.id}" ${maxed ? 'disabled' : ''}>${maxed ? 'MAXED' : `$${upCost(tower, mod.id)}`}</button>
       </div>`;
   }).join('');
   const panel = document.createElement('div');
@@ -1095,12 +1193,12 @@ function openTowerPanel(tower) {
   panel.innerHTML = `
     <div class="tp-head"><b>${entry.name}</b><span class="tp-cat">${entry.cat.toUpperCase()}</span></div>
     <div class="tp-stats">
-      <div><span>DMG</span><b>${Math.round(es.dmg) || '—'}</b></div>
+      <div><span>DMG</span><b>${Math.round(es.dmg * (tower.webDmg || 1)) || '—'}</b></div>
       <div><span>RATE</span><b>${es.rate ? `${(es.rate * tower.boost).toFixed(1)}/s` : '—'}</b></div>
       <div><span>RNG</span><b>${es.infinite ? 'INF' : es.rng || '—'}</b></div>
     </div>
     <p class="tp-special">${entry.special.replace('>> ', '')}</p>
-    ${rows ? `<div class="tp-ups"><div class="tp-ups-head"><span>// FIELD MODULES</span><b>TEMPORARY · LV ${MAX_UP} MAX</b></div>${rows}</div>` : '<p class="tp-noup">NO FIELD MODULES — ECONOMY UNIT</p>'}
+    <div class="tp-ups"><div class="tp-ups-head"><span>// FIELD MODULES</span><b>TEMPORARY · THIS MISSION</b></div>${rows}</div>
     <button class="tp-sell" type="button">SALVAGE BACK +$${refund}</button>
     <p class="tp-note">MODULES ARE SCRAPPED ON SELL &amp; WHEN THE MISSION ENDS</p>`;
   battlefield.appendChild(panel);
@@ -1137,17 +1235,35 @@ function sellTower(tower) {
 // --- Tower combat brain ------------------------------------------------------------------
 function updateTowers(dt) {
   if (!state.layers || !state.towers.length) return;
-  // Nanite Web: +30% fire rate to towers inside its web (web radius scales with modules).
+  // Nanite Web: fire-rate + (with uplink modules) damage boosts to towers in the
+  // web; web radius and boost values scale with the web's own modules.
   const webs = state.towers.filter((tower) => tower.id === 'naniteweb');
   for (const tower of state.towers) {
-    tower.boost = webs.some((web) => web !== tower && Math.hypot(web.x - tower.x, web.y - tower.y) <= effStats(web).rng) ? 1.3 : 1;
+    tower.boost = 1;
+    tower.webDmg = 1;
+    for (const web of webs) {
+      if (web === tower) continue;
+      if (Math.hypot(web.x - tower.x, web.y - tower.y) > effStats(web).rng) continue;
+      tower.boost = Math.max(tower.boost, 1.3 + 0.1 * moduleLevel(web, 'efficiency'));
+      tower.webDmg = Math.max(tower.webDmg, 1 + 0.1 * moduleLevel(web, 'uplink'));
+    }
   }
-  // Enemy-touching auras first: cryo slow, null debuff, gravity pull.
+  // Scrap Foundry salvage drones: squad-wide bounty boost, capped at +24%.
+  let droneLevels = 0;
+  for (const tower of state.towers) {
+    if (tower.id === 'scrapforge') droneLevels += moduleLevel(tower, 'drones');
+  }
+  state.bountyMult = 1 + Math.min(0.24, 0.04 * droneLevels);
+  // Enemy-touching auras first: cryo slow + frostbite, null debuff, gravity pull.
   for (const enemy of state.enemies) {
     if (!enemy.alive) continue;
     enemy.slow = 0;
     enemy.weak = false;
     enemy.pull = 0;
+    enemy.frost = 0;
+    enemy.weakAmp = 0;
+    enemy.shredLv = 0;
+    enemy.gravSlow = 0;
   }
   for (const tower of state.towers) {
     const es = effStats(tower);
@@ -1156,9 +1272,20 @@ function updateTowers(dt) {
       if (!enemy.alive) continue;
       const [ex, ey] = posOf(enemy);
       if (Math.hypot(ex - tower.x, ey - tower.y) > rng) continue;
-      if (tower.id === 'cryobeacon') enemy.slow = Math.max(enemy.slow, 0.35);
-      if (tower.id === 'nullbeacon') enemy.weak = true;
-      if (tower.id === 'gravwell') { enemy.pull = 30; enemy.node.classList.add('e-grav'); }
+      if (tower.id === 'cryobeacon') {
+        enemy.slow = Math.max(enemy.slow, 0.35 + 0.07 * moduleLevel(tower, 'deepfreeze'));
+        enemy.frost = Math.max(enemy.frost, 0.08 * moduleLevel(tower, 'frostbite'));
+      }
+      if (tower.id === 'nullbeacon') {
+        enemy.weak = true;
+        enemy.weakAmp = Math.max(enemy.weakAmp, 0.15 + 0.08 * moduleLevel(tower, 'resonance'));
+        enemy.shredLv = Math.max(enemy.shredLv, moduleLevel(tower, 'collapse'));
+      }
+      if (tower.id === 'gravwell') {
+        enemy.pull = Math.max(enemy.pull, 30 + 12 * moduleLevel(tower, 'well'));
+        enemy.gravSlow = Math.max(enemy.gravSlow, 0.08 * moduleLevel(tower, 'tidal'));
+        enemy.node.classList.add('e-grav');
+      }
     }
   }
   for (const enemy of state.enemies) if (!enemy.pull) enemy.node.classList.remove('e-grav');
@@ -1210,7 +1337,7 @@ function fireLine(tower, target, cls, width = 2) {
 }
 
 function fireTower(tower, target) {
-  const dmg = effStats(tower).dmg;
+  const dmg = effStats(tower).dmg * (tower.webDmg || 1);
   const [tx, ty] = posOf(target);
   switch (tower.id) {
     case 'sentinel': {
@@ -1222,7 +1349,9 @@ function fireTower(tower, target) {
       damageEnemy(target, dmg);
       const hit = [target];
       let from = target;
-      for (let hop = 0; hop < 2; hop++) {
+      // Storm Cell Array: each level adds another fork to the chain.
+      const forks = 2 + moduleLevel(tower, 'storm');
+      for (let hop = 0; hop < forks; hop++) {
         const [fx, fy] = posOf(from);
         const next = state.enemies.find((enemy) => enemy.alive && !hit.includes(enemy) && Math.hypot(...posOf(enemy).map((v, i) => v - [fx, fy][i])) <= 90);
         if (!next) break;
@@ -1239,7 +1368,7 @@ function fireTower(tower, target) {
     case 'plasmort': {
       const shell = svgNode('circle', { class: 'fx-shell', r: 4 });
       state.layers.fx.appendChild(shell);
-      state.projectiles.push({ kind: 'shell', x: tower.x, y: tower.y, tx, ty, speed: 260, dmg, node: shell });
+      state.projectiles.push({ kind: 'shell', x: tower.x, y: tower.y, tx, ty, speed: 260, dmg, splash: 40 + 7 * moduleLevel(tower, 'shell'), node: shell });
       break;
     }
     case 'railspire': {
@@ -1250,24 +1379,35 @@ function fireTower(tower, target) {
       const line = svgNode('line', { class: 'fx-line fx-beam-rail', x1: tower.x, y1: tower.y, x2: ex, y2: ey });
       state.layers.fx.appendChild(line);
       setTimeout(() => line.remove(), 300);
+      const half = 14 + 4 * moduleLevel(tower, 'bore');
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
         const [px, py] = posOf(enemy);
-        if (distToSegment(px, py, tower.x, tower.y, ex, ey) <= 14) damageEnemy(enemy, dmg);
+        if (distToSegment(px, py, tower.x, tower.y, ex, ey) <= half) damageEnemy(enemy, dmg);
       }
       break;
     }
     case 'stingerpad': {
-      const missile = svgNode('polygon', { class: 'fx-missile', points: '5,0 -3,3 -3,-3' });
-      state.layers.fx.appendChild(missile);
-      state.projectiles.push({ kind: 'missile', x: tower.x, y: tower.y, target, speed: 320, dmg, node: missile, angle: 0 });
+      // Twin Missile Pods: extra salvo rounds engage other hostiles in range.
+      const salvo = 1 + moduleLevel(tower, 'pods');
+      const es = effStats(tower);
+      const rng = es.infinite ? 9999 : es.rng;
+      const wingmen = salvo > 1
+        ? state.enemies.filter((enemy) => enemy.alive && enemy !== target && Math.hypot(...posOf(enemy).map((v, i) => v - [tower.x, tower.y][i])) <= rng).slice(0, salvo - 1)
+        : [];
+      for (const tgt of [target, ...wingmen]) {
+        const missile = svgNode('polygon', { class: 'fx-missile', points: '5,0 -3,3 -3,-3' });
+        state.layers.fx.appendChild(missile);
+        state.projectiles.push({ kind: 'missile', x: tower.x, y: tower.y, target: tgt, speed: 320, dmg, node: missile, angle: 0 });
+      }
       break;
     }
     case 'teslacoil': {
       damageEnemy(target, dmg);
       const zapped = [target];
+      const zapMax = 3 + moduleLevel(tower, 'links');
       for (const enemy of state.enemies) {
-        if (zapped.length >= 3) break;
+        if (zapped.length >= zapMax) break;
         if (!enemy.alive || enemy === target) continue;
         const [ex, ey] = posOf(enemy);
         if (Math.hypot(ex - tower.x, ey - tower.y) <= tower.entry.stats.rng) zapped.push(enemy);
@@ -1284,21 +1424,25 @@ function fireTower(tower, target) {
       const burst = svgNode('circle', { class: 'fx-flak', cx: bx, cy: by, r: 5 });
       state.layers.fx.appendChild(burst);
       setTimeout(() => burst.remove(), 420);
+      const radius = 26 + 5 * moduleLevel(tower, 'burst');
+      const airMult = 4 + moduleLevel(tower, 'shred');
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
         const [px, py] = posOf(enemy);
-        if (Math.hypot(px - bx, py - by) <= 26) damageEnemy(enemy, enemy.t.flying ? dmg * 4 : dmg);
+        if (Math.hypot(px - bx, py - by) <= radius) damageEnemy(enemy, enemy.t.flying ? dmg * airMult : dmg);
       }
       break;
     }
     case 'pyrewell': {
       damageEnemy(target, dmg);
-      applyBurn(target);
+      applyBurn(target, burnStats(tower));
       fireLine(tower, target, 'fx-tracer fx-fire');
       break;
     }
     case 'quantum': {
-      const execute = target.hp < target.maxHp * 0.1;
+      // Phase Calibration widens the execute window below 10% HP.
+      const threshold = 0.1 + 0.05 * moduleLevel(tower, 'calibration');
+      const execute = target.hp < target.maxHp * threshold;
       damageEnemy(target, execute ? 99999 : dmg, { phase: true });
       const [qx, qy] = fireLine(tower, target, 'fx-beam-quantum', 1.6);
       floatText(qx, qy - 16, execute ? 'EXECUTED' : `-${dmg}`, execute ? 'core-float' : 'cash-float');
@@ -1310,16 +1454,17 @@ function fireTower(tower, target) {
       break;
     }
     case 'singularity': {
+      const radius = 70 + 12 * moduleLevel(tower, 'horizon');
       const sx2 = tx;
       const sy2 = ty;
-      const hole = svgNode('circle', { class: 'fx-sing', cx: sx2, cy: sy2, r: 70 });
+      const hole = svgNode('circle', { class: 'fx-sing', cx: sx2, cy: sy2, r: radius });
       state.layers.fx.appendChild(hole);
       setTimeout(() => hole.remove(), 620);
       fxRing(sx2, sy2, 'fx-ring-virus');
       for (const enemy of state.enemies) {
         if (!enemy.alive) continue;
         const [px, py] = posOf(enemy);
-        if (Math.hypot(px - sx2, py - sy2) <= 70) damageEnemy(enemy, dmg, { phase: true });
+        if (Math.hypot(px - sx2, py - sy2) <= radius) damageEnemy(enemy, dmg, { phase: true });
       }
       floatText(sx2, sy2 - 74, 'SINGULARITY', 'core-float');
       break;
@@ -1329,8 +1474,24 @@ function fireTower(tower, target) {
   }
 }
 
-function applyBurn(enemy) {
-  enemy.burn = { dps: 6, t: 3 };
+function burnStats(tower) {
+  // Pyre Well module build: incendiary mix, sustained burn, wildfire spread.
+  return {
+    dps: 6 + 3 * moduleLevel(tower, 'incendiary'),
+    t: 3 + 0.75 * moduleLevel(tower, 'sustain'),
+    spread: 55 + 15 * moduleLevel(tower, 'wildfire'),
+  };
+}
+
+function applyBurn(enemy, mix) {
+  // Fresh ignition passes the well's burnStats(); contagion spread passes the
+  // dying foe's mix so upgraded burns propagate through the pack.
+  const stats = mix || { dps: 6, t: 3, spread: 55 };
+  enemy.burn = {
+    dps: stats.dps,
+    t: Math.max(enemy.burn ? enemy.burn.t : 0, stats.t),
+    spread: stats.spread || 55,
+  };
   enemy.node.classList.add('e-burning');
 }
 
@@ -1364,7 +1525,7 @@ function updateProjectiles(dt) {
         for (const enemy of state.enemies) {
           if (!enemy.alive) continue;
           const [px, py] = posOf(enemy);
-          if (Math.hypot(px - p.tx, py - p.ty) <= 40) damageEnemy(enemy, p.dmg);
+          if (Math.hypot(px - p.tx, py - p.ty) <= (p.splash || 40)) damageEnemy(enemy, p.dmg);
         }
       } else {
         p.x += (dx / Math.hypot(dx, dy)) * step;
@@ -1457,25 +1618,14 @@ document.addEventListener('keydown', (event) => {
 });
 
 // --- Room sync ----------------------------------------------------------------------------
-function sendToPeer(message) {
-  if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+function notifyRoomEnded() {
+  // Mission concluded while deployed from a squad room — unlock the bay for everyone.
+  try {
+    if (typeof sendToService === 'function' && typeof currentRoom !== 'undefined' && currentRoom) {
+      sendToService({ type: 'end' });
+    }
+  } catch { /* room service optional — solo missions never hit this. */ }
 }
 
-function handleRoomMessage(message) {
-  if (message.type === 'game-vote' && state.roomVote) {
-    state.roomVote.votes[message.voter] = message.mode;
-    paintVotes();
-    maybeLaunchRoom();
-  }
-}
-
-function peerLeft() {
-  if (state.votePanel && state.roomVote) {
-    closeVote();
-    restoreRecon();
-    showToast('The other commander left — vote cancelled.');
-  }
-}
-
-window.CBZCombat = { startMission, abort, handleRoomMessage, peerLeft, offerRoomVote: () => { dialog.close(); openBattlefield('easy'); startMission(BATTLE_MAPS.easy); }, active: () => state.mode !== 'idle' };
+window.CBZCombat = { startMission, abort, active: () => state.mode !== 'idle' };
 })();

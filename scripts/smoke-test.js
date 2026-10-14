@@ -1,6 +1,6 @@
 // Compact end-to-end smoke test: accounts (name + email) + rooms + static files + map recon assets.
-// Usage: node scripts/smoke-test.js  (expects server on PORT 3111)
-const BASE = 'http://127.0.0.1:3111';
+// Usage: node scripts/smoke-test.js  (expects server on PORT, default 3111)
+const BASE = `http://127.0.0.1:${process.env.PORT || 3111}`;
 const { WebSocket } = require('ws');
 
 let passed = 0;
@@ -21,16 +21,32 @@ async function api(path, payload) {
 
 function wsConnect() {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket('ws://127.0.0.1:3111/rooms');
-    socket.on('open', () => resolve(socket));
+    const socket = new WebSocket(`ws://127.0.0.1:${process.env.PORT || 3111}/rooms`);
+    const inbox = [];
+    const waiters = [];
+    socket.on('message', (raw) => {
+      const message = JSON.parse(raw.toString());
+      const index = waiters.findIndex((waiter) => waiter.match(message));
+      if (index >= 0) {
+        const [waiter] = waiters.splice(index, 1);
+        clearTimeout(waiter.timer);
+        waiter.resolve(message);
+        return;
+      }
+      inbox.push(message);
+    });
+    socket.on('open', () => resolve({
+      socket,
+      send: (message) => socket.send(JSON.stringify(message)),
+      close: () => socket.close(),
+      wait: (match, ms = 2500, label = 'message') => new Promise((resolveWait, rejectWait) => {
+        const found = inbox.findIndex(match);
+        if (found >= 0) return resolveWait(inbox.splice(found, 1)[0]);
+        const timer = setTimeout(() => rejectWait(new Error(`timeout waiting for ${label}`)), ms);
+        waiters.push({ match, resolve: resolveWait, timer });
+      }),
+    }));
     socket.on('error', reject);
-  });
-}
-
-function nextMessage(socket) {
-  return new Promise((resolve) => {
-    const handler = (raw) => { socket.off('message', handler); resolve(JSON.parse(raw.toString())); };
-    socket.on('message', handler);
   });
 }
 
@@ -68,38 +84,53 @@ function nextMessage(socket) {
   check('session token resolves commander', session.status === 200 && session.body.name === 'SMOKE1' && session.body.email === 'smoke@mail.com');
   check('session bad token rejected', (await api('/api/session', { token: 'deadbeef' })).status === 401);
 
-  // --- Rooms over WebSocket ---
+  // --- Deployment bays over WebSocket (fixed 4-bay room service) ---
+  const regAlly = await api('/api/register', { name: 'SMOKE3', email: 's3@mail.com', passcode: 'corebreach' });
+  check('ally account registered for bay test', regAlly.status === 200 && !!regAlly.body.token);
+
   const host = await wsConnect();
-  host.send(JSON.stringify({ type: 'create' }));
-  const created = await nextMessage(host);
-  check('room create returns 6-digit code + playerId 0', created.type === 'created' && /^\d{6}$/.test(created.code) && created.playerId === 0);
+  host.send({ type: 'authenticate', token: reg.body.token });
+  const linked = await host.wait((m) => m.type === 'linked', 2500, 'linked(host)');
+  check('authenticate returns linked + 4 fixed bays', Array.isArray(linked.rooms) && linked.rooms.length === 4 && linked.callsign === 'SMOKE1');
 
   const stranger = await wsConnect();
-  stranger.send(JSON.stringify({ type: 'join', code: '000001' }));
-  check('join unknown room errors', (await nextMessage(stranger)).type === 'error');
+  stranger.send({ type: 'rooms' });
+  check('unauthenticated bays request rejected', (await stranger.wait((m) => m.type === 'auth-error', 2500, 'auth-error')).type === 'auth-error');
+
+  host.send({ type: 'join', room: 'room-01' });
+  const joined = await host.wait((m) => m.type === 'joined', 2500, 'joined(host)');
+  check('commander enters bay-01 as lead', joined.room.id === 'room-01' && joined.room.commanders[0].isHost === true);
 
   const guest = await wsConnect();
-  guest.send(JSON.stringify({ type: 'join', code: created.code }));
-  const joined = await nextMessage(guest);
-  check('guest joins room as playerId 1', joined.type === 'joined' && joined.code === created.code && joined.playerId === 1);
-  check('host notified of peer join', (await nextMessage(host)).type === 'peer-joined');
+  guest.send({ type: 'authenticate', token: regAlly.body.token });
+  await guest.wait((m) => m.type === 'linked', 2500, 'linked(guest)');
+  guest.send({ type: 'join', room: 'room-01' });
+  const joinedAlly = await guest.wait((m) => m.type === 'joined', 2500, 'joined(guest)');
+  check('ally joins the same bay', joinedAlly.room.commanders.length === 2);
+  const rosterUpdate = await host.wait((m) => m.type === 'room-update' && m.room.commanders.length === 2, 2500, 'roster growth');
+  check('lead sees roster grow to 2', rosterUpdate.room.commanders.some((commander) => commander.callsign === 'SMOKE3'));
 
-  const third = await wsConnect();
-  third.send(JSON.stringify({ type: 'join', code: created.code }));
-  check('third commander rejected (room full)', (await nextMessage(third)).type === 'error');
+  guest.send({ type: 'config', map: 'easy' });
+  const denied = await guest.wait((m) => m.type === 'error', 2500, 'config denied');
+  check('non-lead map config rejected', /room lead/i.test(denied.message));
+  host.send({ type: 'config', map: 'medium' });
+  const mapPick = await host.wait((m) => m.type === 'room-update' && m.room.map === 'medium', 2500, 'map config');
+  check('lead picks the map', mapPick.room.map === 'medium');
 
-  host.send(JSON.stringify({ type: 'game-vote', voter: 0, mode: 'easy' }));
-  const relayed = await nextMessage(guest);
-  check('game messages relay host to guest', relayed.type === 'game-vote' && relayed.mode === 'easy' && relayed.voter === 0);
-  guest.send(JSON.stringify({ type: 'game-vote', voter: 1, mode: 'easy' }));
-  const relayedBack = await nextMessage(host);
-  check('game messages relay guest to host', relayedBack.type === 'game-vote' && relayedBack.voter === 1);
+  host.send({ type: 'start' });
+  const launch = await host.wait((m) => m.type === 'launch', 2500, 'launch(host)');
+  const allyLaunch = await guest.wait((m) => m.type === 'launch', 2500, 'launch(guest)');
+  check('lead start broadcasts launch to both', launch.room.started === true && allyLaunch.room.started === true && allyLaunch.room.map === 'medium');
+
+  guest.send({ type: 'end' });
+  const ended = await host.wait((m) => m.type === 'room-update' && m.room.started === false, 2500, 'end unlock');
+  check('mission end unlocks the bay', ended.room.started === false);
 
   host.close();
-  check('guest notified when host leaves', (await nextMessage(guest)).type === 'peer-left');
+  const leaveUpdate = await guest.wait((m) => m.type === 'room-update' && m.room.commanders.length === 1, 2500, 'lead left');
+  check('roster shrinks when lead disconnects', leaveUpdate.room.commanders.length === 1);
   guest.close();
   stranger.close();
-  third.close();
 
   console.log(`\nRESULT: ${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
