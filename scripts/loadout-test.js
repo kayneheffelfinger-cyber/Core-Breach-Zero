@@ -42,28 +42,30 @@ async function api(path, payload) {
     check('profile ships loadout field', Array.isArray(prof.data.profile.loadout), JSON.stringify(prof.data.profile));
     check('default loadout = [sentinel]', prof.data.profile.loadout.length === 1 && prof.data.profile.loadout[0] === 'sentinel', JSON.stringify(prof.data.profile.loadout));
 
-    // Own a second blueprint so multi-bay loadouts can be tested.
-    const buy = await api('/api/shop/purchase', { token, itemId: 'arclance' });
-    check('buy arclance ok', Boolean(buy.data.ok), JSON.stringify(buy.data));
+    // Earn the reward blueprint so a 3-bay loadout can be tested.
+    const win = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 10, bossesKilled: 1, difficulty: 'easy' });
+    check('mission win unlocks firstClear', win.data.ok && win.data.profile.firstClear === true, JSON.stringify(win.data));
+    const buy = await api('/api/shop/purchase', { token, itemId: 'lazermortar' });
+    check('claim lazermortar reward', Boolean(buy.data.ok), JSON.stringify(buy.data));
 
-    const set = await api('/api/loadout', { token, loadout: ['sentinel', 'arclance'] });
-    check('set 2-bay loadout ok', set.data.ok && set.data.profile.loadout.join(',') === 'sentinel,arclance', JSON.stringify(set.data));
+    const set = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar'] });
+    check('set 2-bay loadout ok', set.data.ok && set.data.profile.loadout.join(',') === 'sentinel,lazermortar', JSON.stringify(set.data));
 
-    const reorder = await api('/api/loadout', { token, loadout: ['arclance', 'sentinel'] });
-    check('reorder bays ok', reorder.data.ok && reorder.data.profile.loadout.join(',') === 'arclance,sentinel', JSON.stringify(reorder.data));
+    const reorder = await api('/api/loadout', { token, loadout: ['lazermortar', 'sentinel'] });
+    check('reorder bays ok', reorder.data.ok && reorder.data.profile.loadout.join(',') === 'lazermortar,sentinel', JSON.stringify(reorder.data));
 
-    const unowned = await api('/api/loadout', { token, loadout: ['plasmort'] });
+    const unowned = await api('/api/loadout', { token, loadout: ['virus'] });
     check('unowned blueprint rejected 400', unowned.status === 400, JSON.stringify(unowned.data));
 
-    const six = await api('/api/loadout', { token, loadout: ['sentinel', 'sentinel', 'sentinel', 'sentinel', 'sentinel', 'sentinel'] });
-    check('oversized/dup loadout rejected 400', six.status === 400, JSON.stringify(six.data));
+    const oversized = await api('/api/loadout', { token, loadout: ['sentinel', 'sentinel', 'sentinel', 'lazermortar'] });
+    check('oversized/dup loadout rejected 400', oversized.status === 400, JSON.stringify(oversized.data));
 
     const nonList = await api('/api/loadout', { token, loadout: 'sentinel' });
     check('non-array payload rejected 400', nonList.status === 400);
 
     const empty = await api('/api/loadout', { token, loadout: [] });
     check('empty loadout allowed', empty.data.ok && empty.data.profile.loadout.length === 0, JSON.stringify(empty.data));
-    const restore = await api('/api/loadout', { token, loadout: ['arclance', 'sentinel'] });
+    const restore = await api('/api/loadout', { token, loadout: ['lazermortar', 'sentinel'] });
     check('loadout restored for phase 2', restore.data.ok && restore.data.profile.loadout.length === 2, JSON.stringify(restore.data));
 
     const mission = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 15, bossesKilled: 3, flawless: true, bonusNc: 40, difficulty: 'easy' });
@@ -75,7 +77,7 @@ async function api(path, payload) {
     check('bonusNc clamped to 600', capped.data.ok && capped.data.rewards.bonusNc === 600, JSON.stringify(capped.data.rewards));
   } else {
     const prof = await api('/api/profile', { token });
-    check('loadout persisted after restart', prof.data.ok && prof.data.profile.loadout.join(',') === 'arclance,sentinel', JSON.stringify(prof.data.profile));
+    check('loadout persisted after restart', prof.data.ok && prof.data.profile.loadout.join(',') === 'lazermortar,sentinel', JSON.stringify(prof.data.profile));
   }
 
   console.log(`\n${pass} PASSED / ${fail} FAILED`);

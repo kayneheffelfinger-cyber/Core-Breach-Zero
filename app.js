@@ -93,21 +93,8 @@ const LOCAL = (() => {
   // Mirrors server.js SHOP — keep in sync (name/unlock/price/currency only).
   const SHOP = {
     sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
-    arclance: { name: 'ARC LANCE', unlock: 1, price: 400, currency: 'nc' },
-    plasmort: { name: 'PLASMA MORTAR', unlock: 1, price: 400, currency: 'nc', firstClear: true },
-    cryobeacon: { name: 'CRYO DISRUPTOR', unlock: 3, price: 650, currency: 'nc' },
-    scrapforge: { name: 'SCRAP FOUNDRY', unlock: 5, price: 700, currency: 'nc' },
-    railspire: { name: 'RAIL SPIRE', unlock: 7, price: 950, currency: 'nc' },
-    stingerpad: { name: 'STINGER PAD', unlock: 9, price: 1150, currency: 'nc' },
-    teslacoil: { name: 'TESLA COIL', unlock: 11, price: 1400, currency: 'nc' },
-    flakstorm: { name: 'FLAK STORM', unlock: 13, price: 1600, currency: 'nc' },
-    pyrewell: { name: 'PYRE WELL', unlock: 15, price: 1850, currency: 'nc' },
-    nullbeacon: { name: 'NULL BEACON', unlock: 17, price: 2200, currency: 'nc' },
-    quantum: { name: 'QUANTUM SNIPER', unlock: 19, price: 2600, currency: 'nc' },
-    gravwell: { name: 'GRAVITY WELL', unlock: 21, price: 3000, currency: 'nc' },
-    naniteweb: { name: 'NANITE WEB', unlock: 23, price: 3400, currency: 'nc' },
-    phasedeca: { name: 'PHASE DECIMATOR', unlock: 25, price: 180, currency: 'bt' },
-    singularity: { name: 'SINGULARITY CORE', unlock: 30, price: 400, currency: 'bt' },
+    lazermortar: { name: 'LAZER MORTAR', unlock: 1, price: 0, currency: 'nc', firstClear: true },
+    virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -226,12 +213,11 @@ const LOCAL = (() => {
       if (meta.owned.includes(String(body.itemId || ''))) throw new Error('Blueprint already in your armory.');
       if (meta.level < item.unlock) throw new Error(`Clearance level ${item.unlock} required.`);
       if (item.firstClear && !meta.firstClear) throw new Error('Reward locked — beat Easy Mode to decrypt this blueprint.');
-      if (item.price > 0) {
-        const balance = item.currency === 'bt' ? meta.bt : meta.nc;
-        if (balance < item.price) throw new Error(item.currency === 'bt' ? 'Not enough Breach Tokens.' : 'Not enough Nexus Coins.');
-        if (item.currency === 'bt') meta.bt -= item.price;
-        else meta.nc -= item.price;
-      }
+      const cost = typeof item.price === 'object' ? item.price : { [item.currency === 'bt' ? 'bt' : 'nc']: item.price || 0 };
+      if ((cost.nc || 0) > 0 && meta.nc < cost.nc) throw new Error('Not enough Nexus Coins.');
+      if ((cost.bt || 0) > 0 && meta.bt < cost.bt) throw new Error('Not enough Breach Tokens.');
+      if (cost.nc) meta.nc -= cost.nc;
+      if (cost.bt) meta.bt -= cost.bt;
       meta.owned.push(String(body.itemId || ''));
       const accounts = readAccounts();
       accounts[account.name] = account;
@@ -243,8 +229,8 @@ const LOCAL = (() => {
       const meta = account.meta;
       const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
       if (!list) throw new Error('Loadout payload must be a list of blueprint ids.');
-      const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
-      if (clean.length !== list.length) throw new Error('Loadouts hold max 5 bays and only blueprints you own.');
+      const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 3);
+      if (clean.length !== list.length) throw new Error('Loadouts hold max 3 bays and only blueprints you own.');
       meta.loadout = clean;
       const accounts = readAccounts();
       accounts[account.name] = account;
@@ -642,7 +628,15 @@ const LOCAL_ROOMS = (() => {
     }, 5000);
   }
 
-  return { handle, wake, snapshots: () => snapshots(read()) };
+  function role() {
+    // Squad seat for the co-op relay: the tab holding seat 0 of a started bay leads.
+    const mine = findMine(read());
+    if (!mine || !mine.started || !mine.players.length) return 'solo';
+    const seat = mine.players.findIndex((player) => player.tab === TAB_ID);
+    return seat === 0 ? 'host' : 'guest';
+  }
+
+  return { handle, wake, snapshots: () => snapshots(read()), role };
 })();
 
 function sendToService(message) {
@@ -822,8 +816,17 @@ function handleServiceMessage(message) {
   if (message.type === 'linked') {
     myCallsign = message.callsign;
     roomList = message.rooms;
+    if (Array.isArray(message.chat)) message.chat.forEach(appendChat);
     setStatus('ROOM SERVICE ONLINE');
     if (dialog.open && showingBays) renderBays();
+    return;
+  }
+  if (message.type === 'chat') {
+    appendChat(message);
+    return;
+  }
+  if (message.type === 'coop') {
+    if (window.CBZCombat) CBZCombat.coopHandle({ k: message.kind, ...(message.data || {}) });
     return;
   }
   if (message.type === 'rooms') {
@@ -873,6 +876,19 @@ function showLaunchSequence(mapId) {
   if (dialog.open) dialog.close();
   roomLaunch = true;
   window.CBZ_ROOM_PLAYERS = currentRoom ? currentRoom.commanders.length : 1;
+  // Squad relay: the room lead's sim is authoritative — everyone else mirrors it
+  // and ships intents. Server rooms relay over WebSocket; LOCAL bays relay over
+  // a BroadcastChannel between tabs on this machine.
+  if (LOCAL.down()) {
+    const channel = new BroadcastChannel(`cbz-coop-${currentRoom ? currentRoom.id : 'solo'}`);
+    channel.onmessage = (event) => { if (window.CBZCombat) CBZCombat.coopHandle(event.data); };
+    window.CBZCoopBridge = { role: LOCAL_ROOMS.role(), send: (msg) => channel.postMessage(msg) };
+  } else {
+    window.CBZCoopBridge = {
+      role: currentRoom && isRoomLead(currentRoom) ? 'host' : 'guest',
+      send: (msg) => { const { k, ...data } = msg; sendToService({ type: 'coop', kind: k, data }); },
+    };
+  }
   const overlay = document.querySelector('#loading-overlay');
   const state = document.querySelector('#loading-state');
   state.textContent = `SQUAD LINKED // LOADING ${map.name}`;
@@ -919,6 +935,79 @@ function paintWallet() {
   if (levelLine) levelLine.textContent = `COMMANDER LV ${profile.level}`;
 }
 window.paintWallet = paintWallet;
+
+// --- Global comms: one shared channel, in the menu or mid-mission -----------------------
+const CHAT_KEY = 'cbz-global-chat';
+function chatIdentity() {
+  return myCallsign || myName || 'GUEST';
+}
+function chatOnline() {
+  return !LOCAL.down() && socket && socket.readyState === WebSocket.OPEN;
+}
+function appendChat(entry) {
+  const log = document.querySelector('#chat-log');
+  if (!log || !entry || !entry.text) return;
+  const line = document.createElement('div');
+  line.className = 'chat-line';
+  line.innerHTML = `<b>${escapeHtml(String(entry.from || 'GRID'))}</b><span>${escapeHtml(String(entry.text))}</span>`;
+  log.appendChild(line);
+  while (log.children.length > 80) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+function sendChat(text) {
+  const clean = String(text || '').trim().slice(0, 280);
+  if (!clean) return;
+  if (chatOnline()) {
+    socket.send(JSON.stringify({ type: 'chat', text: clean }));
+    return;
+  }
+  // Static host: relay through localStorage so tabs on this machine stay linked.
+  const entry = { from: chatIdentity(), text: clean, ts: Date.now() };
+  try {
+    const list = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+    list.push(entry);
+    localStorage.setItem(CHAT_KEY, JSON.stringify(list.slice(-50)));
+  } catch { /* storage optional. */ }
+  appendChat(entry);
+}
+window.addEventListener('storage', (event) => {
+  if (event.key !== CHAT_KEY || !event.newValue) return;
+  try {
+    const list = JSON.parse(event.newValue);
+    const last = list[list.length - 1];
+    if (last) appendChat(last);
+  } catch { /* malformed storage — ignore. */ }
+});
+(function ensureComms() {
+  if (document.querySelector('#comms-toggle')) return;
+  const toggle = document.createElement('button');
+  toggle.id = 'comms-toggle';
+  toggle.type = 'button';
+  toggle.textContent = 'COMMS';
+  const panel = document.createElement('div');
+  panel.id = 'comms-panel';
+  panel.hidden = true;
+  panel.innerHTML = `
+    <div class="comms-head"><span>// GLOBAL NET</span><b id="comms-scope">LOCAL RELAY</b></div>
+    <div class="chat-log" id="chat-log"></div>
+    <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="280" autocomplete="off" placeholder="Transmit to the grid..."><button type="submit">SEND</button></form>`;
+  document.body.appendChild(toggle);
+  document.body.appendChild(panel);
+  toggle.addEventListener('click', () => {
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) {
+      document.querySelector('#comms-scope').textContent = chatOnline() ? 'SERVER RELAY' : 'LOCAL RELAY';
+      const log = document.querySelector('#chat-log');
+      if (log) log.scrollTop = log.scrollHeight;
+    }
+  });
+  panel.querySelector('#chat-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = panel.querySelector('#chat-input');
+    sendChat(input.value);
+    input.value = '';
+  });
+})();
 
 // --- Map recon: battle maps (no waves, no enemies, no game mode) -----------------
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -1052,6 +1141,8 @@ function openBattlefield(mapId) {
   if (!map) return;
   playSound();
   dialog.close();
+  // Map recon is always a solo sim — any squad bridge from a previous mission dies here.
+  if (!roomLaunch) window.CBZCoopBridge = null;
   document.querySelector('#battle-map-name').textContent = map.name;
   document.querySelector('#battle-map-sector').textContent = map.sector;
   document.querySelector('#battle-map-mech').textContent = map.mechanic;

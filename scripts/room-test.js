@@ -112,6 +112,31 @@ function connect() {
   check('launch broadcast to lead', launchA.room.started && launchA.room.map === 'medium');
   check('launch broadcast to ally', launchB.room.started && launchB.room.map === 'medium');
 
+  console.log('Global comms');
+  A.send({ type: 'chat', text: 'grid online' });
+  const chatAtB = await B.wait((m) => m.type === 'chat' && m.text === 'grid online', 2500, 'chat relay');
+  check('chat relays between commanders', Boolean(chatAtB) && typeof chatAtB.from === 'string' && chatAtB.from.length > 0);
+  A.send({ type: 'chat', text: '' });
+  const emptyChat = await Promise.race([
+    B.wait((m) => m.type === 'chat' && m.text === '', 600, 'empty chat').then(() => 'leaked', () => 'none'),
+    new Promise((resolve) => setTimeout(() => resolve('none'), 700)),
+  ]);
+  check('empty chat dropped', emptyChat === 'none');
+
+  console.log('Squad combat relay');
+  A.send({ type: 'coop', kind: 'sync', data: { m: 'waves', c: 320 } });
+  const syncAtB = await B.wait((m) => m.type === 'coop' && m.kind === 'sync' && m.data.c === 320, 2500, 'sync relay');
+  check('host snapshot reaches ally', Boolean(syncAtB));
+  B.send({ type: 'coop', kind: 'intent', data: { a: 'place', id: 'sentinel', x: 300, y: 300 } });
+  const intentAtA = await A.wait((m) => m.type === 'coop' && m.kind === 'intent' && m.data.a === 'place', 2500, 'intent relay');
+  check('ally intent reaches the lead', Boolean(intentAtA));
+  B.send({ type: 'coop', kind: 'sync', data: { m: 'waves', c: 1 } });
+  const stray = await Promise.race([
+    A.wait((m) => m.type === 'coop' && m.kind === 'sync', 600, 'stray sync').then(() => 'leaked', () => 'blocked'),
+    new Promise((resolve) => setTimeout(() => resolve('blocked'), 700)),
+  ]);
+  check('non-lead sync is blocked', stray === 'blocked');
+
   B.send({ type: 'end' });
   const endedA = await A.wait((m) => m.type === 'room-update' && m.room.started === false && m.room.commanders.length === 2, 2500, 'end unlock');
   check('mission end unlocks the bay', endedA.room.started === false && endedA.room.commanders.length === 2);

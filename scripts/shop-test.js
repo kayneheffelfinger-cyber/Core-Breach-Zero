@@ -29,6 +29,8 @@ async function api(path, payload) {
   check('homepage 200', home.status === 200);
   const shopjs = await fetch(`${BASE}/shop.js`);
   check('shop.js served 200', shopjs.status === 200);
+  const decal = await fetch(`${BASE}/assets/towers/sentinel.png`);
+  check('tower decal asset served', decal.ok);
 
   const identity = { identity: 'SHOPCMDR1', passcode: 'test1234' };
   const reg = await api('/api/register', { name: 'SHOPCMDR1', email: 'shop1@test.io', passcode: 'test1234' });
@@ -46,12 +48,9 @@ async function api(path, payload) {
     check('starter sentinel owned', Boolean(prof.data.profile.owned.includes('sentinel')), JSON.stringify(prof.data.profile));
     check('xpNext mirrors formula (55)', prof.data.profile.xpNext === 55, `xpNext=${prof.data.profile.xpNext}`);
 
-    const buy = await api('/api/shop/purchase', { token, itemId: 'arclance' });
-    check('buy arclance 400 -> nc=350', buy.data.ok && buy.data.profile.nc === 350 && buy.data.profile.owned.includes('arclance'), JSON.stringify(buy.data));
-    const dup = await api('/api/shop/purchase', { token, itemId: 'arclance' });
-    check('duplicate rejected 409', dup.status === 409);
-    const locked = await api('/api/shop/purchase', { token, itemId: 'singularity' });
-    check('locked tower rejected 403', locked.status === 403, JSON.stringify(locked.data));
+    // Reward blueprint stays encrypted until the first Easy Mode clearance.
+    const reward = await api('/api/shop/purchase', { token, itemId: 'lazermortar' });
+    check('reward blueprint locked 403 before first clear', reward.status === 403, JSON.stringify(reward.data));
     const unknown = await api('/api/shop/purchase', { token, itemId: 'nope' });
     check('unknown blueprint 404', unknown.status === 404);
     const bad = await api('/api/profile', { token: 'garbage' });
@@ -69,23 +68,44 @@ async function api(path, payload) {
     check('firstClear flagged once', win.data.rewards.firstClear === true);
     check('win xp = 400 (180+90+80+50)', win.data.rewards.xp === 400);
     check('levels L2->L5 (+3), xp=13 left', win.data.rewards.levelsGained === 3 && win.data.profile.level === 5 && win.data.profile.xp === 13, JSON.stringify(win.data.rewards));
-    check('wallet totals nc=635 bt=11', win.data.profile.nc === 635 && win.data.profile.bt === 11, JSON.stringify(win.data.profile));
-    const poor = await api('/api/shop/purchase', { token, itemId: 'scrapforge' });
-    check('unaffordable+unlocked -> 402 (700 > 635)', poor.status === 402, `status=${poor.status}`);
+    check('wallet totals nc=1035 bt=11 (750+50+235)', win.data.profile.nc === 1035 && win.data.profile.bt === 11, JSON.stringify(win.data.profile));
+
+    // First clearance decrypts the Lazer Mortar — free reward blueprint.
+    const reward2 = await api('/api/shop/purchase', { token, itemId: 'lazermortar' });
+    check('lazermortar unlocks after first clear (free)', reward2.data.ok && reward2.data.profile.owned.includes('lazermortar') && reward2.data.profile.nc === 1035, JSON.stringify(reward2.data));
+    const dup = await api('/api/shop/purchase', { token, itemId: 'lazermortar' });
+    check('duplicate rejected 409', dup.status === 409);
+
+    // Virus costs 1000 NC + 30 BT — partial funds are rejected, then a grind pass funds it.
+    const poor = await api('/api/shop/purchase', { token, itemId: 'virus' });
+    check('dual-currency shortfall 402', poor.status === 402, `status=${poor.status}`);
+    for (let i = 0; i < 4; i++) {
+      await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 6, difficulty: 'easy' });
+    }
+    const funded = await api('/api/profile', { token });
+    check('grind banked >= 1000 NC and >= 30 BT', funded.data.profile.nc >= 1000 && funded.data.profile.bt >= 30, JSON.stringify(funded.data.profile));
+    const virus = await api('/api/shop/purchase', { token, itemId: 'virus' });
+    check('dual-currency purchase deducts both', virus.data.ok && virus.data.profile.owned.includes('virus') && virus.data.profile.nc === funded.data.profile.nc - 1000 && virus.data.profile.bt === funded.data.profile.bt - 30, JSON.stringify(virus.data));
+
+    // 3-bay loadout cap on the server side.
+    const trio = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus'] });
+    check('3-bay loadout accepted', trio.data.ok && trio.data.profile.loadout.length === 3, JSON.stringify(trio.data));
+    const four = await api('/api/loadout', { token, loadout: ['sentinel', 'sentinel', 'lazermortar', 'virus'] });
+    check('4th bay rejected 400', four.status === 400, JSON.stringify(four.data));
 
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
     check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
     check('no second firstClear, bt=5 (20-wave caps)', again.data.rewards.firstClear === false && again.data.rewards.bt === 5, JSON.stringify(again.data.rewards));
-    check('levels L5->L7, xp=6 banked (20-wave caps)', again.data.profile.level === 7 && again.data.profile.xp === 6, JSON.stringify(again.data.profile));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
 
   if (phase === '2') {
     const prof = await api('/api/profile', { token });
-    check('persisted after restart: nc=845 bt=14 lv=6', prof.data.profile && prof.data.profile.nc === 845 && prof.data.profile.bt === 14 && prof.data.profile.level === 6, JSON.stringify(prof.data));
-    check('persisted armory: sentinel + arclance', prof.data.profile.owned.includes('sentinel') && prof.data.profile.owned.includes('arclance'), JSON.stringify(prof.data.profile));
-    check('persisted firstClear flag', prof.data.profile.firstClear === true);
+    const p = prof.data.profile || {};
+    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus'), JSON.stringify(p));
+    check('persisted firstClear flag', p.firstClear === true);
+    check('persisted 3-bay loadout', Array.isArray(p.loadout) && p.loadout.length === 3, JSON.stringify(p.loadout));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

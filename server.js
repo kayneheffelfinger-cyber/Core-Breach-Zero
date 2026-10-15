@@ -35,21 +35,8 @@ const MAX_LEVEL = 30;
 const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
 const SHOP = {
   sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
-  arclance: { name: 'ARC LANCE', unlock: 1, price: 400, currency: 'nc' },
-  plasmort: { name: 'PLASMA MORTAR', unlock: 1, price: 400, currency: 'nc', firstClear: true },
-  cryobeacon: { name: 'CRYO DISRUPTOR', unlock: 3, price: 650, currency: 'nc' },
-  scrapforge: { name: 'SCRAP FOUNDRY', unlock: 5, price: 700, currency: 'nc' },
-  railspire: { name: 'RAIL SPIRE', unlock: 7, price: 950, currency: 'nc' },
-  stingerpad: { name: 'STINGER PAD', unlock: 9, price: 1150, currency: 'nc' },
-  teslacoil: { name: 'TESLA COIL', unlock: 11, price: 1400, currency: 'nc' },
-  flakstorm: { name: 'FLAK STORM', unlock: 13, price: 1600, currency: 'nc' },
-  pyrewell: { name: 'PYRE WELL', unlock: 15, price: 1850, currency: 'nc' },
-  nullbeacon: { name: 'NULL BEACON', unlock: 17, price: 2200, currency: 'nc' },
-  quantum: { name: 'QUANTUM SNIPER', unlock: 19, price: 2600, currency: 'nc' },
-  gravwell: { name: 'GRAVITY WELL', unlock: 21, price: 3000, currency: 'nc' },
-  naniteweb: { name: 'NANITE WEB', unlock: 23, price: 3400, currency: 'nc' },
-  phasedeca: { name: 'PHASE DECIMATOR', unlock: 25, price: 180, currency: 'bt' },
-  singularity: { name: 'SINGULARITY CORE', unlock: 30, price: 400, currency: 'bt' },
+  lazermortar: { name: 'LAZER MORTAR', unlock: 1, price: 0, currency: 'nc', firstClear: true },
+  virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
 };
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -182,12 +169,12 @@ async function handleApi(request, response, pathname) {
     if (meta.owned.includes(itemId)) return sendJson(response, 409, { ok: false, error: 'Blueprint already in your armory.' });
     if (meta.level < item.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
     if (item.firstClear && !meta.firstClear) return sendJson(response, 403, { ok: false, error: 'Reward locked — beat Easy Mode to decrypt this blueprint.' });
-    if (item.price > 0) {
-      const balance = item.currency === 'bt' ? meta.bt : meta.nc;
-      if (balance < item.price) return sendJson(response, 402, { ok: false, error: item.currency === 'bt' ? 'Not enough Breach Tokens.' : 'Not enough Nexus Coins.' });
-      if (item.currency === 'bt') meta.bt -= item.price;
-      else meta.nc -= item.price;
-    }
+    // Prices may be single-currency (number) or dual-currency ({ nc, bt }).
+    const cost = typeof item.price === 'object' ? item.price : { [item.currency === 'bt' ? 'bt' : 'nc']: item.price || 0 };
+    if ((cost.nc || 0) > 0 && meta.nc < cost.nc) return sendJson(response, 402, { ok: false, error: 'Not enough Nexus Coins.' });
+    if ((cost.bt || 0) > 0 && meta.bt < cost.bt) return sendJson(response, 402, { ok: false, error: 'Not enough Breach Tokens.' });
+    if (cost.nc) meta.nc -= cost.nc;
+    if (cost.bt) meta.bt -= cost.bt;
     meta.owned.push(itemId);
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
@@ -200,8 +187,8 @@ async function handleApi(request, response, pathname) {
     const meta = accounts[name].meta;
     const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
     if (!list) return sendJson(response, 400, { ok: false, error: 'Loadout payload must be a list of blueprint ids.' });
-    const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
-    if (clean.length !== list.length) return sendJson(response, 400, { ok: false, error: 'Loadouts hold max 5 bays and only blueprints you own.' });
+    const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 3);
+    if (clean.length !== list.length) return sendJson(response, 400, { ok: false, error: 'Loadouts hold max 3 bays and only blueprints you own.' });
     meta.loadout = clean;
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
@@ -309,6 +296,17 @@ function roomsSnapshot() {
   return [...rooms.values()].map(roomSnapshot);
 }
 
+// --- Global comms ---------------------------------------------------------------------
+const CHAT_HISTORY = 50;
+const chatLog = [];
+function pushChat(entry) {
+  chatLog.push(entry);
+  if (chatLog.length > CHAT_HISTORY) chatLog.splice(0, chatLog.length - CHAT_HISTORY);
+}
+function chatHistory() {
+  return chatLog.slice();
+}
+
 function broadcastRooms() {
   const message = JSON.stringify({ type: 'rooms', rooms: roomsSnapshot() });
   for (const client of webSockets.clients) {
@@ -359,7 +357,7 @@ webSockets.on('connection', (socket) => {
       socket.authenticated = true;
       socket.sessionToken = token;
       socket.callsign = name;
-      send(socket, { type: 'linked', callsign: name, rooms: roomsSnapshot() });
+      send(socket, { type: 'linked', callsign: name, rooms: roomsSnapshot(), chat: chatHistory() });
       return;
     }
 
@@ -369,6 +367,40 @@ webSockets.on('connection', (socket) => {
     }
 
     if (message.type === 'rooms') return send(socket, { type: 'rooms', rooms: roomsSnapshot() });
+
+    // Global comms: every authenticated commander shares one channel, in the menu
+    // or mid-mission. Server relays to all linked clients and keeps a short history.
+    if (message.type === 'chat') {
+      const text = String(message.text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 280);
+      if (!text) return;
+      const entry = { type: 'chat', from: socket.callsign, text, ts: Date.now() };
+      pushChat(entry);
+      const payload = JSON.stringify(entry);
+      for (const client of webSockets.clients) {
+        if (client.readyState === client.OPEN && client.authenticated) client.send(payload);
+      }
+      return;
+    }
+
+    // Squad relay: host snapshots flow outward, guest intents flow back to the lead.
+    if (message.type === 'coop') {
+      const kind = String(message.kind || '');
+      if (!['sync', 'intent', 'over'].includes(kind)) return send(socket, { type: 'error', message: 'Unknown coop packet.' });
+      const coopRoom = rooms.get(socket.roomId);
+      if (!coopRoom || !coopRoom.started || !coopRoom.players.length) return;
+      const lead = coopRoom.players[0];
+      if (kind === 'intent') {
+        // Guests ship placements/installs to the lead — the lead's sim validates them.
+        if (lead.socket !== socket) return send(lead.socket, { type: 'coop', kind: 'intent', data: message.data, from: socket.callsign });
+        return;
+      }
+      if (lead.socket !== socket) return; // only the lead broadcasts sync / over
+      const payload = JSON.stringify({ type: 'coop', kind, data: message.data, from: socket.callsign });
+      for (const player of coopRoom.players) {
+        if (player.socket !== socket && player.socket.readyState === player.socket.OPEN) player.socket.send(payload);
+      }
+      return;
+    }
 
     if (message.type === 'join') {
       const room = rooms.get(String(message.room || ''));

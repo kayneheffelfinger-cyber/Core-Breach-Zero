@@ -623,3 +623,34 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .tw-on-pad .tw-base { stroke: #ffb45a; stroke-width: 2.5; }
 .tw-on-pad .tw-ped { stroke: #ffb45a; }
 .aa-float { fill: #ffb45a; }
+
+/* --- Upgrade ladder (shop cards + tower panel) --- */
+.tc-track { margin-top: 10px; border: 1px solid #26383d; background: rgba(10,18,22,.5); }
+.tc-track-head { display: block; padding: 6px 9px; color: var(--cyan); font: 700 8px var(--mono); letter-spacing: 1.4px; border-bottom: 1px solid #26383d; }
+.tc-tier { display: grid; grid-template-columns: 24px 1fr auto; grid-template-areas: 'num name cost' 'num info cost'; align-items: center; gap: 1px 8px; padding: 6px 9px; border-bottom: 1px dashed #1d2b30; }
+.tc-tier:last-child { border-bottom: none; }
+.tc-tier span { grid-area: num; color: #57707a; font: 700 10px var(--mono); }
+.tc-tier b { grid-area: name; color: var(--text); font: 700 9.5px var(--mono); letter-spacing: .6px; }
+.tc-tier small { grid-area: info; color: #8fa39d; font: 8px var(--mono); letter-spacing: .3px; }
+.tc-tier em { grid-area: cost; color: #ffb45a; font: 700 9.5px var(--mono); font-style: normal; }
+.tw-art { width: 100%; height: auto; display: block; border: 1px solid #26383d; background: #0a1216; }
+.ls-icon .tw-art { width: 54px; height: 54px; object-fit: cover; }
+.sync-float { fill: #7fd0ff; }
+.fx-slash { stroke: #c49bef; stroke-linecap: round; }
+
+/* --- Global comms panel --- */
+#comms-toggle { position: fixed; right: 16px; bottom: 16px; z-index: 90; padding: 9px 16px; border: 1px solid var(--cyan); background: rgba(10,18,22,.92); color: var(--cyan); font: 700 10px var(--mono); letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 18px rgba(112,225,208,.18); }
+#comms-toggle:hover { background: rgba(112,225,208,.14); }
+#comms-panel { position: fixed; right: 16px; bottom: 58px; z-index: 90; width: min(320px, calc(100vw - 32px)); max-height: min(430px, 62vh); display: grid; grid-template-rows: auto 1fr auto; border: 1px solid var(--cyan); background: rgba(6,12,15,.97); box-shadow: 0 0 40px rgba(112,225,208,.16); }
+#comms-panel[hidden] { display: none; }
+.comms-head { display: flex; justify-content: space-between; align-items: center; padding: 9px 12px; border-bottom: 1px solid #26383d; }
+.comms-head span { color: var(--cyan); font: 700 9px var(--mono); letter-spacing: 1.6px; }
+.comms-head b { color: #57707a; font: 700 8px var(--mono); letter-spacing: 1px; }
+.chat-log { overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 5px; }
+.chat-line { display: flex; gap: 8px; align-items: baseline; font: 10px var(--mono); }
+.chat-line b { color: var(--cyan); font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+.chat-line span { color: #c8d8d4; word-break: break-word; }
+.chat-form { display: flex; border-top: 1px solid #26383d; }
+.chat-form input { flex: 1; padding: 10px 12px; border: none; background: transparent; color: var(--text); font: 10px var(--mono); letter-spacing: .4px; outline: none; }
+.chat-form button { padding: 0 14px; border: none; border-left: 1px solid #26383d; background: rgba(112,225,208,.1); color: var(--cyan); font: 700 9px var(--mono); letter-spacing: 1.6px; cursor: pointer; }
+.chat-form button:hover { background: rgba(112,225,208,.22); }

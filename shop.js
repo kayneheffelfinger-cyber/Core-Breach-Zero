@@ -16,92 +16,66 @@ window.CBZShop = (() => {
 
   const ic = (inner) => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
-  // --- Blueprint catalog: 16 turret lines, each with its own signature trick ------
+  // --- Blueprint catalog: 3 turret lines, each with ONE linear upgrade track ------
+  // track: an ordered ladder of single improvements bought with salvage mid-mission.
+  // Every tier's `sets` are absolute stat values applied on install (cumulative).
   const TOWERS = [
-    { id: 'sentinel', name: 'SENTINEL TURRET', cat: 'offense', unlock: 1, price: 0, cost: 50, currency: 'nc',
+    { id: 'sentinel', name: 'SENTINEL TURRET', cat: 'offense', unlock: 1, price: 0, cost: 100, currency: 'nc',
       tagline: 'Rapid kinetic baseline — cheap, dependable, always ready.',
-      stats: { dmg: 11, rate: 1.45, rng: 140, tgt: 'SINGLE / GROUND · AA ON PADS' },
-      special: '>> The grid standard. Fast bursts, low salvage cost, never overheats.',
+      stats: { dmg: 6, rate: 1.5, rng: 130, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      special: '>> The grid standard. Deploy on a hex pad to link anti-air coverage.',
+      art: 'assets/towers/sentinel.png',
+      track: [
+        { label: 'HIGHER CALIBER', cost: 140, sets: { dmg: 11 }, info: 'DMG 6 → 11' },
+        { label: 'BETTER TECH', cost: 210, sets: { rate: 1.8, rng: 145 }, info: 'RATE 1.5 → 1.8 · RNG 130 → 145' },
+        { label: 'SENTINEL PROMOTION', cost: 350, sets: { dmg: 18, rng: 180 }, info: 'DMG 11 → 18 · RNG 145 → 180' },
+      ],
       icon: ic('<path d="M9 33h22"/><path d="M13 33v-7h14v7"/><path d="M20 26V7"/><circle cx="20" cy="6" r="2.4"/>') },
-    { id: 'arclance', name: 'ARC LANCE', cat: 'offense', unlock: 1, price: 400, cost: 85, currency: 'nc',
-      tagline: 'Voltage that jumps the queue.',
-      stats: { dmg: 18, rate: 0.9, rng: 165, tgt: 'SINGLE / GROUND + AIR' },
-      special: '>> Chain lightning forks to 2 extra targets at 60% damage per arc.',
-      icon: ic('<path d="M23 4L11 23h8l-5 13 14-20h-8z"/>') },
-    { id: 'plasmort', name: 'PLASMA MORTAR', cat: 'offense', unlock: 1, price: 400, cost: 135, currency: 'nc', reward: true,
+    { id: 'lazermortar', name: 'LAZER MORTAR', cat: 'offense', unlock: 1, price: 0, cost: 250, currency: 'nc', reward: true,
       tagline: 'REWARD BLUEPRINT — beat Easy Mode to decrypt it.',
-      stats: { dmg: 60, rate: 0.5, rng: 210, tgt: 'SPLASH 40U · AA ON PADS' },
-      special: '>> Shells detonate on impact for full damage in a 40-unit splash. Trophy chassis for clearing Easy Mode.',
+      stats: { dmg: 60, rate: 0.3, rng: 180, splash: 30, tgt: 'SPLASH 30U · AA ON PADS' },
+      special: '>> Lazer shells detonate on impact for full damage inside the blast ring. Trophy chassis for clearing Easy Mode.',
+      art: 'assets/towers/lazermortar.png',
+      track: [
+        { label: 'BETTER SCOPE', cost: 400, sets: { rng: 210, rate: 0.35 }, info: 'RNG 180 → 210 · RATE 0.3 → 0.35' },
+        { label: 'HIGHLY EXPLOSIVE ROUNDS', cost: 500, sets: { splash: 60, dmg: 80 }, info: 'SPLASH 30 → 60 · DMG 60 → 80' },
+        { label: 'TRUE MORTAR', cost: 1250, sets: { rate: 0.25, dmg: 100, splash: 65 }, info: 'RATE 0.35 → 0.25 · DMG 80 → 100 · SPLASH 60 → 65' },
+        { label: 'USA FUNDING', cost: 2000, sets: { dmg: 140, rate: 0.2, rng: 245, splash: 70 }, info: 'DMG 100 → 140 · RATE 0.25 → 0.2 · RNG 210 → 245 · SPLASH 65 → 70' },
+      ],
       icon: ic('<path d="M8 34h16"/><path d="M12 34L28 18"/><rect x="27" y="6" width="9" height="9" transform="rotate(45 31.5 10.5)"/><path d="M6 14a26 26 0 0 1 11-10" stroke-dasharray="3 4"/>') },
-    { id: 'cryobeacon', name: 'CRYO DISRUPTOR', cat: 'control', unlock: 3, price: 650, cost: 115, currency: 'nc',
-      tagline: 'A cold that never lifts.',
-      stats: { dmg: 4, rate: 1, rng: 140, tgt: 'AURA SLOW 35%' },
-      special: '>> Everything inside the field moves 35% slower — permanently.',
-      icon: ic('<path d="M20 4v32"/><path d="M7 12l26 16"/><path d="M33 12L7 28"/><path d="M20 10l-4 4M20 10l4 4"/>') },
-    { id: 'scrapforge', name: 'SCRAP FOUNDRY', cat: 'support', unlock: 5, price: 700, cost: 95, currency: 'nc',
-      tagline: 'Turns wreckage into wages.',
-      stats: { dmg: 0, rate: 0, rng: 0, tgt: 'ECONOMY' },
-      special: '>> Prints +18 bonus NC every wave your squad clears.',
-      icon: ic('<circle cx="20" cy="20" r="7"/><circle cx="20" cy="20" r="2.5"/><path d="M20 6v5M20 29v5M6 20h5M29 20h5M10 10l3.5 3.5M30 10l-3.5 3.5M10 30l3.5-3.5M30 30l-3.5-3.5"/>') },
-    { id: 'railspire', name: 'RAIL SPIRE', cat: 'offense', unlock: 7, price: 950, cost: 175, currency: 'nc',
-      tagline: 'One line, every offender.',
-      stats: { dmg: 60, rate: 0.5, rng: 240, tgt: 'PIERCE LINE' },
-      special: '>> Slugs drill through every hostile standing in the flight line.',
-      icon: ic('<path d="M15 34L20 6l5 28"/><path d="M4 20h32" stroke-dasharray="2 4"/><circle cx="20" cy="15" r="2.2"/>') },
-    { id: 'stingerpad', name: 'STINGER PAD', cat: 'offense', unlock: 9, price: 1150, cost: 195, currency: 'nc',
-      tagline: 'Hornets with a lock-on license.',
-      stats: { dmg: 12, rate: 2.2, rng: 190, tgt: 'SEEKING / AIR PRIORITY' },
-      special: '>> Missiles chase their target — 200% damage vs flying units.',
-      icon: ic('<path d="M7 33h26"/><path d="M13 27l7-11 7 11z"/><path d="M20 16V9"/><path d="M13 6h14"/>') },
-    { id: 'teslacoil', name: 'TESLA COIL', cat: 'control', unlock: 11, price: 1400, cost: 215, currency: 'nc',
-      tagline: 'Random acts of voltage.',
-      stats: { dmg: 22, rate: 0.7, rng: 130, tgt: 'CHAIN / STUN 0.5S' },
-      special: '>> Every hit may arc-stun up to 3 hostiles for half a second.',
-      icon: ic('<rect x="14" y="23" width="12" height="10"/><path d="M12 23h16"/><path d="M14 18h12"/><path d="M16 13h8"/><path d="M25 13l6-5"/><path d="M26 16l7-1"/>') },
-    { id: 'flakstorm', name: 'FLAK STORM', cat: 'offense', unlock: 13, price: 1600, cost: 245, currency: 'nc',
-      tagline: 'The sky is a target-rich environment.',
-      stats: { dmg: 30, rate: 1.4, rng: 175, tgt: 'BURST / 400% VS AIR' },
-      special: '>> Proximity bursts shred air units for 400% damage.',
-      icon: ic('<path d="M20 34V18"/><path d="M20 34L9 14"/><path d="M20 34L31 14"/><circle cx="20" cy="13" r="2.2"/><circle cx="9" cy="10" r="2.2"/><circle cx="31" cy="10" r="2.2"/>') },
-    { id: 'pyrewell', name: 'PYRE WELL', cat: 'offense', unlock: 15, price: 1850, cost: 235, currency: 'nc',
-      tagline: 'Fire that learns to spread.',
-      stats: { dmg: 10, rate: 1.2, rng: 145, tgt: 'BURN 6/S · 3S' },
-      special: '>> Burned hostiles ignite their neighbors when they die — contagion burn.',
-      icon: ic('<path d="M20 5c6 7 9 11 9 17a9 9 0 1 1-18 0c0-6 3-10 9-17z"/><path d="M20 33a4 4 0 0 1-4-4c0-3 2-5 4-8 2 3 4 5 4 8a4 4 0 0 1-4 4z"/>') },
-    { id: 'nullbeacon', name: 'NULL BEACON', cat: 'support', unlock: 17, price: 2200, cost: 265, currency: 'nc',
-      tagline: 'Strips the plating off the problem.',
-      stats: { dmg: 0, rate: 0, rng: 160, tgt: 'DEBUFF AURA' },
-      special: '>> Hostiles in range lose half their armor and take +15% damage.',
-      icon: ic('<path d="M4 20c5-8 12-12 16-12s11 4 16 12c-5 8-12 12-16 12S9 28 4 20z"/><circle cx="20" cy="20" r="4"/><path d="M8 32L32 8"/>') },
-    { id: 'quantum', name: 'QUANTUM SNIPER', cat: 'offense', unlock: 19, price: 2600, cost: 325, currency: 'nc',
-      tagline: 'The shot already happened.',
-      stats: { dmg: 150, rate: 0.25, rng: 999, tgt: 'SINGLE / EXECUTE' },
-      special: '>> Infinite range; instantly executes any hostile below 10% HP.',
-      icon: ic('<circle cx="20" cy="20" r="11"/><path d="M20 4v8M20 28v8M4 20h8M28 20h8"/><circle cx="20" cy="20" r="2" fill="currentColor" stroke="none"/>') },
-    { id: 'gravwell', name: 'GRAVITY WELL', cat: 'control', unlock: 21, price: 3000, cost: 285, currency: 'nc',
-      tagline: 'Physics, weaponized.',
-      stats: { dmg: 8, rate: 1, rng: 135, tgt: 'PULL FIELD' },
-      special: '>> Drags hostiles backwards while they crawl through the well.',
-      icon: ic('<circle cx="20" cy="20" r="4"/><circle cx="20" cy="20" r="9.5" stroke-dasharray="4 3"/><circle cx="20" cy="20" r="15" stroke-dasharray="2 5"/>') },
-    { id: 'naniteweb', name: 'NANITE WEB', cat: 'support', unlock: 23, price: 3400, cost: 305, currency: 'nc',
-      tagline: 'Your turrets, but caffeinated.',
-      stats: { dmg: 0, rate: 0, rng: 120, tgt: 'SUPPORT AURA' },
-      special: '>> Adjacent turrets fire 30% faster and cycle 20% quicker.',
-      icon: ic('<path d="M20 6l12 7v14l-12 7-12-7V13z"/><circle cx="20" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="32" cy="13" r="2" fill="currentColor" stroke="none"/><circle cx="32" cy="27" r="2" fill="currentColor" stroke="none"/><circle cx="20" cy="34" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="27" r="2" fill="currentColor" stroke="none"/><circle cx="8" cy="13" r="2" fill="currentColor" stroke="none"/><circle cx="20" cy="20" r="3"/>') },
-    { id: 'phasedeca', name: 'PHASE DECIMATOR', cat: 'special', unlock: 25, price: 180, cost: 425, currency: 'bt',
-      tagline: 'Ignores the armor phase entirely.',
-      stats: { dmg: 90, rate: 0.6, rng: 230, tgt: 'PHASE BEAM' },
-      special: '>> Beam phases through armor and shields — always full damage.',
-      icon: ic('<path d="M3 20h11"/><rect x="14" y="11" width="9" height="18"/><path d="M23 20h14"/><path d="M23 15l12-7"/><path d="M23 25l12 7"/>') },
-    { id: 'singularity', name: 'SINGULARITY CORE', cat: 'special', unlock: 30, price: 400, cost: 555, currency: 'bt',
-      tagline: 'Deletes a zip code of hostiles.',
-      stats: { dmg: 400, rate: 0.08, rng: 200, tgt: 'SINGULARITY / 12S' },
-      special: '>> Collapses a black hole every 12s that consumes everything nearby.',
-      icon: ic('<circle cx="20" cy="20" r="5.5" fill="currentColor" stroke="none"/><circle cx="20" cy="20" r="10.5" stroke-dasharray="3 3"/><path d="M33 8a17 17 0 0 1 3 12" stroke-dasharray="2 3"/><path d="M7 32a17 17 0 0 1-3-12" stroke-dasharray="2 3"/>') },
+    { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 1000, bt: 30 }, cost: 400, currency: 'mixed',
+      tagline: 'Melee swarm chassis — blades that feast at contact range.',
+      stats: { dmg: 4, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
+      special: '>> Shreds anything that steps into blade range — walkers and flyers alike.',
+      art: 'assets/towers/virus.png',
+      track: [
+        { label: 'LARGER BLADES', cost: 500, sets: { dmg: 8, rate: 2.7, rng: 100 }, info: 'DMG 4 → 8 · RATE 3 → 2.7 · RNG 90 → 100' },
+        { label: 'SUPER VIRUS', cost: 700, sets: { rate: 3.2, rng: 105 }, info: 'RATE 2.7 → 3.2 · RNG 100 → 105' },
+        { label: 'MALWARE VIRUS', cost: 1400, sets: { rate: 3.5, rng: 110, dmg: 20 }, info: 'RATE 3.2 → 3.5 · RNG 100 → 110 · DMG 8 → 20' },
+      ],
+      icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] };
-  const MAX_BAYS = 5;
+  const MAX_BAYS = 3;
+
+  // Dual-currency prices arrive as { nc, bt }; single-currency as a number.
+  const priceOf = (entry) => (typeof entry.price === 'object' ? entry.price : { [entry.currency || 'nc']: entry.price || 0 });
+  const canAfford = (entry) => {
+    const cost = priceOf(entry);
+    return profile.nc >= (cost.nc || 0) && profile.bt >= (cost.bt || 0);
+  };
+  const priceLabel = (entry) => {
+    const cost = priceOf(entry);
+    const parts = [];
+    if (cost.nc) parts.push(`<i class="tok tok-nc">NC</i>${format(cost.nc)}`);
+    if (cost.bt) parts.push(`<i class="tok tok-bt">BT</i>${format(cost.bt)}`);
+    return parts.join(' ') || 'FREE';
+  };
+  // Tower decal art: generated portraits, one unique emblem per chassis.
+  const artHtml = (entry) => (entry.art ? `<img class="tw-art" src="${entry.art}" alt="${entry.name} decal" loading="lazy" onerror="this.remove()">` : '');
+  const trackHtml = (entry) => (!entry.track ? '' : `<div class="tc-track"><span class="tc-track-head">UPGRADE TRACK — ${entry.track.length} TIERS</span>${entry.track.map((tier, i) =>
+    `<div class="tc-tier"><span>${String(i + 1).padStart(2, '0')}</span><b>${tier.label}</b><small>${tier.info}</small><em>$${format(tier.cost)}</em></div>`).join('')}</div>`);
   let container = null;
   let filter = 'all';
   let armed = null;
@@ -144,10 +118,10 @@ window.CBZShop = (() => {
   function paintBays() {
     const wrap = container && container.querySelector('#ls-bays');
     if (!wrap) return;
-    const bays = [0, 1, 2, 3, 4].map((index) => {
+    const bays = [0, 1, 2].map((index) => {
       const entry = (profile.loadout || [])[index] && towerById(profile.loadout[index]);
       if (!entry) return `<div class="ls-bay ls-empty"><small>BAY ${index + 1}</small><b>EMPTY</b><small>EQUIP BELOW</small></div>`;
-      return `<div class="ls-bay filled cat-${entry.cat}"><small>BAY ${index + 1}</small><span class="ls-icon">${entry.icon}</span><b>${entry.name}</b><small>$${entry.cost} SALVAGE IN MISSION</small></div>`;
+      return `<div class="ls-bay filled cat-${entry.cat}"><small>BAY ${index + 1}</small><span class="ls-icon">${artHtml(entry) || entry.icon}</span><b>${entry.name}</b><small>$${entry.cost} SALVAGE IN MISSION</small></div>`;
     });
     wrap.innerHTML = bays.join('');
   }
@@ -161,7 +135,7 @@ window.CBZShop = (() => {
     } else {
       if (profile.loadout.length >= MAX_BAYS) {
         playSound('alarm');
-        showToast('Loadout full — all 5 bays are occupied. Unequip a blueprint first.');
+        showToast('Loadout full — all 3 bays are occupied. Unequip a blueprint first.');
         return;
       }
       profile.loadout.push(id);
@@ -183,12 +157,13 @@ window.CBZShop = (() => {
   }
 
   function meters(entry) {
-    const caps = { dmg: 160, rate: 2.5, rng: 260 };
+    const caps = { dmg: 160, rate: 3.5, rng: 260 };
     const pct = (value, cap) => `${Math.max(3, Math.min(100, Math.round((value / cap) * 100)))}%`;
+    const splash = entry.stats.splash ? `<div class="tc-meter"><span>SPLASH</span><div class="tm-track"><i style="width:${pct(entry.stats.splash, 80)}"></i></div><b>${entry.stats.splash}U</b></div>` : '';
     return `
       <div class="tc-meter"><span>DMG</span><div class="tm-track"><i style="width:${pct(entry.stats.dmg, caps.dmg)}"></i></div><b>${entry.stats.dmg || '—'}</b></div>
       <div class="tc-meter"><span>RATE</span><div class="tm-track"><i style="width:${pct(entry.stats.rate, caps.rate)}"></i></div><b>${entry.stats.rate ? `${entry.stats.rate}/s` : '—'}</b></div>
-      <div class="tc-meter"><span>RNG</span><div class="tm-track"><i style="width:${pct(entry.stats.rng, caps.rng)}"></i></div><b>${entry.stats.rng >= 999 ? 'INF' : entry.stats.rng || '—'}</b></div>`;
+      <div class="tc-meter"><span>RNG</span><div class="tm-track"><i style="width:${pct(entry.stats.rng, caps.rng)}"></i></div><b>${entry.stats.rng >= 999 ? 'INF' : entry.stats.rng || '—'}</b></div>${splash}`;
   }
 
   function cardHtml(entry) {
@@ -203,6 +178,7 @@ window.CBZShop = (() => {
           <div class="tc-stats">${meters(entry)}</div>
           <div class="tc-target">${entry.stats.tgt}</div>
           <p class="tc-special">${entry.special}</p>
+          ${trackHtml(entry)}
           <div class="tc-lock"><span>SIGNAL ENCRYPTED</span><b>LV ${entry.unlock}</b></div>
         </article>`;
     }
@@ -216,21 +192,23 @@ window.CBZShop = (() => {
           <div class="tc-stats">${meters(entry)}</div>
           <div class="tc-target">${entry.stats.tgt}</div>
           <p class="tc-special">${entry.special}</p>
+          ${trackHtml(entry)}
           <div class="tc-lock"><span>MISSION REWARD</span><b>BEAT EASY MODE</b></div>
         </article>`;
     }
     const owned = vis === 'owned';
-    const affordable = entry.currency === 'bt' ? profile.bt >= entry.price : profile.nc >= entry.price;
+    const affordable = canAfford(entry);
     return `
       <article class="tower-card state-${owned ? 'owned' : 'buy'} cat-${entry.cat}" data-id="${entry.id}">
         <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">${owned ? 'DEPLOYED' : `CLEARANCE ${entry.unlock}`}</span></div>
-        <div class="tc-icon">${entry.icon}</div>
+        <div class="tc-icon">${artHtml(entry) || entry.icon}</div>
         <h4>${entry.name}</h4>
         <p class="tc-tagline">${entry.tagline}</p>
         <div class="tc-stats">${meters(entry)}</div>
         <div class="tc-target">${entry.stats.tgt}</div>
         <p class="tc-special">${entry.special}</p>
-        ${owned ? `<button class="tc-equip${profile.loadout.includes(entry.id) ? ' on' : ''}" type="button" data-equip="${entry.id}">${profile.loadout.includes(entry.id) ? 'UNEQUIP FROM LOADOUT' : 'EQUIP TO LOADOUT'}</button>` : `<button class="tc-buy${affordable ? '' : ' cant'}" type="button" data-buy="${entry.id}"><i class="tok ${entry.currency === 'bt' ? 'tok-bt' : 'tok-nc'}">${entry.currency.toUpperCase()}</i>${format(entry.price)}</button>`}
+        ${trackHtml(entry)}
+        ${owned ? `<button class="tc-equip${profile.loadout.includes(entry.id) ? ' on' : ''}" type="button" data-equip="${entry.id}">${profile.loadout.includes(entry.id) ? 'UNEQUIP FROM LOADOUT' : 'EQUIP TO LOADOUT'}</button>` : `<button class="tc-buy${affordable ? '' : ' cant'}" type="button" data-buy="${entry.id}">${priceLabel(entry)}</button>`}
       </article>`;
   }
 
@@ -254,7 +232,7 @@ window.CBZShop = (() => {
         </div>
       </div>
       <div class="loadout-strip" id="loadout-strip">
-        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small>THE 5 BLUEPRINTS YOU CARRY INTO EVERY MISSION</small></div>
+        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small>THE 3 BLUEPRINTS YOU CARRY INTO EVERY MISSION</small></div>
         <div class="ls-bays" id="ls-bays"></div>
       </div>
       <p class="shop-note">Nexus Coins flow from every wave, boss and cleared sector. <b>Breach Tokens</b> drop only from boss kills, flawless defenses and first clearances. New blueprints decrypt 10 clearance levels before they unlock — beyond that range, their signals stay hidden. Equipped blueprints deploy from the loadout bar in battle; towers you place claim a clearance box on the grid that blocks overlapping builds.</p>
@@ -307,12 +285,11 @@ window.CBZShop = (() => {
     if (!button) return;
     const entry = towerById(button.dataset.buy);
     if (!entry) return;
-    const affordable = entry.currency === 'bt' ? profile.bt >= entry.price : profile.nc >= entry.price;
-    if (!affordable) {
+    if (!canAfford(entry)) {
       playSound('alarm');
       const card = button.closest('.tower-card');
       if (card) { card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
-      showToast(entry.currency === 'bt' ? 'Not enough Breach Tokens — only bosses and flawless runs pay those.' : 'Not enough Nexus Coins — clear more waves.');
+      showToast('Not enough Nexus Coins / Breach Tokens for that blueprint.');
       return;
     }
     if (armed !== entry.id) {
