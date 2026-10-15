@@ -448,7 +448,207 @@ function roomPlayerCount() {
   return Math.max(1, Math.min(4, Number(window.CBZ_ROOM_PLAYERS) || 1));
 }
 
+// --- LOCAL ROOM SERVICE ----------------------------------------------------------
+// GitHub Pages has no Node backend, so the four deployment bays also run in the
+// browser off localStorage, speaking the exact same message protocol as the
+// server's room service. Solo launch works immediately, and a second tab on this
+// machine can drop into the same bay as a real squadmate — shared roster, shared
+// map pick, synchronized launch.
+const LOCAL_ROOMS = (() => {
+  const KEY = 'cbz-local-rooms';
+  const MAX_PLAYERS = 4;
+  const STALE_MS = 20000; // a seat whose tab stops beating this long is abandoned
+  const BAYS = [
+    ['room-01', 'ROOM 01 // ALPHA'],
+    ['room-02', 'ROOM 02 // BRAVO'],
+    ['room-03', 'ROOM 03 // CHARLIE'],
+    ['room-04', 'ROOM 04 // DELTA'],
+  ];
+  let callsign = '';
+  let myRoom = null;
+  let launchedFor = null;
+  let wired = false;
+  let TAB_ID = '';
+  try {
+    TAB_ID = sessionStorage.getItem('cbz-tab') || '';
+    if (!TAB_ID) {
+      TAB_ID = `t${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+      sessionStorage.setItem('cbz-tab', TAB_ID);
+    }
+  } catch { TAB_ID = `t${Math.floor(Math.random() * 1e9).toString(36)}`; }
+
+  function fresh() {
+    return BAYS.map(([id, name]) => ({ id, name, players: [], map: null, started: false, launchId: null }));
+  }
+  function prune(rooms) {
+    const now = Date.now();
+    for (const room of rooms) {
+      room.players = (room.players || []).filter((player) => now - (player.lastSeen || 0) < STALE_MS);
+      if (!room.players.length && (room.map || room.started)) {
+        // An abandoned bay resets, exactly like the server's empty-room rule.
+        room.map = null;
+        room.started = false;
+        room.launchId = null;
+      }
+    }
+    return rooms;
+  }
+  function read() {
+    let rooms = null;
+    try { rooms = JSON.parse(localStorage.getItem(KEY)); } catch { rooms = null; }
+    return prune(Array.isArray(rooms) ? rooms : fresh());
+  }
+  function write(rooms) {
+    try { localStorage.setItem(KEY, JSON.stringify(rooms)); } catch { /* storage optional. */ }
+  }
+  function snapshot(room) {
+    return {
+      id: room.id,
+      name: room.name,
+      map: room.map,
+      maxPlayers: MAX_PLAYERS,
+      started: room.started,
+      commanders: room.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
+    };
+  }
+  const snapshots = (rooms) => rooms.map(snapshot);
+  function findMine(rooms) {
+    return rooms.find((room) => room.players.some((player) => player.tab === TAB_ID)) || null;
+  }
+
+  // Another tab changed the bay state — refresh this tab's UI and follow a launch.
+  function syncFromStorage() {
+    const rooms = read();
+    roomList = snapshots(rooms);
+    const mine = findMine(rooms);
+    if (mine) {
+      currentRoom = snapshot(mine);
+      if (mine.started && mine.map && mine.launchId && launchedFor !== mine.launchId) {
+        launchedFor = mine.launchId;
+        showLaunchSequence(mine.map);
+        return;
+      }
+      if (dialog.open) {
+        if (showingBays) renderBays();
+        else renderLobby();
+      }
+    } else {
+      currentRoom = null;
+      if (dialog.open && showingBays) renderBays();
+    }
+  }
+
+  function handle(message) {
+    const rooms = read();
+    if (message.type === 'authenticate') {
+      callsign = (message.callsign || callsign || 'COMMANDER').toUpperCase();
+      handleServiceMessage({ type: 'linked', callsign, rooms: snapshots(rooms) });
+      return;
+    }
+    if (message.type === 'rooms') {
+      handleServiceMessage({ type: 'rooms', rooms: snapshots(rooms) });
+      return;
+    }
+    if (message.type === 'join') {
+      const room = rooms.find((bay) => bay.id === String(message.room || ''));
+      if (!room) return handleServiceMessage({ type: 'error', message: 'Room not found.' });
+      if (myRoom) return handleServiceMessage({ type: 'error', message: 'Leave your current room before switching.' });
+      if (room.started) return handleServiceMessage({ type: 'error', message: 'This room has already started.' });
+      if (room.players.length >= MAX_PLAYERS) return handleServiceMessage({ type: 'error', message: 'Room is full. Choose another room.' });
+      room.players.push({ callsign, tab: TAB_ID, lastSeen: Date.now() });
+      myRoom = room.id;
+      write(rooms);
+      handleServiceMessage({ type: 'joined', you: callsign, room: snapshot(room) });
+      return;
+    }
+    if (message.type === 'config') {
+      const room = findMine(rooms);
+      if (room && !room.started && room.players[0] && room.players[0].tab === TAB_ID) {
+        room.map = message.map;
+        write(rooms);
+        syncFromStorage();
+      }
+      return;
+    }
+    if (message.type === 'start') {
+      const room = findMine(rooms);
+      if (!room || !room.map || room.started) return;
+      if (!room.players[0] || room.players[0].tab !== TAB_ID) {
+        return handleServiceMessage({ type: 'error', message: 'Only the room lead can start the mission.' });
+      }
+      room.started = true;
+      room.launchId = `${Date.now()}`;
+      write(rooms);
+      launchedFor = room.launchId;
+      handleServiceMessage({ type: 'launch', room: snapshot(room) });
+      return;
+    }
+    if (message.type === 'leave') {
+      const room = findMine(rooms);
+      if (room) {
+        room.players = room.players.filter((player) => player.tab !== TAB_ID);
+        if (!room.players.length) { room.map = null; room.started = false; room.launchId = null; }
+        write(rooms);
+      }
+      myRoom = null;
+      handleServiceMessage({ type: 'rooms', rooms: snapshots(read()) });
+      return;
+    }
+    if (message.type === 'end') {
+      const room = findMine(rooms);
+      if (room && room.started) {
+        room.started = false;
+        room.launchId = null;
+        write(rooms);
+      }
+      return;
+    }
+  }
+
+  function wake() {
+    if (wired) return;
+    wired = true;
+    callsign = (myName || 'COMMANDER').toUpperCase();
+    // A fresh page load can't still be holding a seat — clear this tab's crash leftovers.
+    const rooms = read();
+    let cleaned = false;
+    for (const room of rooms) {
+      const before = room.players.length;
+      room.players = room.players.filter((player) => player.tab !== TAB_ID);
+      if (room.players.length !== before) cleaned = true;
+    }
+    if (cleaned) write(rooms);
+    window.addEventListener('storage', (event) => {
+      if (event.key === KEY) syncFromStorage();
+    });
+    const dropSeat = () => {
+      const current = read();
+      const room = findMine(current);
+      if (room) {
+        room.players = room.players.filter((player) => player.tab !== TAB_ID);
+        if (!room.players.length) { room.map = null; room.started = false; room.launchId = null; }
+        write(current);
+      }
+    };
+    window.addEventListener('pagehide', dropSeat);
+    window.addEventListener('beforeunload', dropSeat);
+    setInterval(() => {
+      const current = read();
+      const room = findMine(current);
+      if (!room) return;
+      const me = room.players.find((player) => player.tab === TAB_ID);
+      if (me) { me.lastSeen = Date.now(); write(current); }
+    }, 5000);
+  }
+
+  return { handle, wake, snapshots: () => snapshots(read()) };
+})();
+
 function sendToService(message) {
+  if (LOCAL.down()) {
+    LOCAL_ROOMS.handle(message);
+    return;
+  }
   if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 
@@ -474,15 +674,12 @@ function connectRoom() {
 
 function openPlayMenu() {
   if (LOCAL.down()) {
-    // Static host: no WebSocket room service exists here — solo still fully works.
-    showingBays = false;
-    document.querySelector('#dialog-kicker').textContent = '// DEPLOYMENT HUB';
-    document.querySelector('#dialog-title').textContent = 'PLAY MENU';
-    body.innerHTML = `
-      <p class="dialog-copy">Local Nexus active — rooms need the Node server. Run <strong>node server.js</strong> and open its address to squad up. Solo missions are fully playable here.</p>
-      <button class="action-button bay-recon" id="map-recon" type="button"><b>SOLO MAP RECON</b><small>Open one of the five maps without joining a room</small></button>
-      <p class="lobby-state">ROOM SERVICE OFFLINE // SOLO DEPLOYMENT READY</p>`;
-    document.querySelector('#map-recon').addEventListener('click', renderMapSelect);
+    // Static host: the four deployment bays run locally off localStorage —
+    // join one, pick a map, launch. No Node server required.
+    showingBays = true;
+    LOCAL_ROOMS.wake();
+    roomList = LOCAL_ROOMS.snapshots();
+    renderBays();
     return;
   }
   // Already linked to the room service? Show the live lobby/bays without
@@ -585,9 +782,9 @@ function renderLobby() {
       </section>
       <section class="config-panel">
         <h3>SELECT MAP // ${roomLead ? 'ROOM LEAD CONTROL' : 'ROOM LEAD SELECTS'}</h3>
-        ${roomLead && !room.started ? '<p class="dialog-copy">Choose a map. Your squad waits here until at least one teammate joins and you start.</p>' : ''}
+        ${roomLead && !room.started ? `<p class="dialog-copy">${LOCAL.down() ? 'Choose a map and launch when ready. Other commanders can drop into this bay from another tab on this machine.' : 'Choose a map. Your squad waits here until at least one teammate joins and you start.'}</p>` : ''}
         <div class="map-grid">${Object.values(BATTLE_MAPS).map((map) => renderRoomMapCard(map, room, roomLead)).join('')}</div>
-        ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map && room.commanders.length >= 2 ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
+        ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map && (LOCAL.down() || room.commanders.length >= 2) ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
         ${room.started ? '<p class="standby-note">MISSION STARTED // DEPLOYMENT LOCKED. FINISH OR EXIT TO REGROUP.</p>' : !roomLead ? '<p class="standby-note">STANDBY // WAITING FOR THE ROOM LEAD TO START.</p>' : ''}
       </section>
     </div>`;
