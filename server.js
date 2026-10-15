@@ -225,6 +225,25 @@ async function handleApi(request, response, pathname) {
     return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
   }
 
+  // Buried payout ritual — no admin menu. The ZERODAY protocol IS the admin menu:
+  // five seals performed in order (logo knocks, old sequence, net whisper, feeding
+  // the baseline, spoken word). The server only ever sees the seal receipt.
+  if (pathname === '/api/breach' && request.method === 'POST') {
+    const body = await readBody(request);
+    const name = sessionName(body ? String(body.token || '') : '');
+    if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
+    const seq = Array.isArray(body.seq) ? body.seq.map((step) => String(step || '').trim().toUpperCase()) : [];
+    const code = String(body.code || '').trim().toUpperCase();
+    if (code !== 'ZERODAY' || seq.join('|') !== 'KNOCK|KONAMI|WHISPER|FEED|WORD') {
+      return sendJson(response, 403, { ok: false, error: 'Unknown protocol. The core rejects you.' });
+    }
+    const meta = accounts[name].meta;
+    meta.nc += 5000;
+    meta.bt += 500;
+    saveAccounts();
+    return sendJson(response, 200, { ok: true, granted: { nc: 5000, bt: 500 }, profile: profilePayload(accounts[name]) });
+  }
+
   return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });
 }
 

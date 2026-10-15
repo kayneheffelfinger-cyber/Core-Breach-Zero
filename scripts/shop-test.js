@@ -96,6 +96,20 @@ async function api(path, payload) {
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
     check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
     check('no second firstClear, bt=5 (20-wave caps)', again.data.rewards.firstClear === false && again.data.rewards.bt === 5, JSON.stringify(again.data.rewards));
+
+    // ZERODAY protocol — /api/breach pays out only with the exact five-seal receipt.
+    const sealed = await api('/api/profile', { token });
+    const beforeNc = sealed.data.profile.nc;
+    const beforeBt = sealed.data.profile.bt;
+    const noAuth = await api('/api/breach', { code: 'ZERODAY', seq: ['KNOCK', 'KONAMI', 'WHISPER', 'FEED', 'WORD'] });
+    check('breach without token 401', noAuth.status === 401, JSON.stringify(noAuth.data));
+    const badSeq = await api('/api/breach', { token, code: 'ZERODAY', seq: ['KNOCK'] });
+    check('breach partial seals 403', badSeq.status === 403, JSON.stringify(badSeq.data));
+    const badCode = await api('/api/breach', { token, code: 'ZERODAYS', seq: ['KNOCK', 'KONAMI', 'WHISPER', 'FEED', 'WORD'] });
+    check('breach wrong word 403', badCode.status === 403, JSON.stringify(badCode.data));
+    const breach = await api('/api/breach', { token, code: 'zeroday', seq: ['knock', 'konami', 'whisper', 'feed', 'word'] });
+    check('breach full seals grant +5000 NC', breach.data.ok && breach.data.profile.nc === beforeNc + 5000, JSON.stringify(breach.data));
+    check('breach full seals grant +500 BT', breach.data.profile.bt === beforeBt + 500, JSON.stringify(breach.data));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

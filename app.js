@@ -267,6 +267,19 @@ const LOCAL = (() => {
       writeJson(ACCOUNTS_KEY, accounts);
       return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(account) };
     }
+    if (path === '/api/breach') {
+      // ZERODAY protocol payout — mirrors server.js exactly (same seals, same grant).
+      const account = requireAccount(body);
+      const seq = Array.isArray(body.seq) ? body.seq.map((step) => String(step || '').trim().toUpperCase()) : [];
+      const code = String(body.code || '').trim().toUpperCase();
+      if (code !== 'ZERODAY' || seq.join('|') !== 'KNOCK|KONAMI|WHISPER|FEED|WORD') throw new Error('Unknown protocol. The core rejects you.');
+      account.meta.nc += 5000;
+      account.meta.bt += 500;
+      const accounts = readAccounts();
+      accounts[account.name] = account;
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, granted: { nc: 5000, bt: 500 }, profile: profilePayload(account) };
+    }
     throw new Error('Unknown API endpoint.');
   }
 
@@ -937,6 +950,184 @@ function paintWallet() {
 window.paintWallet = paintWallet;
 
 // --- Global comms: one shared channel, in the menu or mid-mission -----------------------
+// --- ZERODAY PROTOCOL ----------------------------------------------------------
+// A buried five-seal ritual that pays out test funds — the "admin menu" nobody
+// ships. Seals, in strict order, each within 60s of the last or the signal fades:
+//   1. KNOCK   — knock 5x on the main menu title
+//   2. KONAMI  — the old sequence: ↑ ↑ ↓ ↓ ← → ← → B A
+//   3. WHISPER — tell the global net "nullcore is watching" (relays as REDACTED)
+//   4. FEED    — tap the Sentinel's decal in the Nexus Shop 3 times
+//   5. WORD    — speak "ZERODAY" into the buried terminal that manifests
+// Grant: +5,000 NC / +500 BT via /api/breach (server route + LOCAL mirror).
+const ZERODAY = (() => {
+  const SEQ = ['KNOCK', 'KONAMI', 'WHISPER', 'FEED', 'WORD'];
+  const CODE = 'ZERODAY';
+  const WHISPER = 'nullcore is watching';
+  const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
+  const DECAY_MS = 60000;
+  const RUNS_KEY = 'cbz-zeroday-runs';
+  let stage = 0;      // 0 = dormant, 1..5 = working on SEQ[stage-1]
+  let progress = 0;   // sub-progress inside the current seal
+  let konamiIdx = 0;
+  let fails = 0;
+  let decayTimer = 0;
+
+  const runs = () => { try { return Number(localStorage.getItem(RUNS_KEY)) || 0; } catch { return 0; } };
+
+  function armDecay() {
+    clearTimeout(decayTimer);
+    decayTimer = setTimeout(() => reset('THE SIGNAL FADES. THE GRID FORGETS.'), DECAY_MS);
+  }
+
+  function reset(message) {
+    clearTimeout(decayTimer);
+    stage = 0;
+    progress = 0;
+    konamiIdx = 0;
+    fails = 0;
+    const term = document.querySelector('#zeroday-terminal');
+    if (term && term.open) term.close();
+    if (message) showToast(message);
+  }
+
+  function advance(message) {
+    stage += 1;
+    progress = 0;
+    konamiIdx = 0;
+    armDecay();
+    showToast(message);
+  }
+
+  function knock() {
+    if (!myName) return; // the ritual answers only linked commanders
+    if (stage === 0) { stage = 1; progress = 1; armDecay(); return; }
+    if (stage !== 1) return;
+    progress += 1;
+    armDecay();
+    if (progress === 3) showToast('…?');
+    if (progress === 4) showToast('THE GRID STIRS. KEEP KNOCKING.');
+    if (progress >= 5) advance('SOMETHING ANSWERED. THE OLD SEQUENCE REMEMBERS.');
+  }
+
+  function konamiKey(event) {
+    if (stage !== 2) return;
+    if (event.target && event.target.closest && event.target.closest('input, textarea')) return;
+    const key = String(event.key || '').toLowerCase();
+    if (key === KONAMI[konamiIdx]) {
+      konamiIdx += 1;
+      if (konamiIdx >= KONAMI.length) advance('CARRIER LOCKED. WHISPER TO THE NET.');
+    } else {
+      konamiIdx = key === KONAMI[0] ? 1 : 0;
+    }
+  }
+
+  function filterWhisper(text) {
+    if (stage !== 3) return null;
+    if (String(text || '').trim().toLowerCase() !== WHISPER) return null;
+    advance('THE NET HEARD YOU. GO TO THE NEXUS SHOP AND FEED THE BASELINE.');
+    return '▓▓▓ REDACTED ▓▓▓';
+  }
+
+  function feed(target) {
+    if (stage !== 4 || !target || !target.closest) return;
+    if (!target.closest('.tower-card[data-id="sentinel"] .tc-icon')) return;
+    progress += 1;
+    armDecay();
+    if (progress === 1) showToast('IT HUNGERS.');
+    else if (progress === 2) showToast('ONE LAST BITE.');
+    else openTerminal();
+  }
+
+  function ensureTerminal() {
+    let term = document.querySelector('#zeroday-terminal');
+    if (term) return term;
+    // A native modal dialog: the Nexus Shop renders inside #menu-dialog's focus
+    // trap, so a plain body div could never receive typing. A top-layer dialog
+    // stacks above it and owns the keyboard while it is open.
+    term = document.createElement('dialog');
+    term.id = 'zeroday-terminal';
+    term.innerHTML = `
+      <div class="zt-box">
+        <div class="zt-head"><span>// BURIED TERMINAL — EYES ONLY</span><b>ZD-09</b></div>
+        <div class="zt-log" id="zt-log"></div>
+        <div class="zt-prompt"><span>CMD&gt;</span><input id="zt-input" maxlength="24" autocomplete="off" spellcheck="false" aria-label="Speak the word" autofocus></div>
+      </div>`;
+    document.body.appendChild(term);
+    term.querySelector('#zt-input').addEventListener('keydown', (event) => {
+      event.stopPropagation(); // the terminal is sealed off from other key listeners
+      if (event.key !== 'Enter') return;
+      submitWord(event.target.value);
+      event.target.value = '';
+    });
+    term.addEventListener('close', () => { if (stage === 5) reset(); });
+    return term;
+  }
+
+  function ztPrint(line, cls) {
+    const log = document.querySelector('#zt-log');
+    if (!log) return;
+    const row = document.createElement('div');
+    row.className = `zt-line${cls ? ` ${cls}` : ''}`;
+    row.textContent = line;
+    log.appendChild(row);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function openTerminal() {
+    const term = ensureTerminal();
+    if (!term.open) { try { term.showModal(); } catch { /* already open. */ } }
+    term.querySelector('#zt-log').innerHTML = '';
+    ztPrint('SCANNING RITUAL STATE ......... OK');
+    setTimeout(() => ztPrint('SEALS VERIFIED ................ 5/5'), 240);
+    setTimeout(() => ztPrint('NULLCORE PRESENCE ............. WATCHING'), 480);
+    setTimeout(() => { ztPrint('SPEAK THE WORD, COMMANDER.', 'zt-hi'); term.querySelector('#zt-input').focus(); }, 720);
+    stage = 5;
+    progress = 0;
+    fails = 0;
+    armDecay();
+  }
+
+  async function submitWord(raw) {
+    if (stage !== 5) return;
+    const word = String(raw || '').trim().toUpperCase();
+    if (word !== CODE) {
+      fails += 1;
+      ztPrint(word ? `> ${word} — ACCESS DENIED` : '> … — ACCESS DENIED', 'zt-bad');
+      if (fails >= 3) reset('THE TERMINAL SEALS ITSELF. THE GRID FORGETS.');
+      return;
+    }
+    ztPrint('> ZERODAY — ACCEPTED', 'zt-hi');
+    ztPrint('INJECTING FUNDS ...............');
+    try {
+      const granted = await window.CBZShop.breachProtocol(CODE, SEQ);
+      if (!granted) throw new Error('Transfer rejected.');
+      const count = runs() + 1;
+      try { localStorage.setItem(RUNS_KEY, String(count)); } catch { /* storage optional. */ }
+      const flavor = count === 1 ? 'FIRST BLOOD — THE CORE LEAKS.' : count === 2 ? 'AGAIN? THE CORE REMEMBERS YOU.' : 'THE CORE IS YOURS, COMMANDER.';
+      ztPrint('TRANSFER COMPLETE ............ +5,000 NC / +500 BT', 'zt-hi');
+      ztPrint(flavor, 'zt-bad');
+      document.body.classList.add('zeroday-glitch');
+      playSound();
+      showToast('ZERODAY PROTOCOL — +5,000 NC · +500 BT INJECTED');
+      setTimeout(() => document.body.classList.remove('zeroday-glitch'), 1150);
+      setTimeout(() => reset(), 2800);
+    } catch (error) {
+      ztPrint('TRANSFER REJECTED — NO COMMANDER LINKED.', 'zt-bad');
+      reset();
+      showToast(error && error.message ? error.message : 'The core rejects you.');
+    }
+  }
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest && event.target.closest('#main-title')) { knock(); return; }
+    if (stage === 4) feed(event.target);
+  });
+  document.addEventListener('keydown', (event) => konamiKey(event));
+
+  return { filterWhisper, active: () => stage > 0, debug: () => ({ stage, progress, runs: runs() }) };
+})();
+window.CBZRitual = ZERODAY;
+
 const CHAT_KEY = 'cbz-global-chat';
 function chatIdentity() {
   return myCallsign || myName || 'GUEST';
@@ -957,12 +1148,14 @@ function appendChat(entry) {
 function sendChat(text) {
   const clean = String(text || '').trim().slice(0, 280);
   if (!clean) return;
+  // ZERODAY seal 3: the whisper never hits the net in the clear.
+  const relay = ZERODAY.filterWhisper(clean) || clean;
   if (chatOnline()) {
-    socket.send(JSON.stringify({ type: 'chat', text: clean }));
+    socket.send(JSON.stringify({ type: 'chat', text: relay }));
     return;
   }
   // Static host: relay through localStorage so tabs on this machine stay linked.
-  const entry = { from: chatIdentity(), text: clean, ts: Date.now() };
+  const entry = { from: chatIdentity(), text: relay, ts: Date.now() };
   try {
     const list = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
     list.push(entry);

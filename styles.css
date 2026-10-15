@@ -654,3 +654,21 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .chat-form input { flex: 1; padding: 10px 12px; border: none; background: transparent; color: var(--text); font: 10px var(--mono); letter-spacing: .4px; outline: none; }
 .chat-form button { padding: 0 14px; border: none; border-left: 1px solid #26383d; background: rgba(112,225,208,.1); color: var(--cyan); font: 700 9px var(--mono); letter-spacing: 1.6px; cursor: pointer; }
 .chat-form button:hover { background: rgba(112,225,208,.22); }
+
+/* --- ZERODAY PROTOCOL (buried terminal + payout glitch) --- */
+dialog#zeroday-terminal { padding: 0; border: none; background: transparent; overflow: visible; }
+dialog#zeroday-terminal::backdrop { background: rgba(4,9,12,.82); backdrop-filter: blur(4px); }
+.zt-box { width: min(430px, calc(100vw - 40px)); border: 1px solid var(--cyan); background: rgba(6,12,15,.98); box-shadow: 0 0 60px rgba(112,225,208,.22), inset 0 0 40px rgba(112,225,208,.05); animation: panel-pop .16s ease-out; }
+.zt-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #26383d; }
+.zt-head span { color: var(--cyan); font: 700 9px var(--mono); letter-spacing: 1.8px; }
+.zt-head b { color: var(--amber); font: 700 9px var(--mono); letter-spacing: 1px; }
+.zt-log { min-height: 128px; max-height: 220px; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.zt-line { color: #8fa39d; font: 10.5px var(--mono); letter-spacing: .6px; white-space: pre-wrap; }
+.zt-line.zt-hi { color: var(--cyan); }
+.zt-line.zt-bad { color: #ff4d5e; }
+.zt-prompt { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-top: 1px solid #26383d; }
+.zt-prompt span { color: var(--amber); font: 700 11px var(--mono); }
+.zt-prompt input { flex: 1; padding: 4px 2px; border: none; border-bottom: 1px dashed #2c4046; background: transparent; color: var(--text); font: 12px var(--mono); letter-spacing: 2px; text-transform: uppercase; outline: none; }
+.zt-prompt input:focus { border-bottom-color: var(--cyan); }
+@keyframes zeroday-glitch { 0% { filter: none; transform: none; } 18% { filter: hue-rotate(40deg) saturate(1.8); transform: translate(2px, -1px) skewX(.8deg); } 36% { filter: hue-rotate(-70deg) contrast(1.3); transform: translate(-2px, 1px); } 54% { filter: invert(.85) hue-rotate(90deg); transform: translate(1px, -2px); } 72% { filter: none; transform: translate(-1px, 1px); } 100% { filter: none; transform: none; } }
+body.zeroday-glitch { animation: zeroday-glitch 1.05s steps(2, end) 1; }
