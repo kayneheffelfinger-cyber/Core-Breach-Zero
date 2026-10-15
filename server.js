@@ -36,7 +36,7 @@ const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
 const SHOP = {
   sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
   arclance: { name: 'ARC LANCE', unlock: 1, price: 400, currency: 'nc' },
-  plasmort: { name: 'PLASMA MORTAR', unlock: 2, price: 550, currency: 'nc' },
+  plasmort: { name: 'PLASMA MORTAR', unlock: 1, price: 400, currency: 'nc', firstClear: true },
   cryobeacon: { name: 'CRYO DISRUPTOR', unlock: 3, price: 650, currency: 'nc' },
   scrapforge: { name: 'SCRAP FOUNDRY', unlock: 5, price: 700, currency: 'nc' },
   railspire: { name: 'RAIL SPIRE', unlock: 7, price: 950, currency: 'nc' },
@@ -181,6 +181,7 @@ async function handleApi(request, response, pathname) {
     const meta = accounts[name].meta;
     if (meta.owned.includes(itemId)) return sendJson(response, 409, { ok: false, error: 'Blueprint already in your armory.' });
     if (meta.level < item.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
+    if (item.firstClear && !meta.firstClear) return sendJson(response, 403, { ok: false, error: 'Reward locked — beat Easy Mode to decrypt this blueprint.' });
     if (item.price > 0) {
       const balance = item.currency === 'bt' ? meta.bt : meta.nc;
       if (balance < item.price) return sendJson(response, 402, { ok: false, error: item.currency === 'bt' ? 'Not enough Breach Tokens.' : 'Not enough Nexus Coins.' });

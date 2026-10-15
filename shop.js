@@ -20,7 +20,7 @@ window.CBZShop = (() => {
   const TOWERS = [
     { id: 'sentinel', name: 'SENTINEL TURRET', cat: 'offense', unlock: 1, price: 0, cost: 50, currency: 'nc',
       tagline: 'Rapid kinetic baseline — cheap, dependable, always ready.',
-      stats: { dmg: 14, rate: 1.6, rng: 150, tgt: 'SINGLE / GROUND' },
+      stats: { dmg: 11, rate: 1.45, rng: 140, tgt: 'SINGLE / GROUND · AA ON PADS' },
       special: '>> The grid standard. Fast bursts, low salvage cost, never overheats.',
       icon: ic('<path d="M9 33h22"/><path d="M13 33v-7h14v7"/><path d="M20 26V7"/><circle cx="20" cy="6" r="2.4"/>') },
     { id: 'arclance', name: 'ARC LANCE', cat: 'offense', unlock: 1, price: 400, cost: 85, currency: 'nc',
@@ -28,10 +28,10 @@ window.CBZShop = (() => {
       stats: { dmg: 18, rate: 0.9, rng: 165, tgt: 'SINGLE / GROUND + AIR' },
       special: '>> Chain lightning forks to 2 extra targets at 60% damage per arc.',
       icon: ic('<path d="M23 4L11 23h8l-5 13 14-20h-8z"/>') },
-    { id: 'plasmort', name: 'PLASMA MORTAR', cat: 'offense', unlock: 2, price: 550, cost: 135, currency: 'nc',
-      tagline: 'Lobs searing plasma over the whole grid.',
-      stats: { dmg: 46, rate: 0.4, rng: 210, tgt: 'SPLASH 40U' },
-      special: '>> Shells detonate on impact for full damage in a 40-unit splash.',
+    { id: 'plasmort', name: 'PLASMA MORTAR', cat: 'offense', unlock: 1, price: 400, cost: 135, currency: 'nc', reward: true,
+      tagline: 'REWARD BLUEPRINT — beat Easy Mode to decrypt it.',
+      stats: { dmg: 60, rate: 0.5, rng: 210, tgt: 'SPLASH 40U · AA ON PADS' },
+      special: '>> Shells detonate on impact for full damage in a 40-unit splash. Trophy chassis for clearing Easy Mode.',
       icon: ic('<path d="M8 34h16"/><path d="M12 34L28 18"/><rect x="27" y="6" width="9" height="9" transform="rotate(45 31.5 10.5)"/><path d="M6 14a26 26 0 0 1 11-10" stroke-dasharray="3 4"/>') },
     { id: 'cryobeacon', name: 'CRYO DISRUPTOR', cat: 'control', unlock: 3, price: 650, cost: 115, currency: 'nc',
       tagline: 'A cold that never lifts.',
@@ -130,6 +130,7 @@ window.CBZShop = (() => {
 
   function visibility(entry) {
     if (profile.owned.includes(entry.id)) return 'owned';
+    if (entry.reward && !profile.firstClear) return 'reward-locked';
     if (profile.level >= entry.unlock) return 'buy';
     if (profile.level >= entry.unlock - HORIZON) return 'locked';
     return 'hidden';
@@ -203,6 +204,19 @@ window.CBZShop = (() => {
           <div class="tc-target">${entry.stats.tgt}</div>
           <p class="tc-special">${entry.special}</p>
           <div class="tc-lock"><span>SIGNAL ENCRYPTED</span><b>LV ${entry.unlock}</b></div>
+        </article>`;
+    }
+    if (vis === 'reward-locked') {
+      return `
+        <article class="tower-card state-locked state-reward cat-${entry.cat}" data-id="${entry.id}">
+          <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">REWARD BLUEPRINT</span></div>
+          <div class="tc-icon">${entry.icon}</div>
+          <h4>${entry.name}</h4>
+          <p class="tc-tagline">${entry.tagline}</p>
+          <div class="tc-stats">${meters(entry)}</div>
+          <div class="tc-target">${entry.stats.tgt}</div>
+          <p class="tc-special">${entry.special}</p>
+          <div class="tc-lock"><span>MISSION REWARD</span><b>BEAT EASY MODE</b></div>
         </article>`;
     }
     const owned = vis === 'owned';

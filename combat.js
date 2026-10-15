@@ -24,15 +24,15 @@ const ENEMY_TYPES = {
 // Wave pressure compounds: every wave index adds +10% enemy HP on top of the
 // roster, so the same towers that cruised wave 3 start bleeding around wave 8-10
 // unless the defense network grows with it. Surge modifiers stack on top.
-const WAVE_HP_SCALE = 0.1;   // +10% HP per wave index
+const WAVE_HP_SCALE = 0.12;  // +12% HP per wave index — pressure compounds faster
 const SURGE_MODS = {
   overclock: { hp: 1, speed: 1.25, label: 'OVERCLOCK SURGE', note: 'HOSTILES RUN 25% FASTER' },
   hardened: { hp: 1.4, speed: 1, label: 'HARDENED HULLS', note: 'HOSTILES +40% HP' },
 };
 const EASY_WAVES = [
-  { groups: [['glitched', 14]] },
-  { groups: [['glitched', 18], ['runner', 6]] },
-  { groups: [['glitched', 14], ['runner', 10], ['file', 10]] },
+  { groups: [['glitched', 16]] },
+  { groups: [['glitched', 20], ['runner', 8]] },
+  { groups: [['glitched', 16], ['runner', 10], ['file', 12]] },
   { groups: [['shielded', 12], ['glitched', 14]] },
   { groups: [['runner', 24], ['shielded', 10], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
   { groups: [['drone', 10], ['glitched', 16]], phase: 'AIR DEBUT' },
@@ -46,10 +46,10 @@ const EASY_WAVES = [
   { groups: [['shielded', 20], ['drone', 22], ['glitched', 30]] },
   { groups: [['runner', 30], ['drone', 16]], phase: 'BLITZ RUN', mod: 'overclock' },
   { groups: [['nullcore', 12], ['shielded', 16]], phase: 'ARMOR COLUMN', mod: 'hardened' },
-  { groups: [['drone', 26], ['runner', 20]], phase: 'AIR ARMADA' },
+  { groups: [['drone', 26], ['runner', 20]], phase: 'AIR ARMADA', mod: 'overclock' },
   { groups: [['virus', 2], ['file', 40], ['glitched', 30]], phase: 'VIRULENT SURGE' },
   { groups: [['leak', 2], ['nullcore', 10], ['drone', 20]], phase: 'LEAK STORM', mod: 'hardened' },
-  { groups: [['shielded', 20], ['nullcore', 10], ['overseer', 1], ['drone', 16]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+  { groups: [['shielded', 20], ['nullcore', 10], ['overseer', 1], ['drone', 20]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
 const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75 };
@@ -60,6 +60,8 @@ const START_SALVAGE = 200;   // mission opening funds — enough to open with 2-
 const FOOT_HALF = 24;        // clearance box is 48x48 around every placed unit
 const SEP = 56;              // min axis distance between two unit centers (box + gap)
 const CORE_CLEAR = 58;       // nothing deploys inside the reactor ring
+const PAD_SNAP = 24;         // hex AA pads: deploy this close to a pad center to link anti-air
+const PAD_AIR_BOOST = 1.5;   // pads overcharge linked units: +50% damage vs flying hostiles
 const TRACK_CLEAR = 36;      // nothing deploys on the convoy lane itself
 // Tower limit scales with the squad: every extra commander brings their own
 // hardware allotment to the shared grid.
@@ -369,6 +371,7 @@ function damageEnemy(enemy, amount, opts = {}) {
   // Cryo Frostbite: hostiles that are actively slowed take amplified damage.
   if (enemy.frost && (enemy.slow || 0) > 0) left *= 1 + enemy.frost;
   enemy.hp = Math.max(0, enemy.hp - left);
+  if (enemy.t.boss) updateBossBar(); // the top-bar boss readout tracks every hit
   if (enemy.key === 'leak' && !enemy.replicated && enemy.hp <= enemy.maxHp / 2) replicateLeak(enemy);
   if (enemy.key === 'overseer' && !enemy.shielded && enemy.hp <= enemy.maxHp * 0.25) {
     enemy.shielded = true;
@@ -650,8 +653,9 @@ function updateHud() {
 
 function updateBossBar() {
   const boss = state.enemies.find((enemy) => enemy.alive && enemy.t.boss);
-  if (!boss) { state.bossBar.hidden = true; return; }
-  state.bossBar.hidden = false;
+  state.bossBar.hidden = !boss;
+  state.bossBar.style.display = boss ? '' : 'none';
+  if (!boss) return;
   document.querySelector('#boss-name').textContent = `${boss.t.tag} // ${boss.t.name}`;
   document.querySelector('#boss-fill').style.width = `${(boss.hp / boss.maxHp) * 100}%`;
   document.querySelector('#boss-shield').style.width = boss.maxShield ? `${(boss.shield / boss.maxShield) * 25}%` : '0%';
@@ -928,7 +932,7 @@ function ensureLoadoutBar() {
   bar.innerHTML = `
     <div class="lo-head"><span>// DEPLOYMENT LOADOUT</span><b>${loadout.length}/5 BAYS ARMED</b></div>
     <div class="lo-slots">${slots}</div>
-    <div class="lo-hint">PICK A BAY (1-5) → CLICK THE GRID TO DEPLOY · CLICK A DEPLOYED UNIT → FIELD MODULES · RIGHT-CLICK / ESC TO STOP</div>`;
+    <div class="lo-hint">PICK A BAY (1-5) → CLICK THE GRID TO DEPLOY · HEX PADS = ANTI-AIR · CLICK A DEPLOYED UNIT → FIELD MODULES · RIGHT-CLICK / ESC TO STOP</div>`;
   battlefield.appendChild(bar);
   state.bar = bar;
   bar.addEventListener('click', (event) => {
@@ -1011,6 +1015,12 @@ function canPlace(x, y) {
   return { ok: true, reason: '' };
 }
 
+// Hex AA pads: a unit deployed on one of the map's hexagon pads gains anti-air
+// targeting, even if its chassis is ground-only (Sentinel, Plasma Mortar, ...).
+function padAt(x, y) {
+  return ((state.map && state.map.pads) || []).find(([px, py]) => Math.hypot(px - x, py - y) <= PAD_SNAP) || null;
+}
+
 function boardPoint(event) {
   const point = board.createSVGPoint();
   point.x = event.clientX;
@@ -1066,7 +1076,11 @@ function paintGhost(x, y) {
   state.ghost.classList.toggle('bad', !ok);
   state.ghost.classList.toggle('off', !state.mouseOn);
   const reason = state.ghost.querySelector('.tw-ghost-reason');
-  if (reason) reason.textContent = broke ? `NEED $${state.building.cost} SALVAGE` : verdict.reason;
+  if (reason) {
+    if (broke) reason.textContent = `NEED $${state.building.cost} SALVAGE`;
+    else if (verdict.ok && padAt(x, y)) reason.textContent = 'AA PAD — THIS UNIT CAN HIT FLYERS';
+    else reason.textContent = verdict.reason;
+  }
 }
 
 function rejectPlace(x, y, reason) {
@@ -1079,6 +1093,15 @@ function placeTower(entry, x, y) {
   const node = towerNode(entry, x, y);
   state.layers.towers.appendChild(node);
   const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, webDmg: 1, up: Object.fromEntries(towerModules(entry.id).map((mod) => [mod.id, 0])) };
+  const pad = padAt(x, y);
+  if (pad) {
+    tower.onPad = true;
+    tower.pad = pad;
+    node.classList.add('tw-on-pad');
+    const padNode = document.querySelector(`[data-pad="${pad[0]},${pad[1]}"]`);
+    if (padNode) padNode.classList.add('occupied');
+    floatText(x, y - 46, 'AA PAD LINKED', 'aa-float');
+  }
   state.towers.push(tower);
   node.classList.add('placed');
   setTimeout(() => node.classList.remove('placed'), 620);
@@ -1223,6 +1246,10 @@ function sellTower(tower) {
   const refund = Math.floor(tower.entry.cost * 0.7);
   state.cash += refund;
   tower.node.remove();
+  if (tower.pad) {
+    const padNode = document.querySelector(`[data-pad="${tower.pad[0]},${tower.pad[1]}"]`);
+    if (padNode) padNode.classList.remove('occupied');
+  }
   state.towers = state.towers.filter((item) => item !== tower);
   const [x, y] = [tower.x, tower.y];
   closeTowerPanel();
@@ -1307,19 +1334,40 @@ function acquireTarget(tower) {
   const rule = TOWER_RULES[tower.id] || {};
   const es = effStats(tower);
   const rng = es.infinite ? 9999 : es.rng;
+  // Stickiness: pad AA guns ride their target until it dies or escapes the ring —
+  // re-picking fresher flyers leaves every drone one burst short of dying.
+  if (tower.onPad && tower.target && tower.target.alive && tower.target.t.flying) {
+    const [sx, sy] = posOf(tower.target);
+    if (Math.hypot(sx - tower.x, sy - tower.y) <= rng) return tower.target;
+  }
   let pool = state.enemies.filter((enemy) => {
     if (!enemy.alive) return false;
-    if (rule.air === 'no' && enemy.t.flying) return false;
+    if (rule.air === 'no' && enemy.t.flying && !tower.onPad) return false;
     const [ex, ey] = posOf(enemy);
     return rng > 900 || Math.hypot(ex - tower.x, ey - tower.y) <= rng;
   });
-  if (!pool.length) return null;
+  if (!pool.length) {
+    tower.target = null;
+    return null;
+  }
+  // Ground-only units linked to an AA pad are the only anti-air there — they
+  // prioritize flyers, or drones sail past while track-walkers soak every shot.
+  // Pad guns lead the NEAREST flyer: it has the longest flight time left inside
+  // the range ring, so the burst actually finishes before the drone exits.
+  if (rule.air === 'no' && tower.onPad) {
+    const flying = pool.filter((enemy) => enemy.t.flying);
+    if (flying.length) {
+      tower.target = flying.reduce((best, enemy) => (enemy.dist < best.dist ? enemy : best));
+      return tower.target;
+    }
+  }
   if (rule.air === 'prefer') {
     const flying = pool.filter((enemy) => enemy.t.flying);
     if (flying.length) pool = flying;
   }
   // Priority: the hostile furthest along the track (closest to the core).
-  return pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
+  tower.target = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
+  return tower.target;
 }
 
 function aimHead(tower, target) {
@@ -1337,8 +1385,10 @@ function fireLine(tower, target, cls, width = 2) {
 }
 
 function fireTower(tower, target) {
-  const dmg = effStats(tower).dmg * (tower.webDmg || 1);
+  let dmg = effStats(tower).dmg * (tower.webDmg || 1);
   const [tx, ty] = posOf(target);
+  // Pads overcharge linked units against flying hostiles.
+  if (tower.onPad && target.t.flying) dmg *= PAD_AIR_BOOST;
   switch (tower.id) {
     case 'sentinel': {
       damageEnemy(target, dmg);
@@ -1627,5 +1677,11 @@ function notifyRoomEnded() {
   } catch { /* room service optional — solo missions never hit this. */ }
 }
 
-window.CBZCombat = { startMission, abort, active: () => state.mode !== 'idle' };
+window.CBZCombat = {
+  startMission,
+  abort,
+  active: () => state.mode !== 'idle',
+  // Read-only telemetry for QA + tests.
+  stats: () => ({ mode: state.mode, wave: state.waveIndex + 1, kills: state.kills, cash: Math.round(state.cash), base: state.baseHp, towers: state.towers.length, enemies: state.enemies.filter((enemy) => enemy.alive).length, towersDetail: state.towers.map((t) => ({ id: t.id, onPad: !!t.onPad })), flyingAlive: state.enemies.filter((e) => e.alive && e.t.flying).length }),
+};
 })();

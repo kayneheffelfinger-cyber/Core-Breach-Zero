@@ -617,3 +617,9 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 /* --- Unique field module info lines --- */
 .tp-info { color: #8fa39d; font: 8px var(--mono); letter-spacing: .3px; text-align: right; }
 @media (max-width: 560px) { .bays-grid { grid-template-columns: 1fr; } .lobby-grid { grid-template-columns: 1fr; } }
+
+/* Hex AA pads — anti-air link feedback */
+.pad.occupied { filter: drop-shadow(0 0 10px rgba(255,180,90,.75)); }
+.tw-on-pad .tw-base { stroke: #ffb45a; stroke-width: 2.5; }
+.tw-on-pad .tw-ped { stroke: #ffb45a; }
+.aa-float { fill: #ffb45a; }

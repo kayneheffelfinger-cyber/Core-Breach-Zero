@@ -94,7 +94,7 @@ const LOCAL = (() => {
   const SHOP = {
     sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
     arclance: { name: 'ARC LANCE', unlock: 1, price: 400, currency: 'nc' },
-    plasmort: { name: 'PLASMA MORTAR', unlock: 2, price: 550, currency: 'nc' },
+    plasmort: { name: 'PLASMA MORTAR', unlock: 1, price: 400, currency: 'nc', firstClear: true },
     cryobeacon: { name: 'CRYO DISRUPTOR', unlock: 3, price: 650, currency: 'nc' },
     scrapforge: { name: 'SCRAP FOUNDRY', unlock: 5, price: 700, currency: 'nc' },
     railspire: { name: 'RAIL SPIRE', unlock: 7, price: 950, currency: 'nc' },
@@ -225,6 +225,7 @@ const LOCAL = (() => {
       const meta = account.meta;
       if (meta.owned.includes(String(body.itemId || ''))) throw new Error('Blueprint already in your armory.');
       if (meta.level < item.unlock) throw new Error(`Clearance level ${item.unlock} required.`);
+      if (item.firstClear && !meta.firstClear) throw new Error('Reward locked — beat Easy Mode to decrypt this blueprint.');
       if (item.price > 0) {
         const balance = item.currency === 'bt' ? meta.bt : meta.nc;
         if (balance < item.price) throw new Error(item.currency === 'bt' ? 'Not enough Breach Tokens.' : 'Not enough Nexus Coins.');
@@ -1030,7 +1031,7 @@ function buildBoard(map) {
   spawns.appendChild(svgNode('polygon', { class: 'core-node', points: hexPoints(map.core.x, map.core.y, 20) }));
   spawns.appendChild(svgNode('text', { class: 'core-label', x: map.core.x, y: map.core.y + 42, 'text-anchor': 'middle' }, 'CORE'));
   for (const [x, y] of map.pads) {
-    pads.appendChild(svgNode('polygon', { class: 'pad', points: hexPoints(x, y, 17) }));
+    pads.appendChild(svgNode('polygon', { class: 'pad', points: hexPoints(x, y, 17), 'data-pad': `${x},${y}` }));
   }
 }
 
