@@ -665,9 +665,539 @@ const LOCAL_ROOMS = (() => {
   return { handle, wake, snapshots: () => snapshots(read()), role };
 })();
 
+// --- P2P ROOM SERVICE (WebRTC over PeerJS) ----------------------------------------
+// GitHub Pages serves static files only: no Node process, no /rooms WebSocket.
+// LOCAL_ROOMS above can only link tabs of one browser, so real players on
+// different machines could never share a bay. This service restores multiplayer
+// on any static host: the room lead's browser claims the bay's peer ID on
+// PeerJS's free public broker and becomes the authority, speaking the exact
+// same message protocol as the server's room service (join / config / start /
+// launch / coop / chat / end). Guests reach the bay directly over WebRTC data
+// channels — entering a bay always lands somewhere: claim it when empty, join
+// as crew when a room lead already holds it. If the broker script never loads
+// (offline, blocked), every path degrades back to LOCAL_ROOMS tab linking.
+const P2P_ROOMS = (() => {
+  const NS = 'cbz-cbz0-v1'; // peer-ID namespace on the public broker
+  const BAYS = [
+    ['room-01', 'ROOM 01 // ALPHA'],
+    ['room-02', 'ROOM 02 // BRAVO'],
+    ['room-03', 'ROOM 03 // CHARLIE'],
+    ['room-04', 'ROOM 04 // DELTA'],
+  ];
+  const MAX_PLAYERS = 4;
+  const CLAIM_MS = 6000;   // broker registration window for a bay claim
+  const LINK_MS = 6000;    // guest handshake window
+  const PROBE_MS = 4500;   // bay scan window
+  const SCAN_GAP = 2500;   // minimum gap between scans of one bay
+  const VIEW_TTL = 30000;  // scanned snapshots expire, like server room lists
+  const CHAT_HISTORY = 50;
+
+  let clientPeer = null;   // random-id peer: bay scans + guest links ride on it
+  let hubPeer = null;      // bay-id peer claimed while hosting a bay
+  let clientReady = false;
+  let broken = false;      // broker unusable this session — degrade to LOCAL_ROOMS
+  let callsign = '';
+  let myBay = null;        // HOST: {id, name, map, started, launchId, players:[{callsign, conn}]}
+  let guestLink = null;    // GUEST: {id, conn, room}
+  let views = new Map();   // bay id -> {room, seen} from bay scans
+  let scans = new Map();   // bay id -> {conn, timer}
+  let lastScan = new Map();
+  let chatLog = [];
+  let wired = false;
+  let onClientOpen = null; // queued join that arrived before the broker handshake
+  let lastPong = 0;        // last heartbeat echo from the room lead
+
+  const peerId = (bay) => `${NS}-${bay}`;
+  const bayName = (bay) => (BAYS.find(([id]) => id === bay) || [bay, bay])[1];
+  const usable = () => !broken && typeof window.Peer === 'function';
+  const inRoom = () => Boolean(myBay || guestLink);
+  const guestConns = () => (myBay ? myBay.players.slice(1).map((player) => player.conn) : []);
+
+  function send(conn, message) {
+    try { if (conn && conn.open) conn.send(JSON.stringify(message)); } catch { /* link already gone. */ }
+  }
+
+  function closeConn(conn) { try { if (conn) conn.close(); } catch { /* ignore. */ } }
+
+  // The bay browser repaints only when a scan actually changed something, so a
+  // dialog full of probes never flickers.
+  function paintBays() {
+    const next = snapshots();
+    if (JSON.stringify(next) === JSON.stringify(roomList)) return;
+    roomList = next;
+    if (dialog.open && showingBays && !currentRoom) renderBays();
+  }
+
+  function ensureClient() {
+    if (clientPeer && !clientPeer.destroyed) {
+      if (clientReady) return clientPeer;
+      if (clientPeer.disconnected) { try { clientPeer.reconnect(); } catch { /* ignore */ } }
+      return clientPeer;
+    }
+    clientReady = false;
+    try {
+      clientPeer = new window.Peer({ debug: 0 });
+    } catch {
+      broken = true;
+      return null;
+    }
+    clientPeer.on('open', () => {
+      clientReady = true;
+      scan(true); // a bays view may already be open, waiting on this handshake
+      if (onClientOpen) { const queued = onClientOpen; onClientOpen = null; queued(); }
+    });
+    clientPeer.on('disconnected', () => {
+      clientReady = false;
+      try { clientPeer.reconnect(); } catch { /* ignore */ }
+    });
+    clientPeer.on('error', (error) => {
+      const type = error && error.type;
+      if (type === 'peer-unavailable') {
+        // "Could not connect to peer <id>" — that bay has no room lead right now.
+        const target = String(error.message || '').trim().split(/\s+/).pop();
+        for (const [bay, entry] of scans) {
+          if (peerId(bay) === target) finishScan(bay, null);
+        }
+        for (const bay of [...views.keys()]) {
+          if (peerId(bay) === target) views.delete(bay);
+        }
+        paintBays();
+        return;
+      }
+      if (type === 'browser-incompatible' || type === 'server-error' || type === 'socket-error') {
+        broken = true;
+        paintBays();
+      }
+    });
+    return clientPeer;
+  }
+
+  function finishScan(bay, room) {
+    const entry = scans.get(bay);
+    scans.delete(bay);
+    if (entry) {
+      clearTimeout(entry.timer);
+      closeConn(entry.conn);
+    }
+    // room === undefined: scan timed out, keep the last known view.
+    if (room) views.set(bay, { room, seen: Date.now() });
+    else if (room === null) views.delete(bay); // bay confirmed empty by the broker
+    paintBays();
+  }
+
+  // Live bay scan: one short-lived data connection per bay asks any room lead
+  // for its current snapshot. A self-healing tick keeps it running while the
+  // bays browser is on screen — probes fired before the broker handshake
+  // finishes are dropped, so the tick retries until real results land.
+  function scan(force) {
+    if (!usable() || myBay || guestLink) return;
+    const peer = ensureClient();
+    if (!peer) return;
+    const now = Date.now();
+    for (const [bay] of BAYS) {
+      if (scans.has(bay)) continue;
+      if (!force && now - (lastScan.get(bay) || 0) < SCAN_GAP) continue;
+      lastScan.set(bay, now);
+      let conn;
+      try { conn = peer.connect(peerId(bay), { reliable: true }); } catch { continue; }
+      const entry = { conn, timer: setTimeout(() => finishScan(bay, undefined), PROBE_MS) };
+      scans.set(bay, entry);
+      conn.on('open', () => send(conn, { type: 'state' }));
+      conn.on('data', (raw) => {
+        let message;
+        try { message = JSON.parse(raw); } catch { return; }
+        if (message.type === 'room-state' && message.room) finishScan(bay, message.room);
+      });
+      conn.on('close', () => { if (scans.get(bay) === entry) finishScan(bay, undefined); });
+      conn.on('error', () => { if (scans.get(bay) === entry) finishScan(bay, undefined); });
+    }
+  }
+
+  function hostSnapshot() {
+    return {
+      id: myBay.id,
+      name: myBay.name,
+      map: myBay.map,
+      maxPlayers: MAX_PLAYERS,
+      started: myBay.started,
+      commanders: myBay.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
+    };
+  }
+
+  function snapshots() {
+    const now = Date.now();
+    return BAYS.map(([id, name]) => {
+      if (myBay && myBay.id === id) return hostSnapshot();
+      if (guestLink && guestLink.id === id && guestLink.room) return guestLink.room;
+      const view = views.get(id);
+      if (view && now - view.seen < VIEW_TTL) return view.room;
+      return { id, name, map: null, maxPlayers: MAX_PLAYERS, started: false, commanders: [] };
+    });
+  }
+
+  function role() {
+    if (myBay && myBay.started) return 'host';
+    if (guestLink && guestLink.room && guestLink.room.started) return 'guest';
+    return 'solo';
+  }
+
+  function wake() {
+    if (wired) return;
+    wired = true;
+    callsign = (myName || 'COMMANDER').toUpperCase();
+    // Dropping the page must free the bay for everyone — destroy the hub peer
+    // so every guest link closes immediately, exactly like the server would.
+    const dropBay = () => {
+      if (hubPeer) { try { hubPeer.destroy(); } catch { /* ignore */ } hubPeer = null; }
+    };
+    window.addEventListener('pagehide', dropBay);
+    window.addEventListener('beforeunload', dropBay);
+    ensureClient();
+    // Bay scan heartbeat: only acts while the bays browser is on screen.
+    setInterval(() => {
+      if (dialog.open && showingBays && !currentRoom && usable()) scan();
+    }, 1200);
+    // Seat keepalive: WebRTC fires no timely close when a tab dies (consent
+    // expiry can lag 30s+), so both ends ping every 5s and sweep silent links.
+    setInterval(() => {
+      const now = Date.now();
+      if (myBay) {
+        for (const seat of myBay.players) {
+          if (seat.conn && now - (seat.lastSeen || 0) > 16000) {
+            closeConn(seat.conn);
+            dropConn(seat.conn);
+          }
+        }
+      }
+      if (guestLink && guestLink.conn) {
+        if (lastPong && now - lastPong > 16000) {
+          closeConn(guestLink.conn);
+          linkLost();
+        } else {
+          send(guestLink.conn, { type: 'ping' });
+        }
+      }
+    }, 5000);
+  }
+
+  function handle(message) {
+    if (!usable()) return;
+    wake();
+    switch (message.type) {
+      case 'authenticate':
+        callsign = (myName || message.callsign || 'COMMANDER').toUpperCase();
+        handleServiceMessage({ type: 'linked', callsign, rooms: snapshots(), chat: chatLog });
+        return;
+      case 'rooms':
+        scan();
+        paintBays();
+        return;
+      case 'join': return enterBay(String(message.room || ''));
+      case 'config': return configure(message.map);
+      case 'start': return startMission();
+      case 'leave': return leaveBay();
+      case 'end': return conclude();
+      case 'chat': return chat(String(message.text || ''));
+      case 'coop': return relayOut(message.kind, message.data);
+    }
+  }
+
+  function enterBay(bay) {
+    if (!BAYS.some(([id]) => id === bay)) return handleServiceMessage({ type: 'error', message: 'Room not found.' });
+    if (myBay || guestLink) return handleServiceMessage({ type: 'error', message: 'Leave your current room before switching.' });
+    claim(bay, 0);
+  }
+
+  // First handshake: try to claim the bay as room lead. If another commander
+  // already holds the peer ID, fall through and join as crew instead — either
+  // way, ENTER ROOM lands you inside the bay.
+  function claim(bay, attempt) {
+    let peer;
+    try { peer = new window.Peer(peerId(bay), { debug: 0 }); } catch { broken = true; return; }
+    let settled = false;
+    let timer = 0;
+    const settle = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+    timer = setTimeout(() => settle(() => {
+      try { peer.destroy(); } catch { /* ignore */ }
+      // The broker never answered: degrade so the bays fall back to tab linking.
+      broken = true;
+      handleServiceMessage({ type: 'error', message: 'PEER NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
+    }), CLAIM_MS);
+    peer.on('open', () => settle(() => {
+      hubPeer = peer;
+      myBay = { id: bay, name: bayName(bay), map: null, started: false, launchId: null, players: [{ callsign, conn: null, lastSeen: Date.now() }] };
+      wireHub(peer);
+      handleServiceMessage({ type: 'joined', you: callsign, room: hostSnapshot() });
+    }));
+    peer.on('error', (error) => {
+      if (error && error.type === 'unavailable-id') {
+        settle(() => { try { peer.destroy(); } catch { /* ignore */ } join(bay, attempt); });
+        return;
+      }
+      if (!settled) settle(() => { try { peer.destroy(); } catch { /* ignore */ } });
+    });
+  }
+
+  function uniqueName(name) {
+    const taken = new Set(myBay.players.map((player) => player.callsign));
+    if (!taken.has(name)) return name;
+    for (let i = 2; ; i += 1) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
+  }
+
+  function join(bay, attempt) {
+    const peer = ensureClient();
+    if (!peer) return;
+    if (!clientReady) {
+      // Broker handshake still running — queue the join for the moment it lands.
+      onClientOpen = () => join(bay, attempt);
+      return;
+    }
+    let conn;
+    try { conn = peer.connect(peerId(bay), { reliable: true }); } catch { return; }
+    let settled = false;
+    let timer = 0;
+    const finish = () => { if (settled) return; settled = true; clearTimeout(timer); };
+    timer = setTimeout(() => {
+      if (settled) return;
+      finish();
+      closeConn(conn);
+      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+    }, LINK_MS);
+    conn.on('open', () => send(conn, { type: 'join', callsign }));
+    conn.on('data', (raw) => {
+      let message;
+      try { message = JSON.parse(raw); } catch { return; }
+      if (message.type === 'joined') {
+        finish();
+        guestLink = { id: bay, conn, room: message.room };
+        callsign = message.you || callsign;
+        lastPong = Date.now();
+        handleServiceMessage({ type: 'joined', you: callsign, room: message.room });
+        if (Array.isArray(message.chat)) message.chat.forEach(appendChat);
+        return;
+      }
+      if (message.type === 'error') {
+        finish();
+        closeConn(conn);
+        handleServiceMessage({ type: 'error', message: message.message });
+        return;
+      }
+      guestMessages(conn, message);
+    });
+    conn.on('close', () => {
+      if (guestLink && guestLink.conn === conn) return linkLost();
+      if (settled) return;
+      finish();
+      // The lead vanished between our scan and join — try claiming the bay once.
+      if (attempt < 1) claim(bay, attempt + 1);
+      else handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+    });
+    conn.on('error', () => { if (!settled) { finish(); closeConn(conn); } });
+  }
+
+  // Everything a linked guest can receive once the handshake is done. Same
+  // message shapes the node server sends over its /rooms socket.
+  function guestMessages(conn, message) {
+    if (message.type === 'ping') { lastPong = Date.now(); return; }
+    if (message.type === 'room-update') {
+      if (guestLink && guestLink.conn === conn) guestLink.room = message.room;
+      handleServiceMessage(message);
+      return;
+    }
+    if (message.type === 'launch') {
+      // Carry the started room into the link BEFORE the bridge reads its role.
+      if (guestLink && guestLink.conn === conn) guestLink.room = message.room;
+      handleServiceMessage(message);
+      return;
+    }
+    if (['chat', 'coop', 'error', 'rooms'].includes(message.type)) {
+      handleServiceMessage(message);
+    }
+  }
+
+  function linkLost() {
+    guestLink = null;
+    if (currentRoom) {
+      currentRoom = null;
+      showToast('ROOM LEAD LINK LOST // BAY CLOSED');
+      setStatus('ROOM SERVICE ONLINE');
+      if (dialog.open) renderBays();
+    }
+  }
+
+  function wireHub(peer) {
+    peer.on('connection', (conn) => {
+      conn.on('data', (raw) => {
+        let message;
+        try { message = JSON.parse(raw); } catch { return; }
+        hubMessage(conn, message);
+      });
+      conn.on('close', () => dropConn(conn));
+      conn.on('error', () => dropConn(conn));
+    });
+    peer.on('disconnected', () => { try { peer.reconnect(); } catch { /* ignore */ } });
+    peer.on('error', () => { /* claim errors surface elsewhere; keep the bay alive. */ });
+  }
+
+  // The hub speaks the server's room protocol verbatim.
+  function hubMessage(conn, message) {
+    if (!myBay) return;
+    if (message.type === 'ping') {
+      const player = myBay.players.find((seat) => seat.conn === conn);
+      if (player) player.lastSeen = Date.now();
+      send(conn, { type: 'ping' });
+      return;
+    }
+    if (message.type === 'state') {
+      send(conn, { type: 'room-state', room: hostSnapshot() });
+      setTimeout(() => closeConn(conn), 400);
+      return;
+    }
+    if (message.type === 'join') {
+      if (myBay.started) return send(conn, { type: 'error', message: 'This room has already started.' });
+      if (myBay.players.length >= MAX_PLAYERS) return send(conn, { type: 'error', message: 'Room is full. Choose another room.' });
+      const name = uniqueName(
+        String(message.callsign || 'COMMANDER').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16) || 'COMMANDER',
+      );
+      myBay.players.push({ callsign: name, conn, lastSeen: Date.now() });
+      send(conn, { type: 'joined', you: name, room: hostSnapshot(), chat: chatLog });
+      pushRoomUpdate();
+      return;
+    }
+    const seat = myBay.players.findIndex((player) => player.conn === conn);
+    if (seat === -1) return;
+    const sender = myBay.players[seat];
+    if (message.type === 'leave') { closeConn(conn); return dropConn(conn); }
+    if (message.type === 'end') return conclude();
+    if (message.type === 'chat') {
+      const text = String(message.text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 280);
+      if (!text) return;
+      const entry = { from: sender.callsign, text, ts: Date.now() };
+      chatLog.push(entry);
+      if (chatLog.length > CHAT_HISTORY) chatLog.splice(0, chatLog.length - CHAT_HISTORY);
+      appendChat(entry);
+      for (const other of guestConns()) if (other !== conn) send(other, { type: 'chat', ...entry });
+      return;
+    }
+    // Squad relay: guests ship placements/installs to the lead — the lead's sim
+    // validates them, exactly like the node server forwards intents.
+    if (message.type === 'coop' && message.kind === 'intent') {
+      if (window.CBZCombat) CBZCombat.coopHandle({ k: 'intent', ...(message.data || {}) });
+    }
+  }
+
+  function dropConn(conn) {
+    if (!myBay) return;
+    const index = myBay.players.findIndex((player) => player.conn === conn);
+    if (index === -1) return;
+    myBay.players.splice(index, 1);
+    if (!myBay.players.length) Object.assign(myBay, { map: null, started: false, launchId: null });
+    pushRoomUpdate();
+  }
+
+  function pushRoomUpdate() {
+    if (!myBay) return;
+    const room = hostSnapshot();
+    if (currentRoom && currentRoom.id === myBay.id) {
+      currentRoom = room;
+      if (dialog.open && !showingBays) renderLobby();
+    }
+    for (const conn of guestConns()) send(conn, { type: 'room-update', room });
+  }
+
+  function configure(map) {
+    if (!myBay || myBay.started) return;
+    if (!Object.keys(BATTLE_MAPS).includes(map)) return;
+    myBay.map = map;
+    pushRoomUpdate();
+  }
+
+  function startMission() {
+    if (!myBay || myBay.started) return;
+    if (!myBay.map) return handleServiceMessage({ type: 'error', message: 'Select a map before starting.' });
+    myBay.started = true;
+    myBay.launchId = `${Date.now()}`;
+    const room = hostSnapshot();
+    for (const conn of guestConns()) send(conn, { type: 'launch', room });
+    handleServiceMessage({ type: 'launch', room });
+  }
+
+  function conclude() {
+    if (myBay && myBay.started) {
+      myBay.started = false;
+      myBay.launchId = null;
+      pushRoomUpdate();
+      return;
+    }
+    if (guestLink && guestLink.conn) send(guestLink.conn, { type: 'end' });
+  }
+
+  function leaveBay() {
+    if (guestLink) {
+      send(guestLink.conn, { type: 'leave' });
+      closeConn(guestLink.conn);
+      guestLink = null;
+      return;
+    }
+    if (myBay) {
+      for (const conn of guestConns()) send(conn, { type: 'error', message: 'ROOM LEAD CLOSED THE BAY.' });
+      try { hubPeer.destroy(); } catch { /* ignore */ }
+      hubPeer = null;
+      myBay = null;
+    }
+  }
+
+  // Squad relay: the room lead broadcasts authoritative snapshots; guests ship
+  // intents back for the lead's sim to validate — same contract as the server.
+  function relayOut(kind, data) {
+    if (myBay && myBay.started) {
+      if (kind !== 'sync' && kind !== 'over') return;
+      const payload = JSON.stringify({ type: 'coop', kind, data, from: callsign });
+      for (const conn of guestConns()) { try { if (conn.open) conn.send(payload); } catch { /* ignore */ } }
+      return;
+    }
+    if (guestLink && guestLink.conn) send(guestLink.conn, { type: 'coop', kind, data, from: callsign });
+  }
+
+  function chat(text) {
+    const clean = String(text || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 280);
+    if (!clean) return;
+    const entry = { from: callsign || chatIdentity(), text: clean, ts: Date.now() };
+    if (myBay) {
+      chatLog.push(entry);
+      if (chatLog.length > CHAT_HISTORY) chatLog.splice(0, chatLog.length - CHAT_HISTORY);
+      appendChat(entry);
+      for (const conn of guestConns()) send(conn, { type: 'chat', ...entry });
+      return;
+    }
+    if (guestLink && guestLink.conn) {
+      appendChat(entry);
+      send(guestLink.conn, { type: 'chat', text: clean });
+    }
+  }
+
+  function bridge() {
+    if (!inRoom()) return null;
+    return {
+      role: role(),
+      send: (msg) => { const { k, ...data } = msg; relayOut(k, data); },
+    };
+  }
+
+  return { usable, wake, handle, snapshots, scan, role, inRoom, bridge, chat };
+})();
+
 function sendToService(message) {
   if (LOCAL.down()) {
-    LOCAL_ROOMS.handle(message);
+    // Static host: prefer the peer-net relay (real cross-device multiplayer);
+    // fall back to same-browser tab linking when the broker is unavailable.
+    if (P2P_ROOMS.usable()) P2P_ROOMS.handle(message);
+    else LOCAL_ROOMS.handle(message);
     return;
   }
   if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
@@ -695,9 +1225,17 @@ function connectRoom() {
 
 function openPlayMenu() {
   if (LOCAL.down()) {
-    // Static host: the four deployment bays run locally off localStorage —
-    // join one, pick a map, launch. No Node server required.
     showingBays = true;
+    if (P2P_ROOMS.usable()) {
+      // Peer net: commanders claim bays across the open grid — no server needed.
+      P2P_ROOMS.wake();
+      if (currentRoom && P2P_ROOMS.inRoom()) return renderLobby();
+      roomList = P2P_ROOMS.snapshots();
+      renderBays();
+      return;
+    }
+    // Broker script unavailable: the four bays run locally off localStorage —
+    // join one, pick a map, launch. Links tabs of this browser only.
     LOCAL_ROOMS.wake();
     roomList = LOCAL_ROOMS.snapshots();
     renderBays();
@@ -730,9 +1268,13 @@ function renderBays() {
     document.querySelector('#map-recon').addEventListener('click', renderMapSelect);
     return;
   }
+  const netLine = LOCAL.down() && P2P_ROOMS.usable()
+    ? '<p class="lobby-state">PEER NET ONLINE // COMMANDERS LINK UP ACROSS THE OPEN GRID</p>'
+    : '';
   body.innerHTML = `
     <p class="dialog-copy">Enter an open room for up to four commanders. Choose a map, wait for at least one teammate, and let the room lead start when ready.</p>
     ${reconButton}
+    ${netLine}
     <div class="bays-grid">${roomList.map((room) => {
       const count = room.commanders.length;
       const full = count >= room.maxPlayers;
@@ -756,6 +1298,8 @@ function renderBays() {
   if (invite && roomList.some((room) => room.id === invite && !room.started && room.commanders.length < room.maxPlayers)) {
     sendToService({ type: 'join', room: invite });
   }
+  // Keep the bay scan alive while the browser is on screen (peer net only).
+  if (LOCAL.down() && P2P_ROOMS.usable() && !currentRoom) P2P_ROOMS.scan();
 }
 
 function isRoomLead(room) {
@@ -803,7 +1347,7 @@ function renderLobby() {
       </section>
       <section class="config-panel">
         <h3>SELECT MAP // ${roomLead ? 'ROOM LEAD CONTROL' : 'ROOM LEAD SELECTS'}</h3>
-        ${roomLead && !room.started ? `<p class="dialog-copy">${LOCAL.down() ? 'Choose a map and launch when ready. Other commanders can drop into this bay from another tab on this machine.' : 'Choose a map. Your squad waits here until at least one teammate joins and you start.'}</p>` : ''}
+        ${roomLead && !room.started ? `<p class="dialog-copy">${LOCAL.down() ? (P2P_ROOMS.usable() ? 'Choose a map and launch when ready. Commanders across the net can drop into this bay while you hold it.' : 'Choose a map and launch when ready. Other commanders can drop into this bay from another tab on this machine.') : 'Choose a map. Your squad waits here until at least one teammate joins and you start.'}</p>` : ''}
         <div class="map-grid">${Object.values(BATTLE_MAPS).map((map) => renderRoomMapCard(map, room, roomLead)).join('')}</div>
         ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map && (LOCAL.down() || room.commanders.length >= 2) ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
         ${room.started ? '<p class="standby-note">MISSION STARTED // DEPLOYMENT LOCKED. FINISH OR EXIT TO REGROUP.</p>' : !roomLead ? '<p class="standby-note">STANDBY // WAITING FOR THE ROOM LEAD TO START.</p>' : ''}
@@ -871,6 +1415,7 @@ function handleServiceMessage(message) {
   if (message.type === 'joined') {
     myCallsign = message.you;
     currentRoom = message.room;
+    if (Array.isArray(message.chat)) message.chat.forEach(appendChat);
     setStatus(`ROOM LINKED // ${currentRoom.name}`);
     renderLobby();
     return;
@@ -903,12 +1448,17 @@ function showLaunchSequence(mapId) {
   roomLaunch = true;
   window.CBZ_ROOM_PLAYERS = currentRoom ? currentRoom.commanders.length : 1;
   // Squad relay: the room lead's sim is authoritative — everyone else mirrors it
-  // and ships intents. Server rooms relay over WebSocket; LOCAL bays relay over
-  // a BroadcastChannel between tabs on this machine.
+  // and ships intents. Server rooms relay over WebSocket; peer-net bays relay
+  // over WebRTC to the room lead; LOCAL bays relay over a BroadcastChannel
+  // between tabs on this machine.
   if (LOCAL.down()) {
-    const channel = new BroadcastChannel(`cbz-coop-${currentRoom ? currentRoom.id : 'solo'}`);
-    channel.onmessage = (event) => { if (window.CBZCombat) CBZCombat.coopHandle(event.data); };
-    window.CBZCoopBridge = { role: LOCAL_ROOMS.role(), send: (msg) => channel.postMessage(msg) };
+    if (P2P_ROOMS.usable() && P2P_ROOMS.inRoom()) {
+      window.CBZCoopBridge = P2P_ROOMS.bridge();
+    } else {
+      const channel = new BroadcastChannel(`cbz-coop-${currentRoom ? currentRoom.id : 'solo'}`);
+      channel.onmessage = (event) => { if (window.CBZCombat) CBZCombat.coopHandle(event.data); };
+      window.CBZCoopBridge = { role: LOCAL_ROOMS.role(), send: (msg) => channel.postMessage(msg) };
+    }
   } else {
     window.CBZCoopBridge = {
       role: currentRoom && isRoomLead(currentRoom) ? 'host' : 'guest',
@@ -1038,6 +1588,11 @@ function sendChat(text) {
     socket.send(JSON.stringify({ type: 'chat', text: clean }));
     return;
   }
+  // Peer net: the bay's room lead relays comms between linked commanders.
+  if (LOCAL.down() && P2P_ROOMS.usable() && P2P_ROOMS.inRoom()) {
+    P2P_ROOMS.chat(clean);
+    return;
+  }
   // Static host: relay through localStorage so tabs on this machine stay linked.
   const entry = { from: chatIdentity(), text: clean, ts: Date.now() };
   try {
@@ -1073,7 +1628,7 @@ window.addEventListener('storage', (event) => {
   toggle.addEventListener('click', () => {
     panel.hidden = !panel.hidden;
     if (!panel.hidden) {
-      document.querySelector('#comms-scope').textContent = chatOnline() ? 'SERVER RELAY' : 'LOCAL RELAY';
+      document.querySelector('#comms-scope').textContent = chatOnline() ? 'SERVER RELAY' : (LOCAL.down() && P2P_ROOMS.usable() && P2P_ROOMS.inRoom() ? 'P2P RELAY' : 'LOCAL RELAY');
       const log = document.querySelector('#chat-log');
       if (log) log.scrollTop = log.scrollHeight;
     }
