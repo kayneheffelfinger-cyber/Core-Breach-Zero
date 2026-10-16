@@ -42,10 +42,21 @@ const SHOP = {
 };
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
+  medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
 };
+const PROTOCOLS = Object.keys(REWARDS);
+
+// Achievement ledger — derived from meta.mapWins (`${mapId}:${protocol}` -> win count).
+// Mirrored in app.js LOCAL — keep the derivation in sync there.
+function achievementsFrom(mapWins) {
+  const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  return {
+    overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
+  };
+}
 
 function defaultMeta() {
-  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] };
+  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {} };
 }
 
 // Grant legacy accounts the Nexus wallet without touching their credentials.
@@ -63,7 +74,7 @@ const REDEEM_CODES = {
 
 function profilePayload(account) {
   const meta = account.meta;
-  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [] };
+  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins) };
 }
 
 function saveAccounts() {
@@ -210,11 +221,12 @@ async function handleApi(request, response, pathname) {
     if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
     const table = REWARDS[String(body.difficulty)] || REWARDS.easy;
     const win = body.result === 'win';
-    const waves = Math.max(0, Math.min(20, Number(body.wavesCleared) || 0));
-    const bosses = Math.max(0, Math.min(5, Number(body.bossesKilled) || 0));
+    const waves = Math.max(0, Math.min(30, Number(body.wavesCleared) || 0));
+    const bosses = Math.max(0, Math.min(24, Number(body.bossesKilled) || 0));
     const flawless = Boolean(win && body.flawless);
     const bonusNc = Math.max(0, Math.min(600, Math.round(Number(body.bonusNc) || 0))); // Scrap Foundry yield
     const meta = accounts[name].meta;
+    const beforeAch = achievementsFrom(meta.mapWins);
     let nc = waves * table.waveNC + bosses * table.bossNC + bonusNc;
     let bt = bosses * table.bossBT;
     let xp = waves * table.waveXP + bosses * table.bossXP;
@@ -222,6 +234,14 @@ async function handleApi(request, response, pathname) {
     if (flawless) { nc += table.flawlessNC; bt += table.flawlessBT; xp += table.flawlessXP; }
     let firstClear = false;
     if (win && !meta.firstClear) { meta.firstClear = true; firstClear = true; bt += table.firstClearBT; }
+    // Achievement ledger: wins on known maps/protocols bump `${map}:${protocol}`.
+    if (win && MAP_PROTOCOLS.includes(String(body.map || '')) && PROTOCOLS.includes(String(body.difficulty || ''))) {
+      meta.mapWins = meta.mapWins && typeof meta.mapWins === 'object' ? meta.mapWins : {};
+      const winKey = `${String(body.map)}:${String(body.difficulty)}`;
+      meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
+    }
+    const afterAch = achievementsFrom(meta.mapWins);
+    const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
     const before = meta.level;
     meta.nc += nc;
     meta.bt += bt;
@@ -232,7 +252,7 @@ async function handleApi(request, response, pathname) {
     }
     if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     saveAccounts();
-    return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, unlocked, profile: profilePayload(accounts[name]) });
   }
 
   // Salvage codes — playtesting funds. One redemption per commander account per

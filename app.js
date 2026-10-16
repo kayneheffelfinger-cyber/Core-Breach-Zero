@@ -16,13 +16,18 @@ document.querySelector('#preview-port').textContent = port;
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. EASY MODE: 20 waves, boss encounters, base defense.',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves) and MEDIUM (25 waves, denser and angrier).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
     tag: 'SKILL MATRIX', title: 'TOWER & PERKS',
-    description: 'Turret upgrades, plasma buffs, and commander tech trees will be available when gameplay is added.',
-    stats: [['TURRET SYSTEMS', 'PLANNED'], ['PERK TREE', 'PLANNED'], ['STATUS', 'NOT DEPLOYED']],
+    description: 'The skill matrix runs two tabs: PERKS and ACHIEVEMENTS. Earn achievement records on the grid to decrypt commander perks — starting with OVERDRIVE, the 2x mission time-compression rig.',
+    stats: () => {
+      const shop = window.CBZShop;
+      const profile = shop && shop.profile ? shop.profile() : null;
+      const earned = profile && profile.achievements ? Object.values(profile.achievements).filter(Boolean).length : 0;
+      return [['TABS', 'PERKS + ACHIEVEMENTS'], ['ACHIEVEMENTS', `${earned} / ${ACHIEVEMENTS.length} EARNED`], ['PERKS DEPLOYED', `${PERKS.length}`]];
+    },
   },
   shop: {
     tag: 'NEXUS MARKETPLACE', title: 'NEXUS SHOP',
@@ -91,6 +96,42 @@ const REDEEM_CODES = {
   ZERODAY: { nc: 5000, bt: 500 },
 };
 
+// --- Achievements & perks -------------------------------------------------------
+// Achievement progress derives from profile.mapWins — a ledger keyed by
+// `${mapId}:${protocol}` that /api/mission/complete bumps on every recorded win.
+// Mirrored in server.js — keep the derivation in sync there.
+const ACHIEVEMENTS = [
+  {
+    id: 'overdrive', name: 'OVERDRIVE', glyph: '⚡', map: 'insane',
+    protocols: ['easy', 'medium'],
+    desc: 'Clear the OVERLOAD SPIRE sector on both the EASY and MEDIUM combat protocols.',
+    reward: 'Decrypts the OVERDRIVE perk — a TIME x2 button for missions.',
+  },
+];
+function achievementsFrom(mapWins) {
+  const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  return {
+    overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
+  };
+}
+const PERKS = [
+  {
+    id: 'overdrive', name: 'OVERDRIVE PROTOCOL', ach: 'overdrive',
+    desc: 'Time-compression rig. Adds a TIME x2 toggle to the mission HUD — flip it and the entire battlefield runs at double speed.',
+    req: 'OVERDRIVE ACHIEVEMENT',
+  },
+];
+window.CBZPerks = {
+  list: PERKS,
+  has(id) {
+    const perk = PERKS.find((entry) => entry.id === id);
+    if (!perk) return false;
+    const shop = window.CBZShop;
+    const profile = shop && shop.profile ? shop.profile() : null;
+    return Boolean(profile && profile.achievements && profile.achievements[perk.ach]);
+  },
+};
+
 const LOCAL = (() => {
   const ACCOUNTS_KEY = 'cbz-local-accounts';
   const SESSIONS_KEY = 'cbz-local-sessions';
@@ -109,6 +150,7 @@ const LOCAL = (() => {
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
+    medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
   };
   let down = false;
 
@@ -120,7 +162,7 @@ const LOCAL = (() => {
   }
   const readAccounts = () => readJson(ACCOUNTS_KEY, {});
   const readSessions = () => readJson(SESSIONS_KEY, {});
-  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] });
+  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {} });
 
   function randomHex(bytes) {
     const array = new Uint8Array(bytes);
@@ -170,7 +212,7 @@ const LOCAL = (() => {
 
   function profilePayload(account) {
     const meta = account.meta;
-    return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [] };
+    return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins) };
   }
 
   function requireAccount(body) {
@@ -252,11 +294,12 @@ const LOCAL = (() => {
       const account = requireAccount(body);
       const table = REWARDS[String(body.difficulty)] || REWARDS.easy;
       const win = body.result === 'win';
-      const waves = Math.max(0, Math.min(20, Number(body.wavesCleared) || 0));
-      const bosses = Math.max(0, Math.min(5, Number(body.bossesKilled) || 0));
+      const waves = Math.max(0, Math.min(30, Number(body.wavesCleared) || 0));
+      const bosses = Math.max(0, Math.min(24, Number(body.bossesKilled) || 0));
       const flawless = Boolean(win && body.flawless);
       const bonusNc = Math.max(0, Math.min(600, Math.round(Number(body.bonusNc) || 0))); // Scrap Foundry yield
       const meta = account.meta;
+      const beforeAch = achievementsFrom(meta.mapWins);
       let nc = waves * table.waveNC + bosses * table.bossNC + bonusNc;
       let bt = bosses * table.bossBT;
       let xp = waves * table.waveXP + bosses * table.bossXP;
@@ -264,6 +307,14 @@ const LOCAL = (() => {
       if (flawless) { nc += table.flawlessNC; bt += table.flawlessBT; xp += table.flawlessXP; }
       let firstClear = false;
       if (win && !meta.firstClear) { meta.firstClear = true; firstClear = true; bt += table.firstClearBT; }
+      // Achievement ledger: wins on known maps/protocols bump `${map}:${protocol}`.
+      if (win && BATTLE_MAPS[String(body.map || '')] && REWARDS[String(body.difficulty || '')]) {
+        meta.mapWins = meta.mapWins && typeof meta.mapWins === 'object' ? meta.mapWins : {};
+        const winKey = `${String(body.map)}:${String(body.difficulty)}`;
+        meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
+      }
+      const afterAch = achievementsFrom(meta.mapWins);
+      const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
       const before = meta.level;
       meta.nc += nc;
       meta.bt += bt;
@@ -276,7 +327,7 @@ const LOCAL = (() => {
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(account) };
+      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, unlocked, profile: profilePayload(account) };
     }
     if (path === '/api/redeem') {
       // Salvage-code redemption — mirrors server.js exactly (same codes, same grants).
@@ -444,9 +495,80 @@ function openMenu(key) {
   document.querySelector('#dialog-title').textContent = item.title;
   if (key === 'play') openPlayMenu();
   else if (key === 'shop') renderNexusShop();
+  else if (key === 'perks') renderPerksMenu(item);
   else if (key === 'settings') renderSettingsPanel(item);
   else renderDetails(item);
   dialog.showModal();
+}
+
+// --- Skill matrix: PERKS + ACHIEVEMENTS tabs --------------------------------------
+function renderPerksMenu(item) {
+  const shop = window.CBZShop;
+  const profile = shop && shop.profile ? shop.profile() : null;
+  const paint = (tab) => {
+    const achievements = (profile && profile.achievements) || {};
+    const mapWins = (profile && profile.mapWins) || {};
+    const panel = body.querySelector('#matrix-panel');
+    if (!panel) return;
+    panel.innerHTML = tab === 'achievements' ? achievementsPanelHtml(achievements, mapWins) : perksPanelHtml(achievements);
+  };
+  body.innerHTML = `
+    <p class="dialog-copy">${escapeHtml(item.description)}</p>
+    <div class="matrix-tabs" id="matrix-tabs">
+      <button class="matrix-tab on" type="button" data-tab="perks">PERKS</button>
+      <button class="matrix-tab" type="button" data-tab="achievements">ACHIEVEMENTS</button>
+    </div>
+    <div id="matrix-panel"></div>`;
+  body.querySelector('#matrix-tabs').addEventListener('click', (event) => {
+    const tab = event.target.closest('[data-tab]');
+    if (!tab || tab.classList.contains('on')) return;
+    body.querySelectorAll('.matrix-tab').forEach((el) => el.classList.toggle('on', el === tab));
+    playSound();
+    paint(tab.dataset.tab);
+  });
+  paint('perks');
+}
+
+function perksPanelHtml(achievements) {
+  const cards = PERKS.map((perk) => {
+    const earned = Boolean(achievements[perk.ach]);
+    return `
+      <article class="perk-card${earned ? ' earned' : ''}">
+        <div class="perk-head"><b>${escapeHtml(perk.name)}</b><span class="perk-state">${earned ? 'ACTIVE' : 'LOCKED'}</span></div>
+        <p>${escapeHtml(perk.desc)}</p>
+        <div class="perk-req">${earned ? '>> REQUIREMENT MET — the perk is wired into every mission HUD.' : `>> REQUIREMENT: ${escapeHtml(perk.req)}`}</div>
+      </article>`;
+  }).join('');
+  return `
+    <div class="perk-grid">
+      ${cards}
+      <article class="perk-card placeholder">
+        <div class="perk-head"><b>MORE PERKS INCOMING</b><span class="perk-state">SIGNAL PENDING</span></div>
+        <p>The skill matrix expands as new achievement records decrypt. Keep clearing sectors.</p>
+      </article>
+    </div>`;
+}
+
+function achievementsPanelHtml(achievements, mapWins) {
+  const cards = ACHIEVEMENTS.map((ach) => {
+    const earned = Boolean(achievements[ach.id]);
+    const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+    const steps = ach.protocols.map((protocol) => {
+      const done = (wins[`${ach.map}:${protocol}`] || 0) > 0;
+      return `<span class="ach-step${done ? ' done' : ''}">${escapeHtml(protocol.toUpperCase())} PROTOCOL — ${done ? 'CLEARED' : 'NOT CLEARED'}</span>`;
+    }).join('');
+    return `
+      <article class="ach-card${earned ? ' earned' : ''}">
+        <div class="ach-icon" aria-hidden="true">${ach.glyph}</div>
+        <div class="ach-body">
+          <div class="ach-head"><b>${escapeHtml(ach.name)}</b><span class="ach-state">${earned ? 'UNLOCKED' : 'LOCKED'}</span></div>
+          <p>${escapeHtml(ach.desc)}</p>
+          <div class="ach-steps">${steps}</div>
+          <div class="ach-reward">REWARD // ${escapeHtml(ach.reward)}</div>
+        </div>
+      </article>`;
+  }).join('');
+  return `<div class="ach-list">${cards}</div>`;
 }
 
 // --- Room service: four fixed deployment bays, room lead starts the mission ------

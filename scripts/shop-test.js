@@ -98,8 +98,26 @@ async function api(path, payload) {
     check('duplicate bay rejected 400', four.status === 400, JSON.stringify(four.data));
 
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
-    check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
-    check('no second firstClear, bt=5 (20-wave caps)', again.data.rewards.firstClear === false && again.data.rewards.bt === 5, JSON.stringify(again.data.rewards));
+    check('input clamped: nc=540 (30-wave + 24-boss caps)', again.data.rewards.nc === 540, JSON.stringify(again.data.rewards));
+    check('no second firstClear, bt=24 (24-boss cap)', again.data.rewards.firstClear === false && again.data.rewards.bt === 24, JSON.stringify(again.data.rewards));
+
+    // Medium protocol payouts + achievement ledger (mapWins -> OVERDRIVE).
+    const medLoss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 8, bossesKilled: 3, difficulty: 'medium' });
+    check('medium loss nc = 8*10 + 3*12 = 116', medLoss.data.rewards.nc === 116, JSON.stringify(medLoss.data.rewards));
+    check('medium loss xp = 8*15 + 3*40 = 240', medLoss.data.rewards.xp === 240, `xp=${medLoss.data.rewards.xp}`);
+    const spireEasy = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'easy', map: 'insane' });
+    check('spire easy win records mapWins insane:easy', spireEasy.data.profile.mapWins['insane:easy'] === 1, JSON.stringify(spireEasy.data.profile.mapWins));
+    check('overdrive still locked after easy-only spire', spireEasy.data.profile.achievements.overdrive === false, JSON.stringify(spireEasy.data.profile.achievements));
+    const spireMed = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 25, bossesKilled: 20, difficulty: 'medium', map: 'insane' });
+    check('medium win nc = 25*10 + 20*12 + 100 = 590', spireMed.data.rewards.nc === 590, JSON.stringify(spireMed.data.rewards));
+    check('medium win xp = 25*15 + 20*40 + 140 = 1315', spireMed.data.rewards.xp === 1315, `xp=${spireMed.data.rewards.xp}`);
+    check('OVERDRIVE unlocked on spire medium win', Array.isArray(spireMed.data.unlocked) && spireMed.data.unlocked.includes('overdrive'), JSON.stringify(spireMed.data));
+    check('profile achievements.overdrive true', spireMed.data.profile.achievements.overdrive === true, JSON.stringify(spireMed.data.profile.achievements));
+    check('mapWins insane:medium recorded', spireMed.data.profile.mapWins['insane:medium'] === 1, JSON.stringify(spireMed.data.profile.mapWins));
+    const spireRepeat = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 25, bossesKilled: 20, difficulty: 'medium', map: 'insane' });
+    check('overdrive does not re-unlock', Array.isArray(spireRepeat.data.unlocked) && spireRepeat.data.unlocked.length === 0, JSON.stringify(spireRepeat.data));
+    const bogusWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'easy', map: 'notamap' });
+    check('unknown map win does not touch mapWins', bogusWin.data.profile.mapWins['notamap:easy'] === undefined, JSON.stringify(bogusWin.data.profile.mapWins));
 
     // Salvage codes — /api/redeem grants once per commander account per code.
     const sealed = await api('/api/profile', { token });
@@ -151,6 +169,8 @@ async function api(path, payload) {
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
+    check('persisted achievement overdrive', p.achievements && p.achievements.overdrive === true, JSON.stringify(p.achievements));
+    check('persisted mapWins spire ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2, JSON.stringify(p.mapWins));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

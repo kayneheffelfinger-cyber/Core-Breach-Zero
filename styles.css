@@ -670,3 +670,40 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .redeem-status { margin-top: 9px; font: 10.5px var(--mono); letter-spacing: .6px; }
 .redeem-status.good { color: var(--cyan); }
 .redeem-status.bad { color: #ff4d5e; }
+
+/* --- Skill matrix: PERKS + ACHIEVEMENTS tabs ------------------------------------- */
+.matrix-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.matrix-tab { padding: 9px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: 10px var(--mono); letter-spacing: 2px; transition: color .15s, border-color .15s; }
+.matrix-tab:hover { color: var(--text); }
+.matrix-tab.on { border-color: var(--amber); color: var(--amber); }
+.perk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.perk-card { position: relative; padding: 16px; border: 1px solid var(--line); background: var(--panel); clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%); }
+.perk-card.earned { border-color: rgba(165,213,139,.55); background: rgba(165,213,139,.05); }
+.perk-card.placeholder { border-style: dashed; opacity: .65; }
+.perk-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.perk-head b { font: 700 13px var(--display); color: var(--text); }
+.perk-card p { margin: 0 0 10px; color: var(--muted); font: 11px/1.6 var(--mono); }
+.perk-state { padding: 3px 8px; border: 1px solid rgba(255,77,94,.5); color: #ff8a96; font: 9px var(--mono); letter-spacing: 1.5px; white-space: nowrap; }
+.perk-card.earned .perk-state { border-color: rgba(165,213,139,.6); color: #a5d58b; }
+.perk-req { color: var(--amber); font: 9.5px/1.5 var(--mono); letter-spacing: .5px; }
+.ach-list { display: grid; gap: 12px; }
+.ach-card { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--line); background: var(--panel); }
+.ach-card.earned { border-color: rgba(165,213,139,.55); background: rgba(165,213,139,.05); }
+.ach-icon { display: grid; place-items: center; width: 46px; height: 46px; flex: 0 0 46px; border: 1px solid var(--line); color: var(--muted); font-size: 20px; }
+.ach-card.earned .ach-icon { border-color: rgba(165,213,139,.6); color: #a5d58b; }
+.ach-body { flex: 1; display: grid; gap: 7px; align-content: start; }
+.ach-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ach-head b { font: 700 14px var(--display); color: var(--text); }
+.ach-card p { margin: 0; color: var(--muted); font: 11px/1.6 var(--mono); }
+.ach-state { padding: 3px 8px; border: 1px solid rgba(255,77,94,.5); color: #ff8a96; font: 9px var(--mono); letter-spacing: 1.5px; white-space: nowrap; }
+.ach-card.earned .ach-state { border-color: rgba(165,213,139,.6); color: #a5d58b; }
+.ach-steps { display: flex; gap: 6px; flex-wrap: wrap; }
+.ach-step { padding: 4px 9px; border: 1px dashed rgba(255,77,94,.45); color: #ff8a96; font: 9px var(--mono); letter-spacing: 1px; }
+.ach-step.done { border: 1px solid rgba(165,213,139,.6); color: #a5d58b; }
+.ach-reward { color: var(--amber); font: 9.5px/1.5 var(--mono); letter-spacing: .5px; }
+
+/* --- OVERDRIVE perk: mission time-compression toggle ------------------------------ */
+.speed-toggle { padding: 10px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: 700 11px var(--mono); letter-spacing: 2px; transition: color .15s, border-color .15s, box-shadow .15s; }
+.speed-toggle:hover { color: var(--text); border-color: var(--amber); }
+.speed-toggle.on { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 18px rgba(255,180,90,.35); }
+.payout-ach b { color: #a5d58b; }

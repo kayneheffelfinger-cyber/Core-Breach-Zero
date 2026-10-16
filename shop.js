@@ -26,9 +26,9 @@ window.CBZShop = (() => {
       special: '>> The grid standard. Deploy on a hex pad to link anti-air coverage.',
       art: 'assets/towers/sentinel.png',
       track: [
-        { label: 'HIGHER CALIBER', cost: 140, sets: { dmg: 11 }, info: 'DMG 6 → 11' },
-        { label: 'BETTER TECH', cost: 210, sets: { rate: 1.8, rng: 145 }, info: 'RATE 1.5 → 1.8 · RNG 130 → 145' },
-        { label: 'SENTINEL PROMOTION', cost: 350, sets: { dmg: 18, rng: 180 }, info: 'DMG 11 → 18 · RNG 145 → 180' },
+        { label: 'HIGHER CALIBER', cost: 110, sets: { dmg: 11 }, info: 'DMG 6 → 11' },
+        { label: 'BETTER TECH', cost: 165, sets: { rate: 1.8, rng: 145 }, info: 'RATE 1.5 → 1.8 · RNG 130 → 145' },
+        { label: 'SENTINEL PROMOTION', cost: 280, sets: { dmg: 18, rng: 180 }, info: 'DMG 11 → 18 · RNG 145 → 180' },
       ],
       icon: ic('<path d="M9 33h22"/><path d="M13 33v-7h14v7"/><path d="M20 26V7"/><circle cx="20" cy="6" r="2.4"/>') },
     { id: 'lazermortar', name: 'LAZER MORTAR', cat: 'offense', unlock: 1, price: 0, cost: 250, currency: 'nc', reward: true,
@@ -81,7 +81,7 @@ window.CBZShop = (() => {
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
 
-  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] };
+  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {} };
   const MAX_BAYS = 5;
 
   // Dual-currency prices arrive as { nc, bt }; single-currency as a number.

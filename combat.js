@@ -1,6 +1,6 @@
 // Core Breach: Zero — Combat Protocol (Easy Mode).
 // Loaded after app.js: uses its globals (BATTLE_MAPS, svgNode, playSound, showToast...).
-// Mode voting + 15-wave Easy layout + enemies that follow every map's tracks and mechanics.
+// Mode voting (EASY + MEDIUM) + per-protocol wave ladders + enemies that follow every map's tracks and mechanics.
 (() => {
 const board = document.querySelector('#board');
 const battlefield = document.querySelector('#battlefield');
@@ -51,6 +51,46 @@ const EASY_WAVES = [
   { groups: [['leak', 2], ['nullcore', 10], ['drone', 20]], phase: 'LEAK STORM', mod: 'hardened' },
   { groups: [['shielded', 20], ['nullcore', 10], ['overseer', 1], ['drone', 20]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
+
+// --- Medium Protocol: 25 waves, denser, angrier -----------------------------------
+// Same roster, but the pressure dials all turn clockwise: bigger groups, more
+// overlapping boss waves, more surge modifiers and a steeper HP curve. The
+// final wave throws the CORE BREACH: ZERO overseer at you WITH a mini-boss escort.
+const MEDIUM_WAVES = [
+  { groups: [['glitched', 22], ['runner', 12]] },
+  { groups: [['glitched', 20], ['file', 18], ['runner', 12]] },
+  { groups: [['shielded', 16], ['glitched', 20]], mod: 'hardened' },
+  { groups: [['runner', 28], ['drone', 10], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 16], ['glitched', 22], ['file', 20]], phase: 'AIR PRESSURE' },
+  { groups: [['nullcore', 7], ['file', 32]], mod: 'overclock' },
+  { groups: [['shielded', 22], ['drone', 18], ['runner', 16]] },
+  { groups: [['nullcore', 8], ['leak', 1], ['file', 26]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 42], ['runner', 22]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 1], ['leak', 1], ['shielded', 18]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
+  { groups: [['nullcore', 13], ['drone', 22], ['runner', 20]] },
+  { groups: [['drone', 30], ['runner', 26]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 26], ['nullcore', 11], ['glitched', 32]], mod: 'hardened' },
+  { groups: [['virus', 2], ['file', 46], ['drone', 20]], phase: 'VIRULENT SURGE' },
+  { groups: [['leak', 2], ['nullcore', 13], ['drone', 24]], phase: 'LEAK STORM', mod: 'hardened' },
+  { groups: [['runner', 36], ['drone', 22], ['file', 32]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 15], ['shielded', 24], ['virus', 1]], phase: 'ARMOR COLUMN' },
+  { groups: [['drone', 32], ['runner', 28], ['glitched', 36]], mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 2], ['shielded', 22]], phase: 'COMMANDER WALL', mod: 'hardened' },
+  { groups: [['nullcore', 17], ['drone', 26], ['file', 42]], phase: 'DENSE ASSAULT' },
+  { groups: [['runner', 42], ['drone', 26]], phase: 'FULL SPRINT', mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 2], ['nullcore', 13]], phase: 'TRIPLE THREAT', mod: 'hardened' },
+  { groups: [['shielded', 30], ['drone', 28], ['runner', 30], ['file', 38]], mod: 'overclock' },
+  { groups: [['nullcore', 15], ['virus', 2], ['leak', 2], ['drone', 26]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['shielded', 26], ['nullcore', 13], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 26]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+];
+
+// Per-protocol pressure: Medium compounds HP faster than Easy on top of denser waves.
+const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14 };
+// Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
+const EASY_BOSS_RELIEF = 0.9;
+const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES };
+function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
+
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
 const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75 };
 const BASE_MAX = 100;
@@ -87,6 +127,7 @@ const TOWER_RULES = {
 // --- Mission state ----------------------------------------------------------------
 const state = {
   mode: 'idle', // idle | vote | countdown | waves | over
+  protocol: 'easy', speed2x: false, bossHpMult: 1, speedBtn: null,
   map: null, samplers: [], gateEvents: [], zoneRanges: [],
   waveIndex: -1, queue: [], spawnGap: 0, intermission: 0, countdown: 0,
   cash: 0, baseHp: BASE_MAX, enemies: [], kills: 0, bossesKilled: 0, earned: 0, clock: 0, nidSeq: 0,
@@ -239,8 +280,9 @@ function spawnEnemy(key, pathIdx) {
   const enemy = {
     key, t, node: g, fill, shieldFill,
     nid: ++state.nidSeq,
-    // Wave pressure: +10% HP per wave index, surge modifiers stack on top.
-    hp: Math.round(t.hp * (state.hpScale || 1)), maxHp: Math.round(t.hp * (state.hpScale || 1)), shield: 0, maxShield: t.shield || 0,
+    // Wave pressure: HP scales per wave index, surge modifiers stack on top.
+    // Easy relief: commanders (bosses) spawn with slightly less hull on EASY.
+    hp: Math.round(t.hp * (t.boss ? state.bossHpMult : 1) * (state.hpScale || 1)), maxHp: Math.round(t.hp * (t.boss ? state.bossHpMult : 1) * (state.hpScale || 1)), shield: 0, maxShield: t.shield || 0,
     pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed * (state.surgeSpeed || 1), alive: true,
     usedGates: new Set(), pulseTimer: 8, replicated: false, shielded: false, angle: 0,
   };
@@ -384,15 +426,16 @@ function floatText(x, y, text, cls) {
 // --- Main loop ------------------------------------------------------------------------
 function tick(ts) {
   state.raf = requestAnimationFrame(tick);
-  const dt = Math.min(0.05, (ts - state.last) / 1000 || 0);
+  let dt = Math.min(0.05, (ts - state.last) / 1000 || 0);
   state.last = ts;
+  if (state.speed2x) dt *= 2; // OVERDRIVE perk: the whole sim runs at double tempo
   state.clock += dt;
   if (coopGuest()) { guestFrame(dt); return; }
   if (state.mode === 'countdown') {
     state.countdown -= dt;
     const n = Math.ceil(state.countdown);
     if (n !== state.lastCount && n > 0) { state.lastCount = n; banner(String(n), '// DEPLOYING', 'banner-count'); playSound(); }
-    if (state.countdown <= 0) beginWave(debugWave > 0 ? Math.min(EASY_WAVES.length - 1, debugWave - 1) : 0);
+    if (state.countdown <= 0) beginWave(debugWave > 0 ? Math.min(missionWaves().length - 1, debugWave - 1) : 0);
   }
   if (state.mode === 'waves') runWaves(dt);
   for (const enemy of state.enemies) if (enemy.alive) moveEnemy(enemy, dt);
@@ -473,7 +516,7 @@ function runWaves(dt) {
     state.cash += bonus;
     state.earned += bonus;
     const cleared = state.waveIndex + 1;
-    if (cleared >= EASY_WAVES.length) { endMission(true); return; }
+    if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
     state.intermission = 7; // pace pass: a real build/upgrade window between waves
@@ -488,8 +531,10 @@ function runWaves(dt) {
 function beginWave(index) {
   state.mode = 'waves';
   state.waveIndex = index;
-  const wave = EASY_WAVES[index];
-  state.hpScale = 1 + WAVE_HP_SCALE * index;
+  const waves = missionWaves();
+  const wave = waves[index];
+  state.hpScale = 1 + (MODE_HP_SCALE[state.protocol] || WAVE_HP_SCALE) * index;
+  state.bossHpMult = state.protocol === 'easy' ? EASY_BOSS_RELIEF : 1;
   const surge = wave.mod ? SURGE_MODS[wave.mod] : null;
   state.surgeSpeed = surge ? surge.speed : 1;
   if (surge && surge.hp !== 1) state.hpScale *= surge.hp;
@@ -503,7 +548,7 @@ function beginWave(index) {
   state.queue = queue;
   state.spawnGap = 0;
   state.spawnSide = 0;
-  banner(`WAVE ${String(index + 1).padStart(2, '0')} / ${EASY_WAVES.length}`, surge ? `// ${surge.label} — ${surge.note}` : wave.phase ? `// ${wave.phase}` : '// HOSTILES INBOUND', 'banner-wave');
+  banner(`WAVE ${String(index + 1).padStart(2, '0')} / ${waves.length}`, surge ? `// ${surge.label} — ${surge.note}` : wave.phase ? `// ${wave.phase}` : '// HOSTILES INBOUND', 'banner-wave');
   updateHud();
 }
 
@@ -514,6 +559,7 @@ function ensureHud() {
     state.hud.className = 'combat-hud';
     state.hud.innerHTML = `
       <div class="hud-block hud-wave"><span class="hud-label">WAVE</span><strong id="combat-wave">—</strong></div>
+      <div class="hud-block hud-protocol"><span class="hud-label">PROTOCOL</span><strong id="combat-protocol">—</strong></div>
       <div class="hud-block hud-base"><span class="hud-label">BASE INTEGRITY</span><div class="base-track"><div class="base-fill" id="base-fill"></div></div><b id="base-num">100</b></div>
       <div class="hud-block hud-cash"><span class="hud-label">SALVAGE</span><strong id="combat-cash">$0</strong></div>`;
     if (!state.bossBar) {
@@ -531,11 +577,31 @@ function ensureHud() {
   exit.classList.add('aborting');
   deploy.hidden = true;
   document.querySelector('.field-hud').insertBefore(state.hud, exit);
+  // OVERDRIVE perk: TIME x2 toggle — only rendered once the achievement decrypts it.
+  if (!state.speedBtn && window.CBZPerks && CBZPerks.has('overdrive')) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'speed-toggle';
+    btn.textContent = 'TIME x1';
+    btn.addEventListener('click', () => {
+      state.speed2x = !state.speed2x;
+      btn.textContent = state.speed2x ? 'TIME x2' : 'TIME x1';
+      btn.classList.toggle('on', state.speed2x);
+      playSound();
+    });
+    state.speedBtn = btn;
+  }
+  if (state.speedBtn) {
+    state.speed2x = false;
+    state.speedBtn.textContent = 'TIME x1';
+    state.speedBtn.classList.remove('on');
+    document.querySelector('.field-hud').insertBefore(state.speedBtn, exit);
+  }
 }
 
 function updateHud() {
   if (!state.hud) return;
-  document.querySelector('#combat-wave').textContent = state.waveIndex < 0 ? '—' : `${String(state.waveIndex + 1).padStart(2, '0')}/${EASY_WAVES.length}`;
+  document.querySelector('#combat-wave').textContent = state.waveIndex < 0 ? '—' : `${String(state.waveIndex + 1).padStart(2, '0')}/${missionWaves().length}`;
   document.querySelector('#combat-cash').textContent = `$${state.cash}`;
   const fill = document.querySelector('#base-fill');
   fill.style.width = `${(state.baseHp / BASE_MAX) * 100}%`;
@@ -619,10 +685,10 @@ function banner(title, sub, cls) {
   state.bannerTimer = setTimeout(() => state.banner.classList.remove('show'), 2100);
 }
 
-// --- Mode vote (EASY live, everything else coming soon) ---------------------------------
+// --- Mode vote (EASY + MEDIUM live, the rest coming soon) --------------------------------
 const MODES = [
-  { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES', ready: true },
-  { id: 'medium', label: 'MEDIUM', sub: 'JUNCTION PRESSURE', ready: false },
+  { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
+  { id: 'medium', label: 'MEDIUM', sub: '25 WAVES // DENSER, FASTER, ANGRIER', ready: true },
   { id: 'hard', label: 'HARD', sub: 'DUAL LANE SIEGE', ready: false },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
@@ -667,6 +733,8 @@ function startMission(map, skipVote = false) {
   if (state.mode !== 'idle' && state.mode !== 'over') return;
   state.map = map;
   state.mode = 'vote';
+  state.protocol = null; // the combat protocol locks in at the vote
+  state.speed2x = false;
   state.samplers = buildSamplers(map);
   // Flat point cloud of every lane — placement checks + drone spawn gates use it.
   state.trackPts = state.samplers.flatMap((sampler) => sampler.pts);
@@ -701,6 +769,9 @@ function startMission(map, skipVote = false) {
 
 function launchCombat(mode) {
   closeVote();
+  state.protocol = mode;
+  const proto = document.querySelector('#combat-protocol');
+  if (proto) proto.textContent = String(mode).toUpperCase();
   state.mode = 'countdown';
   state.countdown = 3.4;
   state.lastCount = 4;
@@ -716,6 +787,8 @@ function restoreRecon() {
   exit.classList.remove('aborting');
   if (state.deployBtn) state.deployBtn.hidden = false;
   if (state.hud) { state.hud.remove(); state.hud = null; }
+  if (state.speedBtn) { state.speedBtn.remove(); state.speedBtn = null; }
+  state.speed2x = false;
   if (state.bossBar) state.bossBar.hidden = true;
   if (state.endPanel) { state.endPanel.remove(); state.endPanel = null; }
   setBuilding(null);
@@ -742,6 +815,7 @@ function paintPayout(panel, data) {
     `<div class="payout-row payout-nc"><span>NEXUS COINS</span><b>+${r.nc} NC</b></div>`,
     r.bt > 0 ? `<div class="payout-row payout-bt"><span>BREACH TOKENS</span><b>+${r.bt} BT</b></div>` : '',
     r.firstClear ? '<div class="payout-row payout-bt"><span>FIRST CLEARANCE BONUS</span><b>+5 BT</b></div>' : '',
+    ...(data.unlocked || []).map((id) => `<div class="payout-row payout-ach"><span>ACHIEVEMENT UNLOCKED</span><b>${escapeHtml(String(id).toUpperCase())}</b></div>`),
     r.bonusNc > 0 ? `<div class="payout-row payout-nc"><span>SCRAP FOUNDRY YIELD</span><b>+${r.bonusNc} NC</b></div>` : '',
     `<div class="payout-row payout-xp"><span>COMBAT XP</span><b>+${r.xp} XP</b></div>`,
     r.levelsGained > 0 ? `<div class="payout-row payout-lvl"><span>CLEARANCE LEVEL UP</span><b>LV ${data.profile.level} ▲${r.levelsGained > 1 ? ` ×${r.levelsGained}` : ''}</b></div>` : '',
@@ -763,7 +837,7 @@ function endMission(win, fromSync = false) {
       <div class="eyebrow">${win ? '// PROTOCOL COMPLETE' : '// CORE LOST'}</div>
       <h2>${win ? 'SECTOR CLEARED' : 'CORE BREACHED'}</h2>
       <div class="end-stats">
-        <div><span>OUTCOME</span><b>${win ? `ALL ${EASY_WAVES.length} WAVES REPELLED` : `FELL ON WAVE ${state.waveIndex + 1}`}</b></div>
+        <div><span>OUTCOME</span><b>${win ? `ALL ${missionWaves().length} WAVES REPELLED` : `FELL ON WAVE ${state.waveIndex + 1}`}</b></div>
         <div><span>ELIMINATIONS</span><b>${state.kills}</b></div>
         <div><span>SALVAGE EARNED</span><b>$${state.earned}</b></div>
         <div><span>BASE INTEGRITY</span><b>${Math.round(state.baseHp)}/${BASE_MAX}</b></div>
@@ -780,11 +854,12 @@ function endMission(win, fromSync = false) {
   if (window.CBZShop) {
     CBZShop.submitMission({
       result: win ? 'win' : 'loss',
-      wavesCleared: win ? EASY_WAVES.length : state.waveIndex + 1,
+      wavesCleared: win ? missionWaves().length : state.waveIndex + 1,
       bossesKilled: state.bossesKilled,
       flawless: Boolean(win && state.baseHp >= BASE_MAX),
       bonusNc: state.bonusNc,
-      difficulty: 'easy',
+      difficulty: state.protocol || 'easy',
+      map: state.map ? state.map.id : '',
     }).then((data) => paintPayout(panel, data));
   }
   panel.querySelector('#end-redeploy').addEventListener('click', () => { panel.remove(); state.endPanel = null; resetBoard(); startMission(state.map); });
