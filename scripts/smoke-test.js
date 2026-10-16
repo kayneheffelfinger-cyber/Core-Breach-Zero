@@ -54,6 +54,8 @@ function wsConnect() {
   // --- Static files ---
   const home = await fetch(`${BASE}/`).then((r) => r.text());
   check('GET / serves game shell', home.includes('CORE BREACH') && home.includes('auth-overlay'));
+  // Root-absolute links 404 on GitHub Pages (site lives under /Core-Breach-Zero/).
+  check('no root-absolute links in shell (Pages 404 guard)', !/(href|src)="\//.test(home), (home.match(/(href|src)="\/[^"]*"/g) || []).join(' '));
   const appJs = await fetch(`${BASE}/app.js`);
   check('GET /app.js served as JS', appJs.ok && appJs.headers.get('content-type').includes('javascript'));
   check('GET /app.js has 5 map recon maps', (await appJs.text()).match(/\bid: '(easy|medium|hard|insane|cbz)'/g)?.length === 5);
