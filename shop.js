@@ -332,14 +332,14 @@ window.CBZShop = (() => {
     }
   }
 
-  // ZERODAY PROTOCOL payout — server route + LOCAL mirror share the same contract.
-  // The client only ever sends the seal receipt; the five seals themselves live
-  // entirely in the ritual engine (app.js), so there is no admin surface to abuse.
-  async function breachProtocol(code, seq) {
-    const data = await apiRequest('/api/breach', { token: localStorage.getItem('cbz-token') || '', code, seq });
+  // Salvage-code redemption — server route + LOCAL mirror share the same contract.
+  // Codes validate server-side (and in LOCAL mode) against a one-time-per-commander
+  // ledger, so there is no admin surface to abuse.
+  async function redeemCode(code) {
+    const data = await apiRequest('/api/redeem', { token: localStorage.getItem('cbz-token') || '', code });
     setProfile(data.profile);
     return data.granted || null;
   }
 
-  return { render, setProfile, submitMission, breachProtocol, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_LEVEL, MAX_BAYS };
+  return { render, setProfile, submitMission, redeemCode, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_LEVEL, MAX_BAYS };
 })();

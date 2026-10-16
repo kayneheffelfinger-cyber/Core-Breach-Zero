@@ -51,9 +51,17 @@ for (const account of Object.values(accounts)) {
   account.meta = { ...defaultMeta(), ...(account.meta && typeof account.meta === 'object' ? account.meta : {}) };
 }
 
+// Salvage codes — redeemable once per commander account, in SETTINGS & LOGS.
+const REDEEM_CODES = {
+  NULLCORE: { nc: 1500, bt: 0 },
+  GHOSTWIRE: { nc: 0, bt: 75 },
+  DATACACHE: { nc: 4000, bt: 100 },
+  ZERODAY: { nc: 5000, bt: 500 },
+};
+
 function profilePayload(account) {
   const meta = account.meta;
-  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [] };
+  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [] };
 }
 
 function saveAccounts() {
@@ -225,23 +233,23 @@ async function handleApi(request, response, pathname) {
     return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
   }
 
-  // Buried payout ritual — no admin menu. The ZERODAY protocol IS the admin menu:
-  // five seals performed in order (logo knocks, old sequence, net whisper, feeding
-  // the baseline, spoken word). The server only ever sees the seal receipt.
-  if (pathname === '/api/breach' && request.method === 'POST') {
+  // Salvage codes — playtesting funds. One redemption per commander account per
+  // code; the ledger lives on the account meta. Mirrored in app.js LOCAL mode.
+  if (pathname === '/api/redeem' && request.method === 'POST') {
     const body = await readBody(request);
     const name = sessionName(body ? String(body.token || '') : '');
     if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
-    const seq = Array.isArray(body.seq) ? body.seq.map((step) => String(step || '').trim().toUpperCase()) : [];
     const code = String(body.code || '').trim().toUpperCase();
-    if (code !== 'ZERODAY' || seq.join('|') !== 'KNOCK|KONAMI|WHISPER|FEED|WORD') {
-      return sendJson(response, 403, { ok: false, error: 'Unknown protocol. The core rejects you.' });
-    }
+    const grant = REDEEM_CODES[code];
+    if (!grant) return sendJson(response, 404, { ok: false, error: 'Unknown salvage code. The grid does not recognize it.' });
     const meta = accounts[name].meta;
-    meta.nc += 5000;
-    meta.bt += 500;
+    meta.redeemed = Array.isArray(meta.redeemed) ? meta.redeemed : [];
+    if (meta.redeemed.includes(code)) return sendJson(response, 409, { ok: false, error: 'Code already redeemed by this commander.' });
+    meta.redeemed.push(code);
+    meta.nc += grant.nc;
+    meta.bt += grant.bt;
     saveAccounts();
-    return sendJson(response, 200, { ok: true, granted: { nc: 5000, bt: 500 }, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt }, profile: profilePayload(accounts[name]) });
   }
 
   return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });

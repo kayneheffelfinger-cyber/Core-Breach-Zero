@@ -97,19 +97,24 @@ async function api(path, payload) {
     check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
     check('no second firstClear, bt=5 (20-wave caps)', again.data.rewards.firstClear === false && again.data.rewards.bt === 5, JSON.stringify(again.data.rewards));
 
-    // ZERODAY protocol — /api/breach pays out only with the exact five-seal receipt.
+    // Salvage codes — /api/redeem grants once per commander account per code.
     const sealed = await api('/api/profile', { token });
     const beforeNc = sealed.data.profile.nc;
     const beforeBt = sealed.data.profile.bt;
-    const noAuth = await api('/api/breach', { code: 'ZERODAY', seq: ['KNOCK', 'KONAMI', 'WHISPER', 'FEED', 'WORD'] });
-    check('breach without token 401', noAuth.status === 401, JSON.stringify(noAuth.data));
-    const badSeq = await api('/api/breach', { token, code: 'ZERODAY', seq: ['KNOCK'] });
-    check('breach partial seals 403', badSeq.status === 403, JSON.stringify(badSeq.data));
-    const badCode = await api('/api/breach', { token, code: 'ZERODAYS', seq: ['KNOCK', 'KONAMI', 'WHISPER', 'FEED', 'WORD'] });
-    check('breach wrong word 403', badCode.status === 403, JSON.stringify(badCode.data));
-    const breach = await api('/api/breach', { token, code: 'zeroday', seq: ['knock', 'konami', 'whisper', 'feed', 'word'] });
-    check('breach full seals grant +5000 NC', breach.data.ok && breach.data.profile.nc === beforeNc + 5000, JSON.stringify(breach.data));
-    check('breach full seals grant +500 BT', breach.data.profile.bt === beforeBt + 500, JSON.stringify(breach.data));
+    const noAuth = await api('/api/redeem', { code: 'NULLCORE' });
+    check('redeem without token 401', noAuth.status === 401, JSON.stringify(noAuth.data));
+    const badcode = await api('/api/redeem', { token, code: 'FREEMONEY' });
+    check('unknown code rejected 404', badcode.status === 404, JSON.stringify(badcode.data));
+    const nullcore = await api('/api/redeem', { token, code: 'nullcore' });
+    check('NULLCORE (lowercase) grants +1500 NC', nullcore.data.ok && nullcore.data.profile.nc === beforeNc + 1500, JSON.stringify(nullcore.data));
+    const dupe = await api('/api/redeem', { token, code: 'NULLCORE' });
+    check('second NULLCORE rejected 409', dupe.status === 409, JSON.stringify(dupe.data));
+    const ghostwire = await api('/api/redeem', { token, code: 'GHOSTWIRE' });
+    check('GHOSTWIRE grants +75 BT', ghostwire.data.ok && ghostwire.data.profile.bt === beforeBt + 75, JSON.stringify(ghostwire.data));
+    const datacache = await api('/api/redeem', { token, code: 'DATACACHE' });
+    check('DATACACHE grants +4000 NC +100 BT', datacache.data.ok && datacache.data.profile.nc === beforeNc + 5500 && datacache.data.profile.bt === beforeBt + 175, JSON.stringify(datacache.data));
+    const zeroday = await api('/api/redeem', { token, code: 'zeroday' });
+    check('ZERODAY (lowercase) grants +5000 NC +500 BT', zeroday.data.ok && zeroday.data.profile.nc === beforeNc + 10500 && zeroday.data.profile.bt === beforeBt + 675, JSON.stringify(zeroday.data));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
@@ -120,6 +125,7 @@ async function api(path, payload) {
     check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted 3-bay loadout', Array.isArray(p.loadout) && p.loadout.length === 3, JSON.stringify(p.loadout));
+    check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
