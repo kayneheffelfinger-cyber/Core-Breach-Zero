@@ -195,8 +195,8 @@ async function handleApi(request, response, pathname) {
     const meta = accounts[name].meta;
     const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
     if (!list) return sendJson(response, 400, { ok: false, error: 'Loadout payload must be a list of blueprint ids.' });
-    const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 3);
-    if (clean.length !== list.length) return sendJson(response, 400, { ok: false, error: 'Loadouts hold max 3 bays and only blueprints you own.' });
+    const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
+    if (clean.length !== list.length) return sendJson(response, 400, { ok: false, error: 'Loadouts hold max 5 bays and only blueprints you own.' });
     meta.loadout = clean;
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });

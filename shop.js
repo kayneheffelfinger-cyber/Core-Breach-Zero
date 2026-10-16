@@ -57,7 +57,7 @@ window.CBZShop = (() => {
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'] };
-  const MAX_BAYS = 3;
+  const MAX_BAYS = 5;
 
   // Dual-currency prices arrive as { nc, bt }; single-currency as a number.
   const priceOf = (entry) => (typeof entry.price === 'object' ? entry.price : { [entry.currency || 'nc']: entry.price || 0 });
@@ -118,7 +118,7 @@ window.CBZShop = (() => {
   function paintBays() {
     const wrap = container && container.querySelector('#ls-bays');
     if (!wrap) return;
-    const bays = [0, 1, 2].map((index) => {
+    const bays = [0, 1, 2, 3, 4].map((index) => {
       const entry = (profile.loadout || [])[index] && towerById(profile.loadout[index]);
       if (!entry) return `<div class="ls-bay ls-empty"><small>BAY ${index + 1}</small><b>EMPTY</b><small>EQUIP BELOW</small></div>`;
       return `<div class="ls-bay filled cat-${entry.cat}"><small>BAY ${index + 1}</small><span class="ls-icon">${artHtml(entry) || entry.icon}</span><b>${entry.name}</b><small>$${entry.cost} SALVAGE IN MISSION</small></div>`;
@@ -135,7 +135,7 @@ window.CBZShop = (() => {
     } else {
       if (profile.loadout.length >= MAX_BAYS) {
         playSound('alarm');
-        showToast('Loadout full — all 3 bays are occupied. Unequip a blueprint first.');
+        showToast('Loadout full — all 5 bays are occupied. Unequip a blueprint first.');
         return;
       }
       profile.loadout.push(id);

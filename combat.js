@@ -826,15 +826,15 @@ function ensureLoadoutBar() {
   const loadout = shop && shop.loadout ? shop.loadout() : [];
   const bar = document.createElement('div');
   bar.className = 'loadout-bar';
-  const slots = [0, 1, 2].map((index) => {
+  const slots = [0, 1, 2, 3, 4].map((index) => {
     const entry = loadout[index];
     if (!entry) return `<div class="lo-slot lo-empty"><span class="lo-key">${index + 1}</span><b>EMPTY BAY</b><small>EQUIP IN NEXUS SHOP</small></div>`;
     return `<button class="lo-slot" type="button" data-tower="${entry.id}"><span class="lo-key">${index + 1}</span><span class="lo-icon cat-${entry.cat}">${entry.icon}</span><b>${entry.name}</b><span class="lo-cost">$${entry.cost}</span></button>`;
   }).join('');
   bar.innerHTML = `
-    <div class="lo-head"><span>// DEPLOYMENT LOADOUT</span><b>${loadout.length}/3 BAYS ARMED</b></div>
+    <div class="lo-head"><span>// DEPLOYMENT LOADOUT</span><b>${loadout.length}/5 BAYS ARMED</b></div>
     <div class="lo-slots">${slots}</div>
-    <div class="lo-hint">PICK A BAY (1-3) → CLICK THE GRID TO DEPLOY · HEX PADS = ANTI-AIR · CLICK A DEPLOYED UNIT → UPGRADE LADDER · RIGHT-CLICK / ESC TO STOP</div>`;
+    <div class="lo-hint">PICK A BAY (1-5) → CLICK THE GRID TO DEPLOY · HEX PADS = ANTI-AIR · CLICK A DEPLOYED UNIT → UPGRADE LADDER · RIGHT-CLICK / ESC TO STOP</div>`;
   battlefield.appendChild(bar);
   state.bar = bar;
   bar.addEventListener('click', (event) => {
@@ -1245,7 +1245,7 @@ function fireTower(tower, target) {
       break;
     }
     case 'lazermortar': {
-      const shell = svgNode('circle', { class: 'fx-shell', r: 4 });
+      const shell = svgNode('circle', { class: 'fx-shell', r: 4, cx: tower.x, cy: tower.y });
       state.layers.fx.appendChild(shell);
       state.projectiles.push({ kind: 'shell', x: tower.x, y: tower.y, tx, ty, speed: 260, dmg, splash: effStats(tower).splash || 30, node: shell });
       break;
@@ -1289,6 +1289,7 @@ function updateProjectiles(dt) {
         p.y += (dy / Math.hypot(dx, dy)) * step;
       }
       p.node.setAttribute('cx', p.x.toFixed(1));
+      p.node.setAttribute('cy', p.y.toFixed(1));
     }
     if (p.dead) p.node.remove();
   }
@@ -1350,7 +1351,7 @@ document.addEventListener('keydown', (event) => {
   if (document.querySelector('#battlefield').hidden) return;
   if (event.key === 'Escape') { setBuilding(null); closeTowerPanel(); return; }
   const digit = Number(event.key);
-  if (digit >= 1 && digit <= 3 && state.bar && buildingAllowed()) {
+  if (digit >= 1 && digit <= 5 && state.bar && buildingAllowed()) {
     const slots = state.bar.querySelectorAll('.lo-slot[data-tower]');
     const slot = slots[digit - 1];
     if (slot) toggleBuild(slot.dataset.tower);

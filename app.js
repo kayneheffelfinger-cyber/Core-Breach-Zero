@@ -238,8 +238,8 @@ const LOCAL = (() => {
       const meta = account.meta;
       const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
       if (!list) throw new Error('Loadout payload must be a list of blueprint ids.');
-      const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 3);
-      if (clean.length !== list.length) throw new Error('Loadouts hold max 3 bays and only blueprints you own.');
+      const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
+      if (clean.length !== list.length) throw new Error('Loadouts hold max 5 bays and only blueprints you own.');
       meta.loadout = clean;
       const accounts = readAccounts();
       accounts[account.name] = account;

@@ -89,9 +89,9 @@ async function api(path, payload) {
 
     // 3-bay loadout cap on the server side.
     const trio = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus'] });
-    check('3-bay loadout accepted', trio.data.ok && trio.data.profile.loadout.length === 3, JSON.stringify(trio.data));
+    check('full unique loadout accepted', trio.data.ok && trio.data.profile.loadout.length === 3, JSON.stringify(trio.data));
     const four = await api('/api/loadout', { token, loadout: ['sentinel', 'sentinel', 'lazermortar', 'virus'] });
-    check('4th bay rejected 400', four.status === 400, JSON.stringify(four.data));
+    check('duplicate bay rejected 400', four.status === 400, JSON.stringify(four.data));
 
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
     check('input clamped: nc=270 (20-wave caps)', again.data.rewards.nc === 270, JSON.stringify(again.data.rewards));
@@ -124,7 +124,7 @@ async function api(path, payload) {
     const p = prof.data.profile || {};
     check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
-    check('persisted 3-bay loadout', Array.isArray(p.loadout) && p.loadout.length === 3, JSON.stringify(p.loadout));
+    check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 3, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
