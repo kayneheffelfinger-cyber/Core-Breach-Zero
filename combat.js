@@ -76,6 +76,7 @@ const TOWER_RULES = {
   sentinel: { air: 'no' },
   lazermortar: { air: 'no' },
   shotgunner: { air: 'no' },
+  sniper: { air: 'no' },
   virus: { air: 'yes' },
 };
 
@@ -1203,6 +1204,12 @@ function acquireTarget(tower) {
     tower.target = null;
     return null;
   }
+  // Sniper Headset rewrites acquisition entirely: only the beefiest hostile in
+  // reach is worth a trigger pull — bosses and tanks over track fodder.
+  if (es.targeting === 'maxhp') {
+    tower.target = pool.reduce((best, enemy) => (enemy.hp > best.hp ? enemy : best));
+    return tower.target;
+  }
   // Ground-only units linked to an AA pad are the only anti-air there — they
   // prioritize flyers, or drones sail past while track-walkers soak every shot.
   // Pad guns lead the NEAREST flyer: it has the longest flight time left inside
@@ -1273,6 +1280,14 @@ function fireTower(tower, target) {
         setTimeout(() => pellet.remove(), 300);
       }
       fxRing(tx, ty, 'fx-ring-amber');
+      break;
+    }
+    case 'sniper': {
+      // Hitscan marksman: the round lands the instant the trigger breaks —
+      // no projectile phase, just a bright rail line and a red impact ring.
+      damageEnemy(target, dmg);
+      fireLine(tower, target, 'fx-sniper', 1.6);
+      fxRing(tx, ty, 'fx-ring-red');
       break;
     }
     case 'virus': {

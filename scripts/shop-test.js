@@ -33,6 +33,8 @@ async function api(path, payload) {
   check('tower decal asset served', decal.ok);
   const sgdecal = await fetch(`${BASE}/assets/towers/shotgunner.png`);
   check('shotgunner decal asset served', sgdecal.ok);
+  const sdecal = await fetch(`${BASE}/assets/towers/sniper.png`);
+  check('sniper decal asset served', sdecal.ok);
 
   const identity = { identity: 'SHOPCMDR1', passcode: 'test1234' };
   const reg = await api('/api/register', { name: 'SHOPCMDR1', email: 'shop1@test.io', passcode: 'test1234' });
@@ -127,13 +129,17 @@ async function api(path, payload) {
     }
     const freshBuy = await api('/api/shop/purchase', { token: freshToken, itemId: 'shotgunner' });
     check('level-3 clearance gate blocks fresh account 403', freshBuy.status === 403, JSON.stringify(freshBuy.data));
+    const freshBuySniper = await api('/api/shop/purchase', { token: freshToken, itemId: 'sniper' });
+    check('level-5 clearance gate blocks fresh account 403', freshBuySniper.status === 403, JSON.stringify(freshBuySniper.data));
     const rich = await api('/api/profile', { token });
     const sgBeforeNc = rich.data.profile.nc;
     const sgBeforeBt = rich.data.profile.bt;
     const sg = await api('/api/shop/purchase', { token, itemId: 'shotgunner' });
     check('shotgunner purchase deducts 800 NC + 10 BT', sg.data.ok && sg.data.profile.owned.includes('shotgunner') && sg.data.profile.nc === sgBeforeNc - 800 && sg.data.profile.bt === sgBeforeBt - 10, JSON.stringify(sg.data));
-    const quad = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner'] });
-    check('4-bay unique loadout accepted', quad.data.ok && quad.data.profile.loadout.length === 4, JSON.stringify(quad.data));
+    const sn = await api('/api/shop/purchase', { token, itemId: 'sniper' });
+    check('sniper purchase deducts 1800 NC + 50 BT (L5 gate open)', sn.data.ok && sn.data.profile.owned.includes('sniper') && sn.data.profile.nc === sgBeforeNc - 800 - 1800 && sn.data.profile.bt === sgBeforeBt - 10 - 50, JSON.stringify(sn.data));
+    const quint = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
+    check('5-bay unique loadout accepted', quint.data.ok && quint.data.profile.loadout.length === 5, JSON.stringify(quint.data));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
@@ -141,9 +147,9 @@ async function api(path, payload) {
   if (phase === '2') {
     const prof = await api('/api/profile', { token });
     const p = prof.data.profile || {};
-    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner'), JSON.stringify(p));
+    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
-    check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 4, JSON.stringify(p.loadout));
+    check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);

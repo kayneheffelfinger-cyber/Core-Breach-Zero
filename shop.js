@@ -16,7 +16,7 @@ window.CBZShop = (() => {
 
   const ic = (inner) => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
-  // --- Blueprint catalog: 4 turret lines, each with ONE linear upgrade track ------
+  // --- Blueprint catalog: 5 turret lines, each with ONE linear upgrade track ------
   // track: an ordered ladder of single improvements bought with salvage mid-mission.
   // Every tier's `sets` are absolute stat values applied on install (cumulative).
   const TOWERS = [
@@ -55,6 +55,19 @@ window.CBZShop = (() => {
         { label: 'EXPERT TRAINING', cost: 350, sets: { rate: 1, rng: 120, dmg: 45 }, info: 'RATE 0.8 → 1 · RNG 105 → 120 · DMG 40 → 45' },
       ],
       icon: ic('<path d="M7 33l12-12"/><path d="M12 35L24 23"/><path d="M24 23l5-5"/><circle cx="31" cy="12" r="2.2"/><circle cx="35" cy="17" r="2.2"/><circle cx="27" cy="7" r="1.8"/>') },
+    { id: 'sniper', name: 'SNIPER', cat: 'offense', unlock: 5, price: { nc: 1800, bt: 50 }, cost: 300, currency: 'mixed',
+      tagline: 'Long-reach marksman — one trigger pull, one deletion.',
+      stats: { dmg: 160, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      special: '>> Pinpoint rounds erase the priority threat. Tier-1 Sniper Headset locks every shot onto the highest-HP hostile in reach.',
+      art: 'assets/towers/sniper.png',
+      track: [
+        { label: 'SNIPER HEADSET', cost: 150, sets: { rng: 270, targeting: 'maxhp' }, info: 'RNG 250 → 270 · ONLY TARGETS THE HIGHEST-HP ENEMY IN RANGE' },
+        { label: 'HIGHER CAL', cost: 200, sets: { dmg: 180 }, info: 'DMG 160 → 180' },
+        { label: 'AUTO RE-LOADER 9000', cost: 300, sets: { rate: 0.5 }, info: 'RATE 0.3 → 0.5' },
+        { label: '50 CAL', cost: 300, sets: { dmg: 270 }, info: 'DMG 180 → 270' },
+        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 470, rate: 0.4, rng: 350 }, info: 'DMG 270 → 470 · RATE 0.5 → 0.4 · RNG 270 → 350' },
+      ],
+      icon: ic('<circle cx="20" cy="20" r="9"/><path d="M20 4v7"/><path d="M20 29v7"/><path d="M4 20h7"/><path d="M29 20h7"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
     { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 1000, bt: 30 }, cost: 400, currency: 'mixed',
       tagline: 'Melee swarm chassis — blades that feast at contact range.',
       stats: { dmg: 7, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
