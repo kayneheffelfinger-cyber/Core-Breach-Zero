@@ -677,7 +677,10 @@ const LOCAL_ROOMS = (() => {
 // as crew when a room lead already holds it. If the broker script never loads
 // (offline, blocked), every path degrades back to LOCAL_ROOMS tab linking.
 const P2P_ROOMS = (() => {
-  const NS = 'cbz-cbz0-v1'; // peer-ID namespace on the public broker
+  const NS = 'cbz-cbz0-v1'; // peer-ID namespace base on the public broker
+  // Peer IDs are global on the broker: scope them per deployment host so the
+  // Pages site, dev servers, and any fork never fight over the same bays.
+  const HOST_KEY = (String(location.hostname || 'local').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)) || 'local';
   const BAYS = [
     ['room-01', 'ROOM 01 // ALPHA'],
     ['room-02', 'ROOM 02 // BRAVO'],
@@ -707,7 +710,7 @@ const P2P_ROOMS = (() => {
   let onClientOpen = null; // queued join that arrived before the broker handshake
   let lastPong = 0;        // last heartbeat echo from the room lead
 
-  const peerId = (bay) => `${NS}-${bay}`;
+  const peerId = (bay) => `${NS}-${HOST_KEY}-${bay}`;
   const bayName = (bay) => (BAYS.find(([id]) => id === bay) || [bay, bay])[1];
   const usable = () => !broken && typeof window.Peer === 'function';
   const inRoom = () => Boolean(myBay || guestLink);
@@ -993,8 +996,8 @@ const P2P_ROOMS = (() => {
       if (guestLink && guestLink.conn === conn) return linkLost();
       if (settled) return;
       finish();
-      // The lead vanished between our scan and join — try claiming the bay once.
-      if (attempt < 1) claim(bay, attempt + 1);
+      // The lead vanished between our scan and join — try claiming the bay.
+      if (attempt < 2) claim(bay, attempt + 1);
       else handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
     });
     conn.on('error', () => { if (!settled) { finish(); closeConn(conn); } });
