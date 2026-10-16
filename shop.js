@@ -16,7 +16,7 @@ window.CBZShop = (() => {
 
   const ic = (inner) => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
 
-  // --- Blueprint catalog: 3 turret lines, each with ONE linear upgrade track ------
+  // --- Blueprint catalog: 4 turret lines, each with ONE linear upgrade track ------
   // track: an ordered ladder of single improvements bought with salvage mid-mission.
   // Every tier's `sets` are absolute stat values applied on install (cumulative).
   const TOWERS = [
@@ -43,15 +43,27 @@ window.CBZShop = (() => {
         { label: 'USA FUNDING', cost: 2000, sets: { dmg: 140, rate: 0.2, rng: 245, splash: 70 }, info: 'DMG 100 → 140 · RATE 0.25 → 0.2 · RNG 210 → 245 · SPLASH 65 → 70' },
       ],
       icon: ic('<path d="M8 34h16"/><path d="M12 34L28 18"/><rect x="27" y="6" width="9" height="9" transform="rotate(45 31.5 10.5)"/><path d="M6 14a26 26 0 0 1 11-10" stroke-dasharray="3 4"/>') },
+    { id: 'shotgunner', name: 'SHOTGUNNER', cat: 'offense', unlock: 3, price: { nc: 800, bt: 10 }, cost: 150, currency: 'mixed',
+      tagline: 'Close-work scattergun — wide pellet bursts shred tight packs.',
+      stats: { dmg: 30, rate: 0.8, rng: 100, splash: 15, tgt: 'SPLASH 15U · GROUND · AA VIA SATELLITE' },
+      special: '>> Pellet blasts hammer everything inside the burst ring. Tier-1 Satellite Comms unlocks anti-air without a hex pad.',
+      art: 'assets/towers/shotgunner.png',
+      track: [
+        { label: 'SATELLITE COMMS', cost: 95, sets: { rng: 105, air: 'yes' }, info: 'RNG 100 → 105 · ANTI-AIR UNLOCKED — no pad needed' },
+        { label: 'LARGER SHELLS', cost: 190, sets: { splash: 25 }, info: 'SPLASH 15 → 25' },
+        { label: 'HELL SHELLS', cost: 290, sets: { splash: 30, dmg: 40 }, info: 'SPLASH 25 → 30 · DMG 30 → 40' },
+        { label: 'EXPERT TRAINING', cost: 350, sets: { rate: 1, rng: 120, dmg: 45 }, info: 'RATE 0.8 → 1 · RNG 105 → 120 · DMG 40 → 45' },
+      ],
+      icon: ic('<path d="M7 33l12-12"/><path d="M12 35L24 23"/><path d="M24 23l5-5"/><circle cx="31" cy="12" r="2.2"/><circle cx="35" cy="17" r="2.2"/><circle cx="27" cy="7" r="1.8"/>') },
     { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 1000, bt: 30 }, cost: 400, currency: 'mixed',
       tagline: 'Melee swarm chassis — blades that feast at contact range.',
-      stats: { dmg: 4, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
+      stats: { dmg: 7, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
       special: '>> Shreds anything that steps into blade range — walkers and flyers alike.',
       art: 'assets/towers/virus.png',
       track: [
-        { label: 'LARGER BLADES', cost: 500, sets: { dmg: 8, rate: 2.7, rng: 100 }, info: 'DMG 4 → 8 · RATE 3 → 2.7 · RNG 90 → 100' },
-        { label: 'SUPER VIRUS', cost: 700, sets: { rate: 3.2, rng: 105 }, info: 'RATE 2.7 → 3.2 · RNG 100 → 105' },
-        { label: 'MALWARE VIRUS', cost: 1400, sets: { rate: 3.5, rng: 110, dmg: 20 }, info: 'RATE 3.2 → 3.5 · RNG 100 → 110 · DMG 8 → 20' },
+        { label: 'LARGER BLADES', cost: 500, sets: { dmg: 14, rate: 2.7, rng: 100 }, info: 'DMG 7 → 14 · RATE 3 → 2.7 · RNG 90 → 100' },
+        { label: 'SUPER VIRUS', cost: 700, sets: { dmg: 18, rate: 3.2, rng: 105 }, info: 'DMG 14 → 18 · RATE 2.7 → 3.2 · RNG 100 → 105' },
+        { label: 'MALWARE VIRUS', cost: 1400, sets: { rate: 3.5, rng: 110, dmg: 30 }, info: 'DMG 18 → 30 · RATE 3.2 → 3.5 · RNG 105 → 110' },
       ],
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];

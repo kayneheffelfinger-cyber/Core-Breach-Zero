@@ -31,6 +31,8 @@ async function api(path, payload) {
   check('shop.js served 200', shopjs.status === 200);
   const decal = await fetch(`${BASE}/assets/towers/sentinel.png`);
   check('tower decal asset served', decal.ok);
+  const sgdecal = await fetch(`${BASE}/assets/towers/shotgunner.png`);
+  check('shotgunner decal asset served', sgdecal.ok);
 
   const identity = { identity: 'SHOPCMDR1', passcode: 'test1234' };
   const reg = await api('/api/register', { name: 'SHOPCMDR1', email: 'shop1@test.io', passcode: 'test1234' });
@@ -87,7 +89,7 @@ async function api(path, payload) {
     const virus = await api('/api/shop/purchase', { token, itemId: 'virus' });
     check('dual-currency purchase deducts both', virus.data.ok && virus.data.profile.owned.includes('virus') && virus.data.profile.nc === funded.data.profile.nc - 1000 && virus.data.profile.bt === funded.data.profile.bt - 30, JSON.stringify(virus.data));
 
-    // 3-bay loadout cap on the server side.
+    // Loadout bays on the server side (max 5, unique, owned only).
     const trio = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus'] });
     check('full unique loadout accepted', trio.data.ok && trio.data.profile.loadout.length === 3, JSON.stringify(trio.data));
     const four = await api('/api/loadout', { token, loadout: ['sentinel', 'sentinel', 'lazermortar', 'virus'] });
@@ -115,6 +117,23 @@ async function api(path, payload) {
     check('DATACACHE grants +4000 NC +100 BT', datacache.data.ok && datacache.data.profile.nc === beforeNc + 5500 && datacache.data.profile.bt === beforeBt + 175, JSON.stringify(datacache.data));
     const zeroday = await api('/api/redeem', { token, code: 'zeroday' });
     check('ZERODAY (lowercase) grants +5000 NC +500 BT', zeroday.data.ok && zeroday.data.profile.nc === beforeNc + 10500 && zeroday.data.profile.bt === beforeBt + 675, JSON.stringify(zeroday.data));
+
+    // Shotgunner — clearance level 3 gate + dual-currency 800 NC + 10 BT.
+    const freshreg = await api('/api/register', { name: 'SHOPCMDR2', email: 'shop2@test.io', passcode: 'test1234' });
+    let freshToken = freshreg.data.token;
+    if (!freshToken) {
+      const freshlogin = await api('/api/login', { identity: 'SHOPCMDR2', passcode: 'test1234' });
+      freshToken = freshlogin.data.token;
+    }
+    const freshBuy = await api('/api/shop/purchase', { token: freshToken, itemId: 'shotgunner' });
+    check('level-3 clearance gate blocks fresh account 403', freshBuy.status === 403, JSON.stringify(freshBuy.data));
+    const rich = await api('/api/profile', { token });
+    const sgBeforeNc = rich.data.profile.nc;
+    const sgBeforeBt = rich.data.profile.bt;
+    const sg = await api('/api/shop/purchase', { token, itemId: 'shotgunner' });
+    check('shotgunner purchase deducts 800 NC + 10 BT', sg.data.ok && sg.data.profile.owned.includes('shotgunner') && sg.data.profile.nc === sgBeforeNc - 800 && sg.data.profile.bt === sgBeforeBt - 10, JSON.stringify(sg.data));
+    const quad = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner'] });
+    check('4-bay unique loadout accepted', quad.data.ok && quad.data.profile.loadout.length === 4, JSON.stringify(quad.data));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
@@ -122,9 +141,9 @@ async function api(path, payload) {
   if (phase === '2') {
     const prof = await api('/api/profile', { token });
     const p = prof.data.profile || {};
-    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus'), JSON.stringify(p));
+    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
-    check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 3, JSON.stringify(p.loadout));
+    check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 4, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);

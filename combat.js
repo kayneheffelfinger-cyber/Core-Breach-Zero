@@ -65,7 +65,7 @@ const PAD_AIR_BOOST = 1.5;   // pads overcharge linked units: +50% damage vs fly
 const TRACK_CLEAR = 36;      // nothing deploys on the convoy lane itself
 // Tower limit scales with the squad: every extra commander brings their own
 // hardware allotment to the shared grid.
-const TOWER_BASE = 15;       // solo ceiling
+const TOWER_BASE = 20;       // solo ceiling
 const TOWER_PER_ALLY = 9;    // +9 slots per additional commander in the room
 function towerLimit() {
   const players = (typeof window !== 'undefined' && Number(window.CBZ_ROOM_PLAYERS)) || 1;
@@ -75,6 +75,7 @@ function towerLimit() {
 const TOWER_RULES = {
   sentinel: { air: 'no' },
   lazermortar: { air: 'no' },
+  shotgunner: { air: 'no' },
   virus: { air: 'yes' },
 };
 
@@ -1180,8 +1181,11 @@ function updateTowers(dt) {
 }
 
 function acquireTarget(tower) {
-  const rule = TOWER_RULES[tower.id] || {};
   const es = effStats(tower);
+  // Installed tiers can rewrite chassis rules — Satellite Comms grants the
+  // Shotgunner anti-air coverage without an AA pad link.
+  const rule = { ...(TOWER_RULES[tower.id] || {}) };
+  if (es.air) rule.air = es.air;
   const rng = es.infinite ? 9999 : es.rng;
   // Stickiness: pad AA guns ride their target until it dies or escapes the ring —
   // re-picking fresher flyers leaves every drone one burst short of dying.
@@ -1248,6 +1252,27 @@ function fireTower(tower, target) {
       const shell = svgNode('circle', { class: 'fx-shell', r: 4, cx: tower.x, cy: tower.y });
       state.layers.fx.appendChild(shell);
       state.projectiles.push({ kind: 'shell', x: tower.x, y: tower.y, tx, ty, speed: 260, dmg, splash: effStats(tower).splash || 30, node: shell });
+      break;
+    }
+    case 'shotgunner': {
+      // Scattergun: the whole blast ring takes the hit instantly — no projectile phase.
+      const blast = effStats(tower).splash || 15;
+      for (const enemy of state.enemies) {
+        if (!enemy.alive) continue;
+        const [px, py] = posOf(enemy);
+        if (Math.hypot(px - tx, py - ty) <= blast) damageEnemy(enemy, dmg);
+      }
+      // Pellet fan: three amber streaks fanned around the aim line.
+      const aim = Math.atan2(ty - tower.y, tx - tower.x);
+      const span = Math.hypot(tx - tower.x, ty - tower.y);
+      for (const off of [-0.24, 0, 0.24]) {
+        const px = tower.x + Math.cos(aim + off) * span;
+        const py = tower.y + Math.sin(aim + off) * span;
+        const pellet = svgNode('line', { class: 'fx-line fx-pellet', x1: tower.x, y1: tower.y, x2: px, y2: py, 'stroke-width': 2.5 });
+        state.layers.fx.appendChild(pellet);
+        setTimeout(() => pellet.remove(), 300);
+      }
+      fxRing(tx, ty, 'fx-ring-amber');
       break;
     }
     case 'virus': {

@@ -554,6 +554,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .fx-tracer { stroke: #eafffa; stroke-width: 2; animation-duration: .14s; }
 .fx-fire { stroke: #ffb45a; }
 .fx-chain { stroke: #c49bef; stroke-width: 2; animation-duration: .24s; }
+.fx-pellet { stroke: #ffb45a; stroke-width: 2.5; animation-duration: .18s; }
 .fx-chain-stun { stroke: #eafffa; }
 .fx-beam-rail { stroke: #70e1d0; stroke-width: 4.5; }
 .fx-beam-quantum { stroke: #eafffa; }
