@@ -244,7 +244,7 @@ window.CBZShop = (() => {
         </div>
       </div>
       <div class="loadout-strip" id="loadout-strip">
-        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small>THE 3 BLUEPRINTS YOU CARRY INTO EVERY MISSION</small></div>
+        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small>CARRY UP TO ${MAX_BAYS} BLUEPRINTS INTO EVERY MISSION</small></div>
         <div class="ls-bays" id="ls-bays"></div>
       </div>
       <p class="shop-note">Nexus Coins flow from every wave, boss and cleared sector. <b>Breach Tokens</b> drop only from boss kills, flawless defenses and first clearances. New blueprints decrypt 10 clearance levels before they unlock — beyond that range, their signals stay hidden. Equipped blueprints deploy from the loadout bar in battle; towers you place claim a clearance box on the grid that blocks overlapping builds.</p>
