@@ -68,6 +68,33 @@ window.CBZShop = (() => {
         { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 470, rate: 0.4, rng: 350 }, info: 'DMG 270 → 470 · RATE 0.5 → 0.4 · RNG 270 → 350' },
       ],
       icon: ic('<circle cx="20" cy="20" r="9"/><path d="M20 4v7"/><path d="M20 29v7"/><path d="M4 20h7"/><path d="M29 20h7"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'zeroday', name: 'ZERO DAY-EXPLOIT RIG', cat: 'support', unlock: 15, price: { nc: 3000, bt: 20 }, cost: 300, currency: 'mixed', limit: 1,
+      tagline: 'Passive breach engine — no guns, just money printed every wave.',
+      stats: { dmg: 0, rate: 0, rng: 0, income: 120, tgt: 'ECONOMY RIG // PAYS EVERY WAVE · ONE PER COMMANDER' },
+      special: '>> Prints salvage at the end of every cleared wave. Tier-5 skims +10% off every enemy bounty. Tier-6 arms the Nuclear Fall Out strike — an aimed tactical nuke with radioactive aftermath. Only one rig deploys per commander.',
+      art: 'assets/towers/zeroday.png',
+      track: [
+        { label: 'BETTER RIG', cost: 100, sets: { income: 170 }, info: 'INCOME 120 → 170/WAVE' },
+        { label: 'MORE FABRICATION', cost: 250, sets: { income: 370 }, info: 'INCOME 170 → 370/WAVE' },
+        { label: 'BETTER EXPLOITS', cost: 200, sets: { income: 470 }, info: 'INCOME 370 → 470/WAVE' },
+        { label: 'ONE DAY-RIG', cost: 600, sets: { income: 770 }, info: 'INCOME 470 → 770/WAVE' },
+        { label: 'ZERO DAY', cost: 400, sets: { income: 870, bounty: 0.1 }, info: 'INCOME 770 → 870/WAVE · ENEMY BOUNTIES +10%' },
+        { label: 'NUCLEAR FALL OUT', cost: 400, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
+      ],
+      icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, price: { nc: 6666, bt: 666 }, cost: 300, currency: 'mixed', limit: 1,
+      tagline: 'Grave warden — anything that dies near it rises and walks the lane backwards.',
+      stats: { dmg: 0, rate: 0, rng: 180, summon: 30, tgt: 'SPAWNER // NO ATTACK · ONE PER COMMANDER' },
+      special: '>> When anything dies inside its ring, a weakened copy rises and marches back down the track, detonating on the first hostile it touches for damage equal to its hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain.',
+      art: 'assets/towers/corpseblossom.png',
+      track: [
+        { label: 'LARGER BRANCHES', cost: 100, sets: { rng: 200 }, info: 'RNG 180 → 200' },
+        { label: 'BLOOD VEINS', cost: 450, sets: { veins: 60 }, info: 'AOE PULSE: 60 DMG · RANDOM RATE 0.1-1/s · VEIN KILLS RISE BLOOD STAINED (+50 HP SUMMONS)' },
+        { label: 'LIFEBLOOD', cost: 500, sets: { rng: 230, summonHp: 0.45 }, info: 'RNG 200 → 230 · SUMMONS 30% → 45% HP' },
+        { label: 'KINETIC STORAGE', cost: 1500, sets: { lust: 1 }, info: 'KILLS FEED BLOOD LUST · UNLOCKS BLOOD PURGE — RELEASES +1 DMG PER LUST ACROSS ALL RANGE' },
+        { label: 'TRUE CORPSE BLOSSOM', cost: 3000, sets: { rng: 250, veins: 100, veinRate: [0.4, 1.4], summonHp: 0.75, lust: 3, stainedPct: 1, scream: 1 }, info: 'RNG 230 → 250 · VEINS 60 → 100 DMG · RATE 0.4-1.4/s · SUMMONS 75% HP · STAINED +10% HP · 3 LUST/KILL · BLOOD SCREAM ABILITY' },
+      ],
+      icon: ic('<circle cx="20" cy="20" r="4"/><path d="M20 16c-5-2-7-6-6-10 4 0 7 3 8 7M24 16c5-2 7-6 6-10-4 0-7 3-8 7M16 22c-4 2-8 2-11-1 2-3 6-4 10-3M24 22c4 2 8 2 11-1-2-3-6-4-10-3M17 25c-3 4-7 5-11 4 1-4 4-6 8-6M23 25c3 4 7 5 11 4-1-4-4-6-8-6"/>') },
     { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 1000, bt: 30 }, cost: 400, currency: 'mixed',
       tagline: 'Melee swarm chassis — blades that feast at contact range.',
       stats: { dmg: 7, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
@@ -178,17 +205,21 @@ window.CBZShop = (() => {
       profile = { ...profile, ...data.profile };
       profile.xpNext = xpToNext(profile.level);
       if (profile.level > before && typeof window.paintWallet === 'function') window.paintWallet();
-    } catch { /* Offline: the local loadout still rides into the next mission. */ }
+    } catch (error) {
+      // The Nexus refused the bay layout — say why instead of silently reverting.
+      showToast(error.message || 'Loadout rejected by the Nexus link.');
+      repaint();
+    }
   }
 
   function meters(entry) {
     const caps = { dmg: 160, rate: 3.5, rng: 260 };
     const pct = (value, cap) => `${Math.max(3, Math.min(100, Math.round((value / cap) * 100)))}%`;
     const splash = entry.stats.splash ? `<div class="tc-meter"><span>SPLASH</span><div class="tm-track"><i style="width:${pct(entry.stats.splash, 80)}"></i></div><b>${entry.stats.splash}U</b></div>` : '';
-    return `
-      <div class="tc-meter"><span>DMG</span><div class="tm-track"><i style="width:${pct(entry.stats.dmg, caps.dmg)}"></i></div><b>${entry.stats.dmg || '—'}</b></div>
-      <div class="tc-meter"><span>RATE</span><div class="tm-track"><i style="width:${pct(entry.stats.rate, caps.rate)}"></i></div><b>${entry.stats.rate ? `${entry.stats.rate}/s` : '—'}</b></div>
-      <div class="tc-meter"><span>RNG</span><div class="tm-track"><i style="width:${pct(entry.stats.rng, caps.rng)}"></i></div><b>${entry.stats.rng >= 999 ? 'INF' : entry.stats.rng || '—'}</b></div>${splash}`;
+    const income = entry.stats.income ? `<div class="tc-meter"><span>INCOME</span><div class="tm-track"><i style="width:${pct(entry.stats.income, 1000)}"></i></div><b>$${format(entry.stats.income)}/WAVE</b></div>` : '';
+    const summon = entry.stats.summon ? `<div class="tc-meter"><span>SUMMON</span><div class="tm-track"><i style="width:${pct(entry.stats.summon, 100)}"></i></div><b>${entry.stats.summon}% HP</b></div>` : '';
+    const row = (label, value, cap, suffix = '') => (value ? `<div class="tc-meter"><span>${label}</span><div class="tm-track"><i style="width:${pct(value, cap)}"></i></div><b>${value >= 999 ? 'INF' : value}${suffix}</b></div>` : '');
+    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}`;
   }
 
   function cardHtml(entry) {

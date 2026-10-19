@@ -16,7 +16,7 @@ document.querySelector('#preview-port').textContent = port;
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves) and MEDIUM (25 waves, denser and angrier).',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves) and MEDIUM (30 waves, denser and angrier).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
@@ -147,6 +147,8 @@ const LOCAL = (() => {
     virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
     shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
     sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
+    zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3000, bt: 20 }, currency: 'mixed' },
+    corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 6666, bt: 666 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -283,7 +285,12 @@ const LOCAL = (() => {
       const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
       if (!list) throw new Error('Loadout payload must be a list of blueprint ids.');
       const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
-      if (clean.length !== list.length) throw new Error('Loadouts hold max 5 bays and only blueprints you own.');
+      if (clean.length !== list.length) {
+        const missing = list.find((id) => !id || !meta.owned.includes(id));
+        throw new Error(missing
+          ? `"${missing}" is not in your Nexus armory — log in, claim or purchase it here first, then re-equip. Bays hold max 5 blueprints you own.`
+          : 'Loadouts hold max 5 bays and only blueprints you own.');
+      }
       meta.loadout = clean;
       const accounts = readAccounts();
       accounts[account.name] = account;
@@ -295,7 +302,7 @@ const LOCAL = (() => {
       const table = REWARDS[String(body.difficulty)] || REWARDS.easy;
       const win = body.result === 'win';
       const waves = Math.max(0, Math.min(30, Number(body.wavesCleared) || 0));
-      const bosses = Math.max(0, Math.min(24, Number(body.bossesKilled) || 0));
+      const bosses = Math.max(0, Math.min(30, Number(body.bossesKilled) || 0));
       const flawless = Boolean(win && body.flawless);
       const bonusNc = Math.max(0, Math.min(600, Math.round(Number(body.bonusNc) || 0))); // Scrap Foundry yield
       const meta = account.meta;
@@ -615,7 +622,7 @@ const LOCAL_ROOMS = (() => {
   } catch { TAB_ID = `t${Math.floor(Math.random() * 1e9).toString(36)}`; }
 
   function fresh() {
-    return BAYS.map(([id, name]) => ({ id, name, players: [], map: null, started: false, launchId: null }));
+    return BAYS.map(([id, name]) => ({ id, name, players: [], map: null, protocol: null, started: false, launchId: null }));
   }
   function prune(rooms) {
     const now = Date.now();
@@ -624,6 +631,7 @@ const LOCAL_ROOMS = (() => {
       if (!room.players.length && (room.map || room.started)) {
         // An abandoned bay resets, exactly like the server's empty-room rule.
         room.map = null;
+        room.protocol = null;
         room.started = false;
         room.launchId = null;
       }
@@ -643,6 +651,7 @@ const LOCAL_ROOMS = (() => {
       id: room.id,
       name: room.name,
       map: room.map,
+      protocol: room.protocol || null,
       maxPlayers: MAX_PLAYERS,
       started: room.started,
       commanders: room.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
@@ -662,7 +671,7 @@ const LOCAL_ROOMS = (() => {
       currentRoom = snapshot(mine);
       if (mine.started && mine.map && mine.launchId && launchedFor !== mine.launchId) {
         launchedFor = mine.launchId;
-        showLaunchSequence(mine.map);
+        showLaunchSequence(mine.map, mine.protocol);
         return;
       }
       if (dialog.open) {
@@ -701,7 +710,8 @@ const LOCAL_ROOMS = (() => {
     if (message.type === 'config') {
       const room = findMine(rooms);
       if (room && !room.started && room.players[0] && room.players[0].tab === TAB_ID) {
-        room.map = message.map;
+        if (message.map) room.map = message.map;
+        if (message.protocol && ROOM_PROTOCOLS.includes(message.protocol)) room.protocol = message.protocol;
         write(rooms);
         syncFromStorage();
       }
@@ -724,7 +734,7 @@ const LOCAL_ROOMS = (() => {
       const room = findMine(rooms);
       if (room) {
         room.players = room.players.filter((player) => player.tab !== TAB_ID);
-        if (!room.players.length) { room.map = null; room.started = false; room.launchId = null; }
+        if (!room.players.length) { room.map = null; room.protocol = null; room.started = false; room.launchId = null; }
         write(rooms);
       }
       myRoom = null;
@@ -945,6 +955,7 @@ const P2P_ROOMS = (() => {
       id: myBay.id,
       name: myBay.name,
       map: myBay.map,
+      protocol: myBay.protocol || null,
       maxPlayers: MAX_PLAYERS,
       started: myBay.started,
       commanders: myBay.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
@@ -1020,7 +1031,7 @@ const P2P_ROOMS = (() => {
         paintBays();
         return;
       case 'join': return enterBay(String(message.room || ''));
-      case 'config': return configure(message.map);
+      case 'config': return configure(message.map, message.protocol);
       case 'start': return startMission();
       case 'leave': return leaveBay();
       case 'end': return conclude();
@@ -1057,7 +1068,7 @@ const P2P_ROOMS = (() => {
     }), CLAIM_MS);
     peer.on('open', () => settle(() => {
       hubPeer = peer;
-      myBay = { id: bay, name: bayName(bay), map: null, started: false, launchId: null, players: [{ callsign, conn: null, lastSeen: Date.now() }] };
+      myBay = { id: bay, name: bayName(bay), map: null, protocol: null, started: false, launchId: null, players: [{ callsign, conn: null, lastSeen: Date.now() }] };
       wireHub(peer);
       handleServiceMessage({ type: 'joined', you: callsign, room: hostSnapshot() });
     }));
@@ -1223,7 +1234,7 @@ const P2P_ROOMS = (() => {
     const index = myBay.players.findIndex((player) => player.conn === conn);
     if (index === -1) return;
     myBay.players.splice(index, 1);
-    if (!myBay.players.length) Object.assign(myBay, { map: null, started: false, launchId: null });
+    if (!myBay.players.length) Object.assign(myBay, { map: null, protocol: null, started: false, launchId: null });
     pushRoomUpdate();
   }
 
@@ -1237,10 +1248,10 @@ const P2P_ROOMS = (() => {
     for (const conn of guestConns()) send(conn, { type: 'room-update', room });
   }
 
-  function configure(map) {
+  function configure(map, protocol) {
     if (!myBay || myBay.started) return;
-    if (!Object.keys(BATTLE_MAPS).includes(map)) return;
-    myBay.map = map;
+    if (map && Object.keys(BATTLE_MAPS).includes(map)) myBay.map = map;
+    if (protocol && ROOM_PROTOCOLS.includes(protocol)) myBay.protocol = protocol;
     pushRoomUpdate();
   }
 
@@ -1412,7 +1423,7 @@ function renderBays() {
       const buttonText = started ? 'IN PROGRESS' : full ? 'ROOM FULL' : 'ENTER ROOM';
       return `<article class="bay-card is-${state}">
         <header><strong>${escapeHtml(room.name)}</strong><span class="bay-status">${escapeHtml(stateText)}</span></header>
-        <p class="bay-map">${map ? `${escapeHtml(map.difficulty)} // ${escapeHtml(map.name)}` : 'MAP: NOT SELECTED'}</p>
+        <p class="bay-map">${map ? `${escapeHtml(map.difficulty)} // ${escapeHtml(map.name)}` : 'MAP: NOT SELECTED'}${room.protocol ? ` // ${escapeHtml(String(room.protocol).toUpperCase())}` : ''}</p>
         <button class="join-button" type="button" data-bay="${escapeHtml(room.id)}" ${full || started ? 'disabled' : ''}>${buttonText}</button>
       </article>`;
     }).join('')}</div>`;
@@ -1429,8 +1440,20 @@ function renderBays() {
   if (LOCAL.down() && P2P_ROOMS.usable() && !currentRoom) P2P_ROOMS.scan();
 }
 
+// Combat protocols a room can run — keep in sync with server.js PROTOCOL_CHOICES.
+const ROOM_PROTOCOLS = ['easy', 'medium'];
+
 function isRoomLead(room) {
   return room.commanders.some((commander) => commander.isHost && commander.callsign === myCallsign);
+}
+
+function protocolRow(room, roomLead) {
+  const active = room.protocol || 'easy';
+  if (!roomLead || room.started) {
+    return `<div class="proto-row static"><span>// COMBAT PROTOCOL</span><b>${escapeHtml(active.toUpperCase())}</b>${roomLead ? '' : '<small>ROOM LEAD SELECTS</small>'}</div>`;
+  }
+  return `<div class="proto-row"><span>// COMBAT PROTOCOL</span>${ROOM_PROTOCOLS.map((protocol) =>
+    `<button class="proto-chip${protocol === active ? ' on' : ''}" type="button" data-proto="${protocol}">${protocol.toUpperCase()}</button>`).join('')}<small>SET THE WAVE LADDER THE SQUAD RUNS</small></div>`;
 }
 
 function renderRoomMapCard(map, room, roomLead) {
@@ -1476,6 +1499,7 @@ function renderLobby() {
         <h3>SELECT MAP // ${roomLead ? 'ROOM LEAD CONTROL' : 'ROOM LEAD SELECTS'}</h3>
         ${roomLead && !room.started ? `<p class="dialog-copy">${LOCAL.down() ? (P2P_ROOMS.usable() ? 'Choose a map and launch when ready. Commanders across the net can drop into this bay while you hold it.' : 'Choose a map and launch when ready. Other commanders can drop into this bay from another tab on this machine.') : 'Choose a map. Your squad waits here until at least one teammate joins and you start.'}</p>` : ''}
         <div class="map-grid">${Object.values(BATTLE_MAPS).map((map) => renderRoomMapCard(map, room, roomLead)).join('')}</div>
+        ${protocolRow(room, roomLead)}
         ${roomLead && !room.started ? `<button class="start-button" id="start-room" type="button" ${room.map && (LOCAL.down() || room.commanders.length >= 2) ? '' : 'disabled'}>START WHEN READY <span>→</span></button>` : ''}
         ${room.started ? '<p class="standby-note">MISSION STARTED // DEPLOYMENT LOCKED. FINISH OR EXIT TO REGROUP.</p>' : !roomLead ? '<p class="standby-note">STANDBY // WAITING FOR THE ROOM LEAD TO START.</p>' : ''}
       </section>
@@ -1491,7 +1515,12 @@ function renderLobby() {
   body.querySelectorAll('[data-map]').forEach((button) => button.addEventListener('click', () => {
     if (!roomLead || room.started) return;
     playSound();
-    sendToService({ type: 'config', map: button.dataset.map });
+    sendToService({ type: 'config', map: button.dataset.map, protocol: room.protocol || 'easy' });
+  }));
+  body.querySelectorAll('[data-proto]').forEach((button) => button.addEventListener('click', () => {
+    if (!roomLead || room.started) return;
+    playSound();
+    sendToService({ type: 'config', map: room.map, protocol: button.dataset.proto });
   }));
   const startButton = document.querySelector('#start-room');
   if (startButton) startButton.addEventListener('click', () => {
@@ -1559,11 +1588,11 @@ function handleServiceMessage(message) {
   }
   if (message.type === 'launch') {
     currentRoom = message.room;
-    showLaunchSequence(currentRoom.map);
+    showLaunchSequence(currentRoom.map, currentRoom.protocol);
   }
 }
 
-function showLaunchSequence(mapId) {
+function showLaunchSequence(mapId, protocol = null) {
   clearTimeout(launchTimer);
   const map = BATTLE_MAPS[mapId];
   if (!map) {
@@ -1600,8 +1629,8 @@ function showLaunchSequence(mapId) {
   launchTimer = setTimeout(() => {
     overlay.hidden = true;
     openBattlefield(mapId);
-    // Room launch skips the solo protocol vote — the room lead already picked the map.
-    if (window.CBZCombat) CBZCombat.startMission(map, true);
+    // Room launch skips the solo vote — the room lead locked the protocol in config.
+    if (window.CBZCombat) CBZCombat.startMission(map, true, protocol || 'easy');
   }, 1600);
 }
 

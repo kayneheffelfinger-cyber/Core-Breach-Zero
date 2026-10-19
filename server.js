@@ -39,6 +39,8 @@ const SHOP = {
   virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
   shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
   sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
+  zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3000, bt: 20 }, currency: 'mixed' },
+  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 6666, bt: 666 }, currency: 'mixed' },
 };
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -209,7 +211,13 @@ async function handleApi(request, response, pathname) {
     const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
     if (!list) return sendJson(response, 400, { ok: false, error: 'Loadout payload must be a list of blueprint ids.' });
     const clean = [...new Set(list)].filter((id) => id && meta.owned.includes(id)).slice(0, 5);
-    if (clean.length !== list.length) return sendJson(response, 400, { ok: false, error: 'Loadouts hold max 5 bays and only blueprints you own.' });
+    if (clean.length !== list.length) {
+      const missing = list.find((id) => !id || !meta.owned.includes(id));
+      const why = missing
+        ? `"${missing}" is not in your Nexus armory — log in, claim or purchase it here first, then re-equip. Bays hold max 5 blueprints you own.`
+        : 'Loadouts hold max 5 bays and only blueprints you own.';
+      return sendJson(response, 400, { ok: false, error: why });
+    }
     meta.loadout = clean;
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
@@ -222,7 +230,7 @@ async function handleApi(request, response, pathname) {
     const table = REWARDS[String(body.difficulty)] || REWARDS.easy;
     const win = body.result === 'win';
     const waves = Math.max(0, Math.min(30, Number(body.wavesCleared) || 0));
-    const bosses = Math.max(0, Math.min(24, Number(body.bossesKilled) || 0));
+    const bosses = Math.max(0, Math.min(30, Number(body.bossesKilled) || 0));
     const flawless = Boolean(win && body.flawless);
     const bonusNc = Math.max(0, Math.min(600, Math.round(Number(body.bonusNc) || 0))); // Scrap Foundry yield
     const meta = accounts[name].meta;
@@ -319,9 +327,10 @@ for (const [id, name] of [
   ['room-03', 'ROOM 03 // CHARLIE'],
   ['room-04', 'ROOM 04 // DELTA'],
 ]) {
-  rooms.set(id, { id, name, players: [], map: null, started: false });
+  rooms.set(id, { id, name, players: [], map: null, protocol: null, started: false });
 }
 const MAP_PROTOCOLS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
+const PROTOCOL_CHOICES = ['easy', 'medium']; // combat protocols a room lead can lock in
 const MAX_PLAYERS = 4;
 
 const webSockets = new WebSocketServer({ server, path: '/rooms' });
@@ -335,6 +344,7 @@ function roomSnapshot(room) {
     id: room.id,
     name: room.name,
     map: room.map,
+    protocol: room.protocol || null,
     maxPlayers: MAX_PLAYERS,
     started: room.started,
     commanders: room.players.map((player, index) => ({ callsign: player.callsign, isHost: index === 0 })),
@@ -374,7 +384,7 @@ function removePlayer(room, socket) {
   if (index === -1) return;
   room.players.splice(index, 1);
   socket.roomId = null;
-  if (room.players.length === 0) Object.assign(room, { map: null, started: false });
+  if (room.players.length === 0) Object.assign(room, { map: null, protocol: null, started: false });
   else broadcastRoom(room);
   broadcastRooms();
 }
@@ -473,8 +483,14 @@ webSockets.on('connection', (socket) => {
     if (message.type === 'config') {
       if (playerIndex !== 0) return send(socket, { type: 'error', message: 'Only the room lead can change the map.' });
       if (room.started) return send(socket, { type: 'error', message: 'This room has already started.' });
-      if (!MAP_PROTOCOLS.includes(message.map)) return send(socket, { type: 'error', message: 'Unknown map protocol.' });
-      room.map = message.map;
+      if (message.map !== undefined && message.map !== null) {
+        if (!MAP_PROTOCOLS.includes(message.map)) return send(socket, { type: 'error', message: 'Unknown map protocol.' });
+        room.map = message.map;
+      }
+      if (message.protocol !== undefined && message.protocol !== null) {
+        if (!PROTOCOL_CHOICES.includes(message.protocol)) return send(socket, { type: 'error', message: 'Unknown combat protocol.' });
+        room.protocol = message.protocol;
+      }
       broadcastRoom(room);
       return broadcastRooms();
     }

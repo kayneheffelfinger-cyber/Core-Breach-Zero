@@ -423,7 +423,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .ls-head span { color: var(--cyan); font: 10px var(--mono); letter-spacing: 2px; }
 .ls-head small { color: var(--muted); font: 8.5px var(--mono); letter-spacing: 1px; }
 .ls-bays { display: flex; gap: 8px; padding: 11px 12px; flex-wrap: wrap; }
-.ls-bay { --cat: var(--cyan); flex: 1; min-width: 150px; display: grid; gap: 4px; justify-items: center; padding: 10px 8px 9px; border: 1px solid #243338; background: rgba(14,23,29,.7); text-align: center; }
+.ls-bay { --cat: var(--cyan); flex: 1; min-width: 126px; display: grid; gap: 4px; justify-items: center; padding: 10px 6px 9px; border: 1px solid #243338; background: rgba(14,23,29,.7); text-align: center; }
 .ls-bay.filled { border-style: solid; border-color: rgba(112,225,208,.35); }
 .ls-bay.filled.cat-control { --cat: var(--violet); border-color: rgba(196,155,239,.4); }
 .ls-bay.filled.cat-support { --cat: var(--green); border-color: rgba(165,213,139,.4); }
@@ -706,4 +706,45 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .speed-toggle { padding: 10px 16px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: 700 11px var(--mono); letter-spacing: 2px; transition: color .15s, border-color .15s, box-shadow .15s; }
 .speed-toggle:hover { color: var(--text); border-color: var(--amber); }
 .speed-toggle.on { border-color: var(--amber); color: var(--amber); box-shadow: 0 0 18px rgba(255,180,90,.35); }
+
+/* --- Nuclear Fall Out: aimed strike toggle + crosshair + fallout pool -------------- */
+.nuke-toggle { padding: 10px 16px; border: 1px solid rgba(255,110,130,.5); background: var(--panel); color: #ff8a96; font: 700 11px var(--mono); letter-spacing: 2px; transition: color .15s, border-color .15s, box-shadow .15s; }
+.nuke-toggle:hover { color: var(--text); border-color: #ff5e7a; }
+.nuke-toggle.on { border-color: #ff5e7a; color: #ff5e7a; box-shadow: 0 0 18px rgba(255,94,122,.4); animation: nuke-pulse 1s infinite; }
+.nuke-toggle.cd { opacity: .55; }
+@keyframes nuke-pulse { 50% { box-shadow: 0 0 30px rgba(255,94,122,.7); } }
+.nuke-crosshair { pointer-events: none; }
+.nuke-crosshair .nuke-blast { fill: rgba(255,94,122,.08); stroke: #ff5e7a; stroke-width: 2; stroke-dasharray: 10 8; }
+.nuke-crosshair .nuke-waste { fill: rgba(165,213,139,.1); stroke: #a5d58b; stroke-width: 1.5; stroke-dasharray: 5 6; }
+.nuke-crosshair .nuke-label { fill: #ff5e7a; font: 700 13px var(--mono); letter-spacing: 3px; }
+.fx-waste { fill: rgba(122,196,102,.14); stroke: rgba(165,213,139,.55); stroke-width: 1.5; animation: waste-flicker 3s infinite; pointer-events: none; }
+@keyframes waste-flicker { 50% { fill: rgba(122,196,102,.22); } }
+
+/* --- Corpse Blossom: risen corpses + lust floats ------------------------------------ */
+.e-summon .e-chassis { filter: hue-rotate(90deg) saturate(1.3) brightness(.85); }
+.e-summon::after { content: ''; position: absolute; }
+.summon-float { fill: #9be87a; }
+.lust-float { fill: #ff5e7a; font-weight: 700; }
+
+/* --- Room combat protocol picker ----------------------------------------------------- */
+.proto-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); background: rgba(112,225,208,.04); }
+.proto-row span { color: var(--cyan); font: 9px var(--mono); letter-spacing: 2px; }
+.proto-row small { color: var(--muted); font: 8px var(--mono); letter-spacing: 1px; margin-left: auto; }
+.proto-row.static b { color: var(--text); font: 700 11px var(--mono); letter-spacing: 2px; }
+.proto-chip { padding: 7px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: 700 10px var(--mono); letter-spacing: 2px; transition: color .15s, border-color .15s, box-shadow .15s; }
+.proto-chip:hover { color: var(--text); border-color: var(--cyan); }
+.proto-chip.on { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px rgba(112,225,208,.3); }
+
+/* --- Tower panel: special chassis readouts + ability buttons -------------------------- */
+.tp-specials { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.tp-abil-row { display: flex; gap: 6px; align-items: baseline; padding: 4px 8px; border: 1px solid var(--line); background: rgba(9,16,21,.7); }
+.tp-abil-row span { color: var(--muted); font: 8px var(--mono); letter-spacing: 1.5px; }
+.tp-abil-row b { color: var(--text); font: 700 11px var(--mono); }
+.tp-abil-row.lust b { color: #ff5e7a; }
+.tp-abilities { display: grid; gap: 6px; margin: 0 0 10px; }
+.tp-ability { width: 100%; padding: 9px; border: 1px solid rgba(255,94,122,.6); background: rgba(255,94,122,.07); color: #ff8a96; font: 700 10px var(--mono); letter-spacing: 1.5px; transition: background .15s, color .15s; }
+.tp-ability.purge:hover:not(:disabled) { background: #ff5e7a; color: #2b0509; }
+.tp-ability.scream { border-color: rgba(196,155,239,.6); background: rgba(196,155,239,.07); color: #c49bef; }
+.tp-ability.scream:hover:not(:disabled) { background: #c49bef; color: #1d0f2b; }
+.tp-ability:disabled { opacity: .45; }
 .payout-ach b { color: #a5d58b; }

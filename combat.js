@@ -52,7 +52,7 @@ const EASY_WAVES = [
   { groups: [['shielded', 20], ['nullcore', 10], ['overseer', 1], ['drone', 20]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
-// --- Medium Protocol: 25 waves, denser, angrier -----------------------------------
+// --- Medium Protocol: 30 waves, denser, angrier -----------------------------------
 // Same roster, but the pressure dials all turn clockwise: bigger groups, more
 // overlapping boss waves, more surge modifiers and a steeper HP curve. The
 // final wave throws the CORE BREACH: ZERO overseer at you WITH a mini-boss escort.
@@ -81,6 +81,11 @@ const MEDIUM_WAVES = [
   { groups: [['virus', 2], ['leak', 2], ['nullcore', 13]], phase: 'TRIPLE THREAT', mod: 'hardened' },
   { groups: [['shielded', 30], ['drone', 28], ['runner', 30], ['file', 38]], mod: 'overclock' },
   { groups: [['nullcore', 15], ['virus', 2], ['leak', 2], ['drone', 26]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['file', 48], ['nullcore', 14], ['drone', 24]], phase: 'GRID LOCK', mod: 'overclock' },
+  { groups: [['shielded', 30], ['nullcore', 14], ['runner', 30]], mod: 'hardened' },
+  { groups: [['virus', 2], ['leak', 2], ['drone', 28]], phase: 'SIEGE PAIR', mod: 'overclock' },
+  { groups: [['nullcore', 16], ['file', 50], ['glitched', 40]], phase: 'DEAD STACK' },
+  { groups: [['runner', 40], ['drone', 30], ['shielded', 26]], phase: 'LAST BREACH', mod: 'overclock' },
   { groups: [['shielded', 26], ['nullcore', 13], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 26]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
@@ -118,7 +123,20 @@ const TOWER_RULES = {
   shotgunner: { air: 'no' },
   sniper: { air: 'no' },
   virus: { air: 'yes' },
+  zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
+  corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
 };
+
+// One-off rigs: only a single unit of these chassis may deploy per commander.
+const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom']);
+const NUKE_DAMAGE = 2200;      // Nuclear Fall Out: flat strike damage inside the blast
+const NUKE_RADIUS = 240;       // strike decimates everything inside this ring
+const NUKE_COST = 500;         // salvage price per cast
+const NUKE_COOLDOWN = 300;     // seconds between casts
+const WASTE_RADIUS = 130;      // radioactive aftermath pool
+const WASTE_SECONDS = 100;     // fallout lingers this long
+const WASTE_DPS = 30;          // small tick damage inside the fallout
+const SUMMON_CAP = 60;         // global ceiling so Blossom chains stay performant
 
 // --- Upgrade ladder data rides on the blueprint catalog (shop.js entry.track) ------
 // Nothing module-shaped lives here anymore: one chassis, one linear ladder.
@@ -127,7 +145,8 @@ const TOWER_RULES = {
 // --- Mission state ----------------------------------------------------------------
 const state = {
   mode: 'idle', // idle | vote | countdown | waves | over
-  protocol: 'easy', speed2x: false, bossHpMult: 1, speedBtn: null,
+  protocol: 'easy', speed2x: false, bossHpMult: 1, speedBtn: null, nukeBtn: null,
+  nukeAim: false, crosshair: null, wasteZones: [],
   map: null, samplers: [], gateEvents: [], zoneRanges: [],
   waveIndex: -1, queue: [], spawnGap: 0, intermission: 0, countdown: 0,
   cash: 0, baseHp: BASE_MAX, enemies: [], kills: 0, bossesKilled: 0, earned: 0, clock: 0, nidSeq: 0,
@@ -136,6 +155,7 @@ const state = {
   raf: 0, last: 0,
   hud: null, bossBar: null, tip: null, tipTarget: null, votePanel: null, endPanel: null, banner: null,
   layers: null, deployBtn: null,
+  corpseLust: 0, // reserved telemetry: total Blood Lust banked across Blossoms
 };
 
 const debugWave = Number(new URLSearchParams(location.search).get('cbzwave') || 0);
@@ -309,6 +329,7 @@ function spawnEnemy(key, pathIdx) {
 }
 
 function damageEnemy(enemy, amount, opts = {}) {
+  if (enemy.friendly && !opts.friendlyFire) return; // Blossom summons shrug off friendly grid fire
   let left = amount;
   if (!opts.phase) {
     // Null Beacon collapse modules shred deeper into armor; base weak still halves it.
@@ -333,7 +354,7 @@ function damageEnemy(enemy, amount, opts = {}) {
     enemy.node.querySelector('.e-shield-ring').classList.add('on');
     fxRing(...posOf(enemy), 'fx-ring-white');
   }
-  if (enemy.hp <= 0) killEnemy(enemy);
+  if (enemy.hp <= 0) killEnemy(enemy, opts.src);
   else paintBars(enemy);
 }
 
@@ -344,11 +365,19 @@ function paintBars(enemy) {
   enemy.shieldFill.setAttribute('width', enemy.maxShield ? (barW * enemy.shield) / enemy.maxShield : 0);
 }
 
-function killEnemy(enemy) {
+function killEnemy(enemy, src) {
   if (!enemy.alive) return;
   enemy.alive = false;
   hideTip(enemy);
-  const payout = Math.round(enemy.t.bounty);
+  if (enemy.friendly) {
+    // Summons expire quietly — no bounty, no kill credit, no Blossom chains.
+    enemy.node.classList.add('dying');
+    setTimeout(() => enemy.node.remove(), 300);
+    return;
+  }
+  // Zero Day tier-5 skim: enemy bounties pay +10% while the rig runs that tier.
+  const skim = state.towers.some((tower) => tower.id === 'zeroday' && (effStats(tower).bounty || 0) > 0) ? 1.1 : 1;
+  const payout = Math.round(enemy.t.bounty * skim);
   state.cash += payout;
   state.earned += payout;
   state.kills += 1;
@@ -358,8 +387,113 @@ function killEnemy(enemy) {
   fxRing(x, y, 'fx-ring-red');
   enemy.node.classList.add('dying');
   setTimeout(() => enemy.node.remove(), 300);
+  corpseBlossomFeed(enemy, x, y, src);
   updateHud();
   if (enemy.t.boss) updateBossBar();
+}
+
+// --- Corpse Blossom: the dead rise and walk the lane backwards -------------------
+function corpseBlossomFeed(enemy, x, y, src) {
+  for (const tower of state.towers) {
+    if (tower.id !== 'corpseblossom') continue;
+    if (Math.hypot(x - tower.x, y - tower.y) > effStats(tower).rng) continue;
+    const lvl = trackLevel(tower);
+    if (lvl >= 4) {
+      tower.lust = (tower.lust || 0) + (effStats(tower).lust || 1);
+      floatText(tower.x, tower.y - 44, `BLOOD LUST ${tower.lust}`, 'lust-float');
+      if (state.panelTower === tower) openTowerPanel(tower); // live lust counter
+    }
+    spawnSummon(enemy, tower, src === 'veins' && lvl >= 2);
+  }
+}
+
+function spawnSummon(enemy, tower, stained) {
+  if (state.enemies.filter((item) => item.friendly && item.alive).length >= SUMMON_CAP) return;
+  const t = enemy.t;
+  const es = effStats(tower);
+  const bonus = stained ? 50 + (es.stainedPct ? Math.round(t.hp * 0.1) : 0) : 0;
+  const hp = Math.max(1, Math.round(t.hp * (es.summonHp || 0.3)) + bonus);
+  const g = svgNode('g', { class: `enemy e-summon e-${enemy.key}` });
+  const chassis = svgNode('g', { class: 'e-chassis' });
+  for (const node of shapeFor(enemy.key, t)) chassis.appendChild(node);
+  g.appendChild(chassis);
+  const barY = -(t.size + 13);
+  g.appendChild(svgNode('rect', { class: 'hp-bg', x: -11, y: barY, width: 22, height: 3.4 }));
+  const fill = svgNode('rect', { class: 'hp-fill', x: -11, y: barY, width: 22, height: 3.4 });
+  g.appendChild(fill);
+  const summon = {
+    key: enemy.key, t, node: g, fill, shieldFill: fill, nid: ++state.nidSeq,
+    hp, maxHp: hp, shield: 0, maxShield: t.shield || 0,
+    pathIdx: enemy.pathIdx, dist: enemy.dist || 0,
+    speed: t.speed * 0.85, alive: true, friendly: true, reverse: true,
+    usedGates: new Set(), angle: 0,
+  };
+  if (t.flying) {
+    // Dead flyers rise where they fell and fly the route BACK to the breach gate.
+    const [gx, gy] = state.samplers[enemy.pathIdx].at(0);
+    summon.flight = { sx: enemy.fx, sy: enemy.fy, tx: gx, ty: gy, total: Math.max(1, Math.hypot(gx - enemy.fx, gy - enemy.fy)) };
+    summon.dist = 0;
+    summon.fx = enemy.fx;
+    summon.fy = enemy.fy;
+  } else {
+    const [px, py] = state.samplers[enemy.pathIdx].at(summon.dist);
+    summon.fx = px;
+    summon.fy = py;
+  }
+  g.setAttribute('transform', `translate(${summon.fx.toFixed(1)} ${summon.fy.toFixed(1)})`);
+  g.classList.add('spawn-in');
+  setTimeout(() => g.classList.remove('spawn-in'), 420);
+  state.layers.enemies.appendChild(g);
+  state.enemies.push(summon);
+  fxRing(summon.fx, summon.fy, 'fx-ring-virus');
+  floatText(summon.fx, summon.fy - t.size - 10, stained ? 'BLOOD STAINED RISES' : 'RISEN', 'summon-float');
+  paintBars(summon);
+  return summon;
+}
+
+function despawnSummon(summon) {
+  summon.alive = false;
+  fxRing(summon.fx, summon.fy, 'fx-ring-virus');
+  summon.node.remove();
+}
+
+// Summons kamikaze: the first hostile they touch takes damage equal to the
+// summon's full hull, then the corpse collapses.
+function contactDamage(summon) {
+  const [sx, sy] = [summon.fx, summon.fy];
+  for (const enemy of state.enemies) {
+    if (!enemy.alive || enemy.friendly) continue;
+    if (summon.flight || enemy.flight) {
+      const [ex, ey] = posOf(enemy);
+      if (Math.hypot(ex - sx, ey - sy) > 14) continue;
+    } else if (enemy.pathIdx !== summon.pathIdx || Math.abs(enemy.dist - summon.dist) > 12) {
+      continue;
+    }
+    damageEnemy(enemy, summon.maxHp, { src: 'summon' });
+    despawnSummon(summon);
+    return;
+  }
+}
+
+function moveSummon(summon, dt) {
+  if (debugFreeze || state.mode !== 'waves') return;
+  if (summon.flight) {
+    summon.dist += summon.speed * (1 - (summon.slow || 0)) * dt;
+    if (summon.dist >= summon.flight.total) { despawnSummon(summon); return; }
+    const [fx, fy] = flightPos(summon, summon.dist);
+    summon.fx = fx;
+    summon.fy = fy;
+    summon.node.setAttribute('transform', `translate(${fx.toFixed(1)} ${fy.toFixed(1)})`);
+    contactDamage(summon);
+    return;
+  }
+  summon.dist -= summon.speed * (1 - (summon.slow || 0)) * dt;
+  if (summon.dist <= 0) { despawnSummon(summon); return; }
+  const [x, y] = state.samplers[summon.pathIdx].at(summon.dist);
+  summon.fx = x;
+  summon.fy = y;
+  summon.node.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+  contactDamage(summon);
 }
 
 function replicateLeak(enemy) {
@@ -438,6 +572,7 @@ function tick(ts) {
     if (state.countdown <= 0) beginWave(debugWave > 0 ? Math.min(missionWaves().length - 1, debugWave - 1) : 0);
   }
   if (state.mode === 'waves') runWaves(dt);
+  tickWaste(dt);
   for (const enemy of state.enemies) if (enemy.alive) moveEnemy(enemy, dt);
   state.enemies = state.enemies.filter((enemy) => enemy.alive);
   updateTowers(dt);
@@ -449,6 +584,7 @@ function tick(ts) {
 }
 
 function moveEnemy(enemy, dt) {
+  if (enemy.friendly) { moveSummon(enemy, dt); return; }
   if (debugFreeze || state.mode !== 'waves') return;
   if (enemy.stun > 0) {
     enemy.stun -= dt;
@@ -509,15 +645,24 @@ function runWaves(dt) {
       state.spawnGap = SPAWN_GAP[key] || 0.8;
       paintBars(enemy);
     }
-  } else if (!state.enemies.some((enemy) => enemy.alive) && state.intermission <= 0) {
+  } else if (!state.enemies.some((enemy) => enemy.alive && !enemy.friendly) && state.intermission <= 0) {
     // Income pass: cleared waves pay build money. Rates trimmed — the upgrade
     // ladder is the real salvage sink now, maxing a chassis must hurt.
-    const bonus = 30 + (state.waveIndex + 1) * 7;
+    // Zero Day rigs skim their wave yield on top.
+    let rigYield = 0;
+    for (const tower of state.towers) {
+      if (tower.id !== 'zeroday') continue;
+      const income = effStats(tower).income || 0;
+      if (!income) continue;
+      rigYield += income;
+      floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
+    }
+    const bonus = 30 + (state.waveIndex + 1) * 7 + rigYield;
     state.cash += bonus;
     state.earned += bonus;
     const cleared = state.waveIndex + 1;
     if (cleared >= missionWaves().length) { endMission(true); return; }
-    banner(`WAVE ${cleared} CLEARED`, `// +$${bonus} SALVAGE`, 'banner-green');
+    banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
     state.intermission = 7; // pace pass: a real build/upgrade window between waves
     updateHud();
@@ -597,6 +742,27 @@ function ensureHud() {
     state.speedBtn.classList.remove('on');
     document.querySelector('.field-hud').insertBefore(state.speedBtn, exit);
   }
+  // Nuclear Fall Out: strike button lives next to the time toggle once a rig deploys.
+  if (!state.nukeBtn) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'nuke-toggle';
+    btn.hidden = true;
+    btn.addEventListener('click', () => {
+      const rig = readyRig();
+      if (!rig) return;
+      if (state.nukeAim) { setNukeAim(false); return; }
+      if ((rig.nukeCd || 0) > 0) { playSound('alarm'); showToast(`Nuke recharging — ${Math.ceil(rig.nukeCd)}s left.`); return; }
+      if (state.cash < NUKE_COST) { playSound('alarm'); showToast(`Need $${NUKE_COST} salvage to call the nuke.`); return; }
+      setNukeAim(true);
+      playSound();
+    });
+    state.nukeBtn = btn;
+  }
+  state.nukeAim = false;
+  if (state.crosshair) { state.crosshair.remove(); state.crosshair = null; }
+  paintNukeButton();
+  document.querySelector('.field-hud').insertBefore(state.nukeBtn, exit);
 }
 
 function updateHud() {
@@ -612,8 +778,121 @@ function updateHud() {
   refreshPanelAfford();
 }
 
+// Radioactive aftermath: fallout pools burn everything inside them — hostiles
+// and risen corpses alike — until the fallout decays.
+function tickWaste(dt) {
+  if (!state.wasteZones.length || state.mode !== 'waves') return;
+  for (const zone of state.wasteZones) {
+    if (state.clock >= zone.until) {
+      if (zone.node) zone.node.remove();
+      zone.dead = true;
+      continue;
+    }
+    for (const enemy of state.enemies) {
+      if (!enemy.alive) continue;
+      const [px, py] = posOf(enemy);
+      if (Math.hypot(px - zone.x, py - zone.y) <= zone.r) damageEnemy(enemy, WASTE_DPS * dt, { src: 'waste', friendlyFire: true });
+    }
+  }
+  state.wasteZones = state.wasteZones.filter((zone) => !zone.dead);
+}
+
+// --- Nuclear Fall Out: aimed tactical strike ---------------------------------------
+function readyRig() {
+  return state.towers.find((tower) => tower.id === 'zeroday' && trackLevel(tower) >= 6) || null;
+}
+
+function setNukeAim(on) {
+  state.nukeAim = Boolean(on);
+  if (state.crosshair) { state.crosshair.remove(); state.crosshair = null; }
+  if (state.nukeAim) {
+    setBuilding(null);
+    state.crosshair = svgNode('g', { class: 'nuke-crosshair' });
+    state.crosshair.appendChild(svgNode('circle', { class: 'nuke-blast', r: NUKE_RADIUS }));
+    state.crosshair.appendChild(svgNode('circle', { class: 'nuke-waste', r: WASTE_RADIUS }));
+    const label = svgNode('text', { class: 'nuke-label', y: -NUKE_RADIUS - 12, 'text-anchor': 'middle' }, 'NUCLEAR FALL OUT');
+    state.crosshair.appendChild(label);
+    state.layers.fx.appendChild(state.crosshair);
+    paintGhost(state.mouseX, state.mouseY);
+  }
+  if (state.nukeBtn) paintNukeButton();
+}
+
+function paintNukeButton() {
+  const rig = readyRig();
+  if (!state.nukeBtn) return;
+  state.nukeBtn.hidden = !rig;
+  if (!rig) return;
+  const cd = rig.nukeCd || 0;
+  state.nukeBtn.textContent = state.nukeAim ? 'CLICK TARGET — ESC CANCELS' : cd > 0 ? `NUKE ${Math.ceil(cd)}s` : `NUKE READY — $${NUKE_COST}`;
+  state.nukeBtn.classList.toggle('on', state.nukeAim);
+  state.nukeBtn.classList.toggle('cd', cd > 0 && !state.nukeAim);
+}
+
+function fireNuke(x, y) {
+  const rig = readyRig();
+  if (!rig || (rig.nukeCd || 0) > 0) { setNukeAim(false); return; }
+  if (state.cash < NUKE_COST) { playSound('alarm'); showToast(`Need $${NUKE_COST} salvage to call the nuke.`); setNukeAim(false); return; }
+  state.cash -= NUKE_COST;
+  rig.nukeCd = NUKE_COOLDOWN;
+  setNukeAim(false);
+  // Strike: flat devastation inside the blast ring, then lingering fallout.
+  for (const enemy of state.enemies) {
+    if (!enemy.alive) continue;
+    const [px, py] = posOf(enemy);
+    if (Math.hypot(px - x, py - y) <= NUKE_RADIUS) damageEnemy(enemy, NUKE_DAMAGE, { src: 'nuke', friendlyFire: true });
+  }
+  const node = svgNode('circle', { class: 'fx-waste', cx: x, cy: y, r: WASTE_RADIUS });
+  state.layers.fx.appendChild(node);
+  state.wasteZones.push({ x, y, r: WASTE_RADIUS, until: state.clock + WASTE_SECONDS, node });
+  fxRing(x, y, 'fx-ring-red');
+  floatText(x, y - NUKE_RADIUS - 20, 'NUCLEAR FALL OUT', 'core-float');
+  playSound('alarm');
+  updateHud();
+}
+
+// --- Corpse Blossom abilities --------------------------------------------------------
+function bloodPurge(tower) {
+  if (trackLevel(tower) < 4) return;
+  const lust = tower.lust || 0;
+  if (lust <= 0) { playSound('alarm'); showToast('Blood Lust bar is empty — kills feed it.'); return; }
+  const rng = effStats(tower).rng;
+  let hits = 0;
+  for (const enemy of state.enemies) {
+    if (!enemy.alive || enemy.friendly) continue;
+    const [px, py] = posOf(enemy);
+    if (Math.hypot(px - tower.x, py - tower.y) <= rng) { damageEnemy(enemy, lust, { src: 'purge' }); hits += 1; }
+  }
+  tower.lust = 0;
+  fxRing(tower.x, tower.y, 'fx-ring-virus');
+  floatText(tower.x, tower.y - 52, `BLOOD PURGE — ${lust} DMG`, 'lust-float');
+  playSound();
+  openTowerPanel(tower);
+  updateHud();
+}
+
+function bloodScream(tower) {
+  if (trackLevel(tower) < 5) return;
+  if ((tower.screamCd || 0) > 0) return;
+  let buffed = 0;
+  for (const summon of state.enemies) {
+    if (!summon.alive || !summon.friendly || summon.screamed) continue;
+    summon.maxHp *= 2;
+    summon.hp *= 2;
+    summon.speed *= 2.5;
+    summon.screamed = true;
+    paintBars(summon);
+    buffed += 1;
+  }
+  tower.screamCd = 200;
+  fxRing(tower.x, tower.y, 'fx-ring-virus');
+  banner('BLOOD SCREAM', buffed ? `// ${buffed} SUMMONS ENRAGED — 2x HP · +150% SPEED` : '// NO SUMMONS ON THE FIELD', 'banner-red');
+  playSound();
+  openTowerPanel(tower);
+}
+
 function updateBossBar() {
-  const boss = state.enemies.find((enemy) => enemy.alive && enemy.t.boss);
+  const boss = state.enemies.find((enemy) => enemy.alive && enemy.t.boss && !enemy.friendly);
   state.bossBar.hidden = !boss;
   state.bossBar.style.display = boss ? '' : 'none';
   if (!boss) return;
@@ -688,7 +967,7 @@ function banner(title, sub, cls) {
 // --- Mode vote (EASY + MEDIUM live, the rest coming soon) --------------------------------
 const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
-  { id: 'medium', label: 'MEDIUM', sub: '25 WAVES // DENSER, FASTER, ANGRIER', ready: true },
+  { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
   { id: 'hard', label: 'HARD', sub: 'DUAL LANE SIEGE', ready: false },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
@@ -729,7 +1008,7 @@ function closeVote() {
 }
 
 // --- Mission lifecycle ------------------------------------------------------------------
-function startMission(map, skipVote = false) {
+function startMission(map, skipVote = false, forcedProtocol = null) {
   if (state.mode !== 'idle' && state.mode !== 'over') return;
   state.map = map;
   state.mode = 'vote';
@@ -744,6 +1023,8 @@ function startMission(map, skipVote = false) {
   state.enemies = [];
   state.towers = [];
   state.projectiles = [];
+  state.wasteZones = [];
+  state.nukeAim = false;
   state.bonusNc = 0;
   state.building = null;
   state.kills = 0;
@@ -763,7 +1044,7 @@ function startMission(map, skipVote = false) {
   ensureTip();
   updateHud();
   setStatus(`COMBAT PROTOCOL // ${map.name}`);
-  if (skipVote) launchCombat('easy');
+  if (skipVote) launchCombat(forcedProtocol || 'easy');
   else showVote('solo');
 }
 
@@ -789,6 +1070,10 @@ function restoreRecon() {
   if (state.hud) { state.hud.remove(); state.hud = null; }
   if (state.speedBtn) { state.speedBtn.remove(); state.speedBtn = null; }
   state.speed2x = false;
+  if (state.nukeBtn) { state.nukeBtn.remove(); state.nukeBtn = null; }
+  state.nukeAim = false;
+  if (state.crosshair) { state.crosshair.remove(); state.crosshair = null; }
+  state.wasteZones = [];
   if (state.bossBar) state.bossBar.hidden = true;
   if (state.endPanel) { state.endPanel.remove(); state.endPanel = null; }
   setBuilding(null);
@@ -955,6 +1240,11 @@ function toggleBuild(id) {
   if (!entry) return;
   const limit = towerLimit();
   if (state.towers.length >= limit) { playSound('alarm'); showToast(`Command grid saturated — ${limit} units max at ${window.CBZ_ROOM_PLAYERS || 1} commander(s).`); return; }
+  if (entry.limit && state.towers.some((tower) => tower.id === id)) {
+    playSound('alarm');
+    showToast(`${entry.name} is a one-off rig — only one deploys per commander.`);
+    return;
+  }
   if (state.cash < entry.cost) { playSound('alarm'); showToast(`Need $${entry.cost} salvage to deploy ${entry.name}.`); return; }
   setBuilding(entry);
 }
@@ -1069,11 +1359,18 @@ function rejectPlace(x, y, reason) {
 
 function placeTower(entry, x, y) {
   if (state.towers.length >= towerLimit()) { playSound('alarm'); showToast(`Command grid saturated — ${towerLimit()} units max.`); return false; }
+  if (entry.limit && state.towers.some((tower) => tower.id === entry.id)) {
+    playSound('alarm');
+    showToast(`${entry.name} is a one-off rig — only one deploys per commander.`);
+    return false;
+  }
   if (state.cash < entry.cost) { playSound('alarm'); showToast(`Need $${entry.cost} salvage to deploy ${entry.name}.`); return false; }
   state.cash -= entry.cost;
   const node = towerNode(entry, x, y);
   state.layers.towers.appendChild(node);
   const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, lvl: 0 };
+  if (entry.id === 'corpseblossom') { tower.veinCd = 0.6; tower.lust = 0; tower.screamCd = 0; }
+  if (entry.id === 'zeroday') tower.nukeCd = 0;
   const pad = padAt(x, y);
   if (pad) {
     tower.onPad = true;
@@ -1124,13 +1421,14 @@ function towerTrack(tower) {
 }
 
 function effStats(tower) {
-  const s = tower.entry.stats;
-  const stats = { dmg: s.dmg, rate: s.rate, rng: s.rng, splash: s.splash || 0 };
+  // Spread the whole base stats object — special chassis carry custom keys
+  // (income / veins / summonHp / lust / bounty) that upgrade tiers overwrite.
+  const stats = { ...tower.entry.stats };
   for (let i = 0; i < trackLevel(tower); i++) {
     const tier = towerTrack(tower)[i];
     if (tier && tier.sets) Object.assign(stats, tier.sets);
   }
-  return { ...stats, infinite: s.rng >= 999 };
+  return { ...stats, infinite: tower.entry.stats.rng >= 999 };
 }
 
 function trackInvested(tower) {
@@ -1188,6 +1486,20 @@ function openTowerPanel(tower) {
         <button class="tp-buy" type="button" data-tier="${index}" ${next ? '' : 'disabled'}>${installed ? 'INSTALLED' : next ? `$${tier.cost}` : 'LOCKED'}</button>
       </div>`;
   }).join('');
+  const specials = [];
+  if (entry.id === 'corpseblossom') {
+    specials.push(`<div class="tp-abil-row"><span>SUMMON HP</span><b>${Math.round((es.summonHp || 0.3) * 100)}%</b></div>`);
+    if (trackLevel(tower) >= 4) specials.push(`<div class="tp-abil-row lust"><span>BLOOD LUST</span><b>${tower.lust || 0}</b></div>`);
+  }
+  if (entry.id === 'zeroday') specials.push(`<div class="tp-abil-row"><span>WAVE INCOME</span><b>$${es.income || 0}/WAVE</b></div>`);
+  const abilities = [];
+  if (entry.id === 'corpseblossom' && trackLevel(tower) >= 4) {
+    abilities.push(`<button class="tp-ability purge" type="button" id="tp-purge" ${tower.lust > 0 ? '' : 'disabled'}>BLOOD PURGE — RELEASE ${tower.lust || 0} LUST</button>`);
+  }
+  if (entry.id === 'corpseblossom' && trackLevel(tower) >= 5) {
+    const cd = Math.ceil(tower.screamCd || 0);
+    abilities.push(`<button class="tp-ability scream" type="button" id="tp-scream" ${cd > 0 ? 'disabled' : ''}>BLOOD SCREAM${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
+  }
   const panel = document.createElement('div');
   panel.className = `tower-panel tw-${entry.cat}`;
   panel.innerHTML = `
@@ -1198,8 +1510,10 @@ function openTowerPanel(tower) {
       <div><span>RNG</span><b>${es.infinite ? 'INF' : Math.round(es.rng)}</b></div>
       ${es.splash ? `<div><span>SPLASH</span><b>${Math.round(es.splash)}U</b></div>` : ''}
     </div>
+    ${specials.length ? `<div class="tp-specials">${specials.join('')}</div>` : ''}
     <p class="tp-special">${entry.special.replace('>> ', '')}</p>
     <div class="tp-ups"><div class="tp-ups-head"><span>// UPGRADE LADDER</span><b>TIER ${Math.min(lvl + 1, tiers.length)} / ${tiers.length} · THIS MISSION</b></div>${rows}</div>
+    ${abilities.length ? `<div class="tp-abilities">${abilities.join('')}</div>` : ''}
     <button class="tp-sell" type="button">SALVAGE BACK +$${refund}</button>
     <p class="tp-note">UPGRADES ARE SCRAPPED ON SELL &amp; WHEN THE MISSION ENDS</p>`;
   battlefield.appendChild(panel);
@@ -1211,6 +1525,10 @@ function openTowerPanel(tower) {
   tower.node.classList.add('selected');
   panel.querySelectorAll('.tp-buy').forEach((button) => button.addEventListener('click', () => buyTrack(tower)));
   panel.querySelector('.tp-sell').addEventListener('click', () => sellTower(tower));
+  const purge = panel.querySelector('#tp-purge');
+  if (purge) purge.addEventListener('click', () => bloodPurge(tower));
+  const scream = panel.querySelector('#tp-scream');
+  if (scream) scream.addEventListener('click', () => bloodScream(tower));
   refreshPanelAfford();
 }
 
@@ -1240,8 +1558,38 @@ function sellTower(tower) {
 
 // --- Tower combat brain ------------------------------------------------------------------
 function updateTowers(dt) {
-  if (!state.layers || !state.towers.length) return;
+  if (!state.layers || !state.towers.length) { paintNukeButton(); return; }
   for (const tower of state.towers) tower.boost = 1;
+  // Special chassis upkeep: Blossom curse pulses + ability cooldowns, rig nuke clock.
+  for (const tower of state.towers) {
+    if (tower.id === 'corpseblossom') {
+      tower.screamCd = Math.max(0, (tower.screamCd || 0) - dt);
+      const es = effStats(tower);
+      if (es.veins) {
+        tower.veinCd -= dt;
+        if (tower.veinCd <= 0) {
+          const [lo, hi] = es.veinRate || [0.1, 1];
+          tower.veinCd = lo + Math.random() * (hi - lo);
+          const pool = state.enemies.filter((enemy) => {
+            if (!enemy.alive || enemy.friendly) return false;
+            const [px, py] = posOf(enemy);
+            return Math.hypot(px - tower.x, py - tower.y) <= es.rng;
+          });
+          if (pool.length) {
+            const target = pool[Math.floor(Math.random() * pool.length)];
+            const [tx, ty] = posOf(target);
+            fxRing(tx, ty, 'fx-ring-virus');
+            for (const enemy of pool) {
+              const [px, py] = posOf(enemy);
+              if (Math.hypot(px - tx, py - ty) <= 55) damageEnemy(enemy, es.veins, { src: 'veins' });
+            }
+          }
+        }
+      }
+    }
+    if (tower.id === 'zeroday') tower.nukeCd = Math.max(0, (tower.nukeCd || 0) - dt);
+  }
+  paintNukeButton();
   // Fire control.
   for (const tower of state.towers) {
     const rate = effStats(tower).rate * tower.boost;
@@ -1425,6 +1773,7 @@ board.addEventListener('pointermove', (event) => {
   state.mouseX = x;
   state.mouseY = y;
   state.mouseOn = true;
+  if (state.crosshair) state.crosshair.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
   if (state.building) paintGhost(x, y);
 });
 
@@ -1436,6 +1785,7 @@ board.addEventListener('pointerleave', () => {
 board.addEventListener('click', (event) => {
   if (!state.bar || !buildingAllowed()) return;
   const [x, y] = boardPoint(event);
+  if (state.nukeAim) { fireNuke(x, y); return; }
   if (state.building) {
     const verdict = canPlace(x, y);
     if (!verdict.ok) { rejectPlace(x, y, verdict.reason); return; }
@@ -1464,7 +1814,7 @@ board.addEventListener('contextmenu', (event) => {
 
 document.addEventListener('keydown', (event) => {
   if (document.querySelector('#battlefield').hidden) return;
-  if (event.key === 'Escape') { setBuilding(null); closeTowerPanel(); return; }
+  if (event.key === 'Escape') { setBuilding(null); closeTowerPanel(); if (state.nukeAim) setNukeAim(false); return; }
   const digit = Number(event.key);
   if (digit >= 1 && digit <= 5 && state.bar && buildingAllowed()) {
     const slots = state.bar.querySelectorAll('.lo-slot[data-tower]');
@@ -1498,14 +1848,14 @@ const coopGuest = () => coopRole() === 'guest';
 function coopBroadcast() {
   const bridge = window.CBZCoopBridge;
   if (!bridge || !bridge.send) return;
-  const boss = state.enemies.find((enemy) => enemy.alive && enemy.t.boss);
+  const boss = state.enemies.find((enemy) => enemy.alive && enemy.t.boss && !enemy.friendly);
   bridge.send({
     k: 'sync',
     m: state.mode, w: state.waveIndex, c: Math.round(state.cash), b: Math.max(0, Math.ceil(state.baseHp)),
     kk: state.kills, bk: state.bossesKilled, er: Math.round(state.earned),
     sq: state.syncSeq || 0, st: state.syncTitle || '',
     tw: state.towers.map((tower, index) => [index, tower.id, Math.round(tower.x), Math.round(tower.y), tower.lvl || 0, tower.onPad ? 1 : 0]),
-    en: state.enemies.filter((enemy) => enemy.alive).map((enemy) => [enemy.nid, enemy.key, Math.round(enemy.fx), Math.round(enemy.fy), Math.round(enemy.hp), enemy.maxHp, Math.round(enemy.shield || 0), enemy.t.flying ? 1 : 0]),
+    en: state.enemies.filter((enemy) => enemy.alive).map((enemy) => [enemy.nid, enemy.key, Math.round(enemy.fx), Math.round(enemy.fy), Math.round(enemy.hp), enemy.maxHp, Math.round(enemy.shield || 0), enemy.t.flying ? 1 : 0, enemy.friendly ? 1 : 0]),
     bo: boss ? [boss.nid, Math.round(boss.hp), boss.maxHp, Math.round(boss.shield || 0)] : null,
   });
 }
@@ -1568,7 +1918,7 @@ function coopApplySync(snap) {
   });
   // Enemies keyed by host spawn id: create missing, refresh bars, drop the dead.
   const alive = new Set();
-  for (const [nid, key, x, y, hp, maxHp, shield] of snap.en) {
+  for (const [nid, key, x, y, hp, maxHp, shield, flying, friendly] of snap.en) {
     alive.add(nid);
     let enemy = state.guestMap.get(nid);
     if (!enemy) {
@@ -1586,7 +1936,7 @@ function coopApplySync(snap) {
       const shieldFill = svgNode('rect', { class: 'shield-fill', x: -barW / 2, y: barY - 4, width: 0, height: 2.4 });
       g.appendChild(shieldFill);
       state.layers.enemies.appendChild(g);
-      enemy = { key, t, node: g, fill, shieldFill, hp, maxHp, shield, maxShield: t.shield || 0, alive: true, gx: x, gy: y, fx: x, fy: y, angle: 0, guest: true, guestNid: nid };
+      enemy = { key, t, node: g, fill, shieldFill, hp, maxHp, shield, maxShield: t.shield || 0, alive: true, gx: x, gy: y, fx: x, fy: y, angle: 0, guest: true, guestNid: nid, friendly: Boolean(friendly) };
       state.guestMap.set(nid, enemy);
       g.classList.add('spawn-in');
       setTimeout(() => g.classList.remove('spawn-in'), 420);

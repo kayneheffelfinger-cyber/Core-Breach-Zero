@@ -98,8 +98,8 @@ async function api(path, payload) {
     check('duplicate bay rejected 400', four.status === 400, JSON.stringify(four.data));
 
     const again = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 999, bossesKilled: 99, difficulty: 'easy' });
-    check('input clamped: nc=540 (30-wave + 24-boss caps)', again.data.rewards.nc === 540, JSON.stringify(again.data.rewards));
-    check('no second firstClear, bt=24 (24-boss cap)', again.data.rewards.firstClear === false && again.data.rewards.bt === 24, JSON.stringify(again.data.rewards));
+    check('input clamped: nc=600 (30-wave + 30-boss caps)', again.data.rewards.nc === 600, JSON.stringify(again.data.rewards));
+    check('no second firstClear, bt=30 (30-boss cap)', again.data.rewards.firstClear === false && again.data.rewards.bt === 30, JSON.stringify(again.data.rewards));
 
     // Medium protocol payouts + achievement ledger (mapWins -> OVERDRIVE).
     const medLoss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 8, bossesKilled: 3, difficulty: 'medium' });
@@ -149,6 +149,10 @@ async function api(path, payload) {
     check('level-3 clearance gate blocks fresh account 403', freshBuy.status === 403, JSON.stringify(freshBuy.data));
     const freshBuySniper = await api('/api/shop/purchase', { token: freshToken, itemId: 'sniper' });
     check('level-5 clearance gate blocks fresh account 403', freshBuySniper.status === 403, JSON.stringify(freshBuySniper.data));
+    const freshBuyRig = await api('/api/shop/purchase', { token: freshToken, itemId: 'zeroday' });
+    check('level-15 clearance gate blocks fresh account 403', freshBuyRig.status === 403, JSON.stringify(freshBuyRig.data));
+    const freshBuyBlossom = await api('/api/shop/purchase', { token: freshToken, itemId: 'corpseblossom' });
+    check('level-20 clearance gate blocks fresh account 403', freshBuyBlossom.status === 403, JSON.stringify(freshBuyBlossom.data));
     const rich = await api('/api/profile', { token });
     const sgBeforeNc = rich.data.profile.nc;
     const sgBeforeBt = rich.data.profile.bt;
@@ -156,8 +160,17 @@ async function api(path, payload) {
     check('shotgunner purchase deducts 800 NC + 10 BT', sg.data.ok && sg.data.profile.owned.includes('shotgunner') && sg.data.profile.nc === sgBeforeNc - 800 && sg.data.profile.bt === sgBeforeBt - 10, JSON.stringify(sg.data));
     const sn = await api('/api/shop/purchase', { token, itemId: 'sniper' });
     check('sniper purchase deducts 1800 NC + 50 BT (L5 gate open)', sn.data.ok && sn.data.profile.owned.includes('sniper') && sn.data.profile.nc === sgBeforeNc - 800 - 1800 && sn.data.profile.bt === sgBeforeBt - 10 - 50, JSON.stringify(sn.data));
+    const rigWallet = await api('/api/profile', { token });
+    const rigNc = rigWallet.data.profile.nc;
+    const rigBt = rigWallet.data.profile.bt;
+    const rig = await api('/api/shop/purchase', { token, itemId: 'zeroday' });
+    check('zeroday purchase deducts 3000 NC + 20 BT (L15 gate open)', rig.data.ok && rig.data.profile.owned.includes('zeroday') && rig.data.profile.nc === rigNc - 3000 && rig.data.profile.bt === rigBt - 20, JSON.stringify(rig.data));
+    const blossom = await api('/api/shop/purchase', { token, itemId: 'corpseblossom' });
+    check('corpseblossom purchase deducts 6666 NC + 666 BT (L20 gate open)', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3000 - 6666 && blossom.data.profile.bt === rigBt - 20 - 666, JSON.stringify(blossom.data));
     const quint = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     check('5-bay unique loadout accepted', quint.data.ok && quint.data.profile.loadout.length === 5, JSON.stringify(quint.data));
+    const sept = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper', 'zeroday', 'corpseblossom'] });
+    check('7-bay loadout rejected 400 (max 5)', sept.status === 400, JSON.stringify(sept.data));
     console.log(`PHASE1 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
@@ -165,7 +178,7 @@ async function api(path, payload) {
   if (phase === '2') {
     const prof = await api('/api/profile', { token });
     const p = prof.data.profile || {};
-    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper'), JSON.stringify(p));
+    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper') && p.owned.includes('zeroday') && p.owned.includes('corpseblossom'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
