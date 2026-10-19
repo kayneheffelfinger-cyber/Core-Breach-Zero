@@ -94,7 +94,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
-  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000 }, // admin test grant — heavy wallet + XP
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true }, // admin test grant — heavy wallet + XP, redeemable unlimited times
 };
 
 // --- Achievements & perks -------------------------------------------------------
@@ -344,8 +344,10 @@ const LOCAL = (() => {
       const grant = REDEEM_CODES[code];
       if (!grant) throw new Error('Unknown salvage code. The grid does not recognize it.');
       account.meta.redeemed = Array.isArray(account.meta.redeemed) ? account.meta.redeemed : [];
-      if (account.meta.redeemed.includes(code)) throw new Error('Code already redeemed by this commander.');
-      account.meta.redeemed.push(code);
+      if (!grant.repeat) {
+        if (account.meta.redeemed.includes(code)) throw new Error('Code already redeemed by this commander.');
+        account.meta.redeemed.push(code);
+      }
       account.meta.nc += grant.nc;
       account.meta.bt += grant.bt;
       const meta = account.meta;

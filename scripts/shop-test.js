@@ -138,17 +138,21 @@ async function api(path, payload) {
     const zeroday = await api('/api/redeem', { token, code: 'zeroday' });
     check('ZERODAY (lowercase) grants +5000 NC +500 BT', zeroday.data.ok && zeroday.data.profile.nc === beforeNc + 10500 && zeroday.data.profile.bt === beforeBt + 675, JSON.stringify(zeroday.data));
 
-    // ADMINLOG101011 — admin test grant: 10000 NC + 1000 BT + 5000 XP (level-up loop applies).
+    // ADMINLOG101011 — admin test grant: 10000 NC + 1000 BT + 5000 XP, REPEATABLE (no ledger entry, no 409).
     const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
-    let expLevel = sealed.data.profile.level;
-    let expXp = sealed.data.profile.xp + 5000;
-    while (expLevel < 30 && expXp >= xpToNext(expLevel)) { expXp -= xpToNext(expLevel); expLevel += 1; }
-    if (expLevel >= 30) expXp = Math.min(expXp, xpToNext(30));
+    const applyXp = (level, xp, gain) => {
+      xp += gain;
+      while (level < 30 && xp >= xpToNext(level)) { xp -= xpToNext(level); level += 1; }
+      if (level >= 30) xp = Math.min(xp, xpToNext(30));
+      return [level, xp];
+    };
+    const [expLevel1, expXp1] = applyXp(sealed.data.profile.level, sealed.data.profile.xp, 5000);
     const adminlog = await api('/api/redeem', { token, code: 'adminlog101011' });
     check('ADMINLOG101011 (lowercase) grants +10000 NC +1000 BT +5000 XP', adminlog.data.ok && adminlog.data.profile.nc === beforeNc + 20500 && adminlog.data.profile.bt === beforeBt + 1675 && adminlog.data.granted.xp === 5000, JSON.stringify(adminlog.data));
-    check('ADMINLOG101011 level-up loop matches simulation', adminlog.data.profile.level === expLevel && adminlog.data.profile.xp === expXp && adminlog.data.granted.levelsGained === expLevel - sealed.data.profile.level, JSON.stringify(adminlog.data));
-    const dupeAdmin = await api('/api/redeem', { token, code: 'ADMINLOG101011' });
-    check('second ADMINLOG101011 rejected 409', dupeAdmin.status === 409, JSON.stringify(dupeAdmin.data));
+    check('ADMINLOG101011 level-up loop matches simulation', adminlog.data.profile.level === expLevel1 && adminlog.data.profile.xp === expXp1 && adminlog.data.granted.levelsGained === expLevel1 - sealed.data.profile.level, JSON.stringify(adminlog.data));
+    const [expLevel2, expXp2] = applyXp(sealed.data.profile.level, sealed.data.profile.xp, 10000);
+    const adminlog2 = await api('/api/redeem', { token, code: 'ADMINLOG101011' });
+    check('ADMINLOG101011 re-redeemable (repeat grant, no 409)', adminlog2.data.ok && adminlog2.data.profile.nc === beforeNc + 30500 && adminlog2.data.profile.bt === beforeBt + 2675 && adminlog2.data.profile.level === expLevel2 && adminlog2.data.profile.xp === expXp2, JSON.stringify(adminlog2.data));
 
     // Shotgunner — clearance level 3 gate + dual-currency 800 NC + 10 BT.
     const freshreg = await api('/api/register', { name: 'SHOPCMDR2', email: 'shop2@test.io', passcode: 'test1234' });
@@ -195,7 +199,7 @@ async function api(path, payload) {
     check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper') && p.owned.includes('zeroday') && p.owned.includes('corpseblossom'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
-    check('persisted redeemed ledger (5 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 5, JSON.stringify(p.redeemed));
+    check('persisted redeemed ledger (4 codes, repeatable skips ledger)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     check('persisted achievement overdrive', p.achievements && p.achievements.overdrive === true, JSON.stringify(p.achievements));
     check('persisted mapWins spire ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2, JSON.stringify(p.mapWins));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
