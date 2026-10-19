@@ -16,7 +16,7 @@ document.querySelector('#preview-port').textContent = port;
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves) and MEDIUM (30 waves, denser and angrier).',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of torture — boss breaches near-kill the core).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
@@ -108,11 +108,49 @@ const ACHIEVEMENTS = [
     desc: 'Clear the OVERLOAD SPIRE sector on both the EASY and MEDIUM combat protocols.',
     reward: 'Decrypts the OVERDRIVE perk — a TIME x2 button for missions.',
   },
+  {
+    id: 'hardline', name: 'HARDLINE', glyph: '☠', map: 'any',
+    protocols: ['hard'],
+    desc: 'Clear any sector on the HARD combat protocol — 30 waves of torture with near-lethal boss breaches.',
+    reward: 'Decrypts the SALVAGE PROTOCOL perk — every mission payout pays +10% Nexus Coins.',
+  },
+  {
+    id: 'ironcommander', name: 'IRON COMMANDER', glyph: '⚑', map: 'any',
+    protocols: ['hard'],
+    count: 5,
+    desc: 'Rack up 5 HARD protocol victories across any sectors. The grid starts taking you seriously.',
+    reward: 'Decrypts the DEEP POCKETS perk — every mission opens with +150 salvage.',
+  },
+  {
+    id: 'spirebreaker', name: 'SPIRE BREAKER', glyph: '▲', map: 'insane',
+    protocols: ['hard'],
+    desc: 'Clear the OVERLOAD SPIRE sector on the HARD combat protocol.',
+    reward: 'Decrypts the FIELD REPAIRS perk — the core self-repairs 2 HP after every cleared wave.',
+  },
+  {
+    id: 'grandslam', name: 'GRAND SLAM', glyph: '★', map: 'all',
+    protocols: ['hard'],
+    desc: 'Clear every battle sector — PERIMETER PATROL, IRON JUNCTION, MELTDOWN GRID, OVERLOAD SPIRE and CORE: ZERO — on the HARD protocol.',
+    reward: 'Decrypts the BOUNTY HUNTER perk — hostile commanders pay +25% bounty.',
+  },
+  {
+    id: 'apexpredator', name: 'APEX PREDATOR', glyph: '✚', map: 'any',
+    protocols: ['hard'],
+    count: 10,
+    desc: 'Rack up 10 HARD protocol victories. The grid learns to fear your ledger.',
+    reward: 'Decrypts the OVERCLOCK MATRIX perk — every turret fires 5% faster.',
+  },
 ];
 function achievementsFrom(mapWins) {
   const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  const hardWins = Object.keys(wins).reduce((sum, key) => sum + (key.endsWith(':hard') ? (wins[key] || 0) : 0), 0);
   return {
     overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
+    hardline: Boolean(hardWins >= 1),
+    ironcommander: Boolean(hardWins >= 5),
+    spirebreaker: Boolean((wins['insane:hard'] || 0) > 0),
+    grandslam: Boolean(['easy', 'medium', 'hard', 'insane', 'cbz'].every((mapId) => (wins[`${mapId}:hard`] || 0) > 0)),
+    apexpredator: Boolean(hardWins >= 10),
   };
 }
 const PERKS = [
@@ -120,6 +158,31 @@ const PERKS = [
     id: 'overdrive', name: 'OVERDRIVE PROTOCOL', ach: 'overdrive',
     desc: 'Time-compression rig. Adds a TIME x2 toggle to the mission HUD — flip it and the entire battlefield runs at double speed.',
     req: 'OVERDRIVE ACHIEVEMENT',
+  },
+  {
+    id: 'salvage', name: 'SALVAGE PROTOCOL', ach: 'hardline',
+    desc: 'Reclamation routines strip every wreck twice. All mission payouts pay +10% Nexus Coins.',
+    req: 'HARDLINE ACHIEVEMENT',
+  },
+  {
+    id: 'deeppockets', name: 'DEEP POCKETS', ach: 'ironcommander',
+    desc: 'Off-grid credit lines open the moment you deploy. Every mission starts with +150 salvage.',
+    req: 'IRON COMMANDER ACHIEVEMENT',
+  },
+  {
+    id: 'fieldrep', name: 'FIELD REPAIRS', ach: 'spirebreaker',
+    desc: 'Nanite repair swarms patch the core between assaults — +2 core HP after every cleared wave.',
+    req: 'SPIRE BREAKER ACHIEVEMENT',
+  },
+  {
+    id: 'bounty', name: 'BOUNTY HUNTER', ach: 'grandslam',
+    desc: 'Command bounties renegotiated in your favor — hostile commanders pay +25% bounty salvage.',
+    req: 'GRAND SLAM ACHIEVEMENT',
+  },
+  {
+    id: 'overclock', name: 'OVERCLOCK MATRIX', ach: 'apexpredator',
+    desc: 'Weapons-grade clock boost across the whole network — every turret fires 5% faster.',
+    req: 'APEX PREDATOR ACHIEVEMENT',
   },
 ];
 window.CBZPerks = {
@@ -148,12 +211,13 @@ const LOCAL = (() => {
     virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
     shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
     sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
-    zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3000, bt: 20 }, currency: 'mixed' },
-    corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 6666, bt: 666 }, currency: 'mixed' },
+    zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
+    corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
     medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
+    hard: { waveNC: 12, waveXP: 18, bossNC: 15, bossBT: 1, bossXP: 50, winNC: 150, winXP: 200, flawlessNC: 60, flawlessBT: 4, flawlessXP: 100, firstClearBT: 5 },
   };
   let down = false;
 
@@ -322,6 +386,11 @@ const LOCAL = (() => {
         meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
       }
       const afterAch = achievementsFrom(meta.mapWins);
+      // Perk multipliers — post-unlock: the win that decrypts a perk already
+      // benefits from it. SALVAGE PROTOCOL perk (hardline ach) = +10% NC;
+      // BOUNTY HUNTER perk (grandslam ach) = +25% commander bounty NC.
+      if (afterAch.hardline) nc = Math.round(nc * 1.1);
+      if (afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
       const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
       const before = meta.level;
       meta.nc += nc;
@@ -1454,7 +1523,7 @@ function renderBays() {
 }
 
 // Combat protocols a room can run — keep in sync with server.js PROTOCOL_CHOICES.
-const ROOM_PROTOCOLS = ['easy', 'medium'];
+const ROOM_PROTOCOLS = ['easy', 'medium', 'hard'];
 
 function isRoomLead(room) {
   return room.commanders.some((commander) => commander.isHost && commander.callsign === myCallsign);

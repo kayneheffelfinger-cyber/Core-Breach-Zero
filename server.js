@@ -39,12 +39,13 @@ const SHOP = {
   virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
   shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
   sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
-  zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3000, bt: 20 }, currency: 'mixed' },
-  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 6666, bt: 666 }, currency: 'mixed' },
+  zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
+  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed' },
 };
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
   medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
+  hard: { waveNC: 12, waveXP: 18, bossNC: 15, bossBT: 1, bossXP: 50, winNC: 150, winXP: 200, flawlessNC: 60, flawlessBT: 4, flawlessXP: 100, firstClearBT: 5 },
 };
 const PROTOCOLS = Object.keys(REWARDS);
 
@@ -52,8 +53,14 @@ const PROTOCOLS = Object.keys(REWARDS);
 // Mirrored in app.js LOCAL — keep the derivation in sync there.
 function achievementsFrom(mapWins) {
   const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  const hardWins = Object.keys(wins).reduce((sum, key) => sum + (key.endsWith(':hard') ? (wins[key] || 0) : 0), 0);
   return {
     overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
+    hardline: Boolean(hardWins >= 1),
+    ironcommander: Boolean(hardWins >= 5),
+    spirebreaker: Boolean((wins['insane:hard'] || 0) > 0),
+    grandslam: Boolean(['easy', 'medium', 'hard', 'insane', 'cbz'].every((mapId) => (wins[`${mapId}:hard`] || 0) > 0)),
+    apexpredator: Boolean(hardWins >= 10),
   };
 }
 
@@ -250,6 +257,11 @@ async function handleApi(request, response, pathname) {
       meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
     }
     const afterAch = achievementsFrom(meta.mapWins);
+    // Perk multipliers — post-unlock: the win that decrypts a perk already
+    // benefits from it. SALVAGE PROTOCOL perk (hardline ach) = +10% NC;
+    // BOUNTY HUNTER perk (grandslam ach) = +25% commander bounty NC.
+    if (afterAch.hardline) nc = Math.round(nc * 1.1);
+    if (afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
     const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
     const before = meta.level;
     meta.nc += nc;
@@ -342,7 +354,7 @@ for (const [id, name] of [
   rooms.set(id, { id, name, players: [], map: null, protocol: null, started: false });
 }
 const MAP_PROTOCOLS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
-const PROTOCOL_CHOICES = ['easy', 'medium']; // combat protocols a room lead can lock in
+const PROTOCOL_CHOICES = ['easy', 'medium', 'hard']; // combat protocols a room lead can lock in
 const MAX_PLAYERS = 4;
 
 const webSockets = new WebSocketServer({ server, path: '/rooms' });

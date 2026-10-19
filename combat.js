@@ -18,6 +18,10 @@ const ENEMY_TYPES = {
   virus: { name: 'SYSTEM VIRUS', tag: 'MINI-BOSS', hp: 600, speed: 48, size: 20, bounty: 120, dmg: 6, color: '#ff5e7a', boss: true, ability: 'Malware Pulse — emits a stunning shockwave every 8s.' },
   leak: { name: 'MEMORY LEAK', tag: 'MINI-BOSS', hp: 1200, speed: 34, size: 22, bounty: 225, dmg: 8, color: '#ffb45a', boss: true, ability: 'Replication — spills 6 Corrupted Files at 50% HP.' },
   overseer: { name: 'CORE BREACH: ZERO', tag: 'FINAL BOSS', hp: 4200, speed: 27, size: 26, bounty: 750, dmg: 25, color: '#ff4d5e', boss: true, shield: 400, ability: 'Overheat — shockwave disables a tower for 4s. Shielding Matrix — gains a 400 HP shield at 25% HP.' },
+  hexbug: { name: 'HEX CRAWLER', tag: 'REGEN', hp: 55, speed: 58, size: 10, bounty: 12, dmg: 2, color: '#6ee7a0', regen: 0.03, ability: 'Nanite Weave — knits 3% hull back per second. Burst it down or it outlives your DPS.' },
+  juggernaut: { name: 'DATA JUGGERNAUT', tag: 'SUPERARMOR', hp: 320, speed: 24, size: 17, bounty: 55, dmg: 5, color: '#98a7b8', armor: 0.45, ability: 'Ablative megaplate — absorbs 45% of all incoming damage.' },
+  phantom: { name: 'PHANTOM PACKET', tag: 'PHASE', hp: 40, speed: 70, size: 9, bounty: 14, dmg: 2, color: '#9ad1ff', blink: { every: 3.2, jump: 90 }, ability: 'Phase Jump — blinks 90u up the lane every few seconds, dodging chokepoint DPS.' },
+  warden: { name: 'FIREWALL WARDEN', tag: 'HARD BOSS', hp: 2400, speed: 31, size: 23, bounty: 420, dmg: 12, color: '#ff8a3d', boss: true, shield: 700, ability: 'Packet Storm — spills 4 Hex Crawlers at 60% hull. Shield Lattice — spawns with a 700 HP shield.' },
 };
 
 // --- Easy Mode: 20 waves, 6 boss encounters ---------------------------------------
@@ -28,6 +32,7 @@ const WAVE_HP_SCALE = 0.12;  // +12% HP per wave index — pressure compounds fa
 const SURGE_MODS = {
   overclock: { hp: 1, speed: 1.25, label: 'OVERCLOCK SURGE', note: 'HOSTILES RUN 25% FASTER' },
   hardened: { hp: 1.4, speed: 1, label: 'HARDENED HULLS', note: 'HOSTILES +40% HP' },
+  crush: { hp: 1.5, speed: 1.15, label: 'CRUSH PROTOCOL', note: 'HOSTILES +50% HP · 15% FASTER' },
 };
 const EASY_WAVES = [
   { groups: [['glitched', 16]] },
@@ -89,15 +94,58 @@ const MEDIUM_WAVES = [
   { groups: [['shielded', 26], ['nullcore', 13], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 26]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
+// --- Hard Protocol: 30 waves of pure torture ---------------------------------------
+// The pressure dials snap off: HARD ladders the Medium roster with four new
+// hostile classes (Hex Crawlers regen, Data Juggernauts tank, Phantom Packets
+// blink past chokepoints, Firewall Wardens spill swarms), overlapping boss
+// waves every few indices and the steepest HP curve in the game. The catch:
+// payouts scale up slightly — you will need every salvage point.
+const HARD_WAVES = [
+  { groups: [['glitched', 26], ['runner', 16]] },
+  { groups: [['glitched', 24], ['file', 22], ['runner', 16]] },
+  { groups: [['shielded', 20], ['glitched', 24], ['hexbug', 6]], phase: 'NANITE DEBUT', mod: 'hardened' },
+  { groups: [['runner', 34], ['drone', 14], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 20], ['glitched', 26], ['phantom', 8]], phase: 'PHASE PRESSURE' },
+  { groups: [['nullcore', 10], ['file', 38], ['hexbug', 8]], mod: 'overclock' },
+  { groups: [['shielded', 26], ['drone', 22], ['runner', 20]] },
+  { groups: [['nullcore', 12], ['leak', 1], ['file', 30], ['phantom', 8]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 50], ['runner', 26], ['hexbug', 10]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 1], ['leak', 1], ['shielded', 22], ['juggernaut', 2]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
+  { groups: [['nullcore', 16], ['drone', 26], ['runner', 24]] },
+  { groups: [['drone', 36], ['runner', 30], ['phantom', 10]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 30], ['nullcore', 14], ['glitched', 36], ['hexbug', 10]], mod: 'crush' },
+  { groups: [['virus', 2], ['file', 52], ['drone', 24], ['juggernaut', 2]], phase: 'VIRULENT SURGE' },
+  { groups: [['leak', 2], ['nullcore', 16], ['drone', 28]], phase: 'LEAK STORM', mod: 'hardened' },
+  { groups: [['runner', 42], ['drone', 26], ['file', 38], ['phantom', 10]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 18], ['shielded', 28], ['virus', 1], ['juggernaut', 3]], phase: 'ARMOR COLUMN', mod: 'hardened' },
+  { groups: [['drone', 38], ['runner', 32], ['glitched', 40]], mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 2], ['shielded', 26], ['warden', 1]], phase: 'FIREWALL RISING' },
+  { groups: [['nullcore', 20], ['drone', 30], ['file', 48]], phase: 'DENSE ASSAULT' },
+  { groups: [['runner', 48], ['drone', 30], ['hexbug', 12]], phase: 'FULL SPRINT', mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 2], ['nullcore', 16], ['juggernaut', 3]], phase: 'TRIPLE THREAT', mod: 'crush' },
+  { groups: [['shielded', 34], ['drone', 32], ['runner', 34], ['file', 44]], mod: 'overclock' },
+  { groups: [['nullcore', 18], ['virus', 2], ['leak', 2], ['drone', 30], ['warden', 1]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['file', 56], ['nullcore', 18], ['drone', 28], ['phantom', 12]], phase: 'GRID LOCK', mod: 'overclock' },
+  { groups: [['shielded', 34], ['nullcore', 18], ['runner', 34], ['juggernaut', 4]], mod: 'crush' },
+  { groups: [['virus', 3], ['leak', 3], ['drone', 32], ['hexbug', 12]], phase: 'SIEGE WALL', mod: 'overclock' },
+  { groups: [['nullcore', 20], ['file', 56], ['glitched', 44], ['warden', 1]], phase: 'DEAD STACK' },
+  { groups: [['runner', 46], ['drone', 34], ['shielded', 30], ['phantom', 12]], phase: 'LAST BREACH', mod: 'overclock' },
+  { groups: [['shielded', 30], ['nullcore', 16], ['warden', 1], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 30], ['juggernaut', 3]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+];
+
 // Per-protocol pressure: Medium compounds HP faster than Easy on top of denser waves.
-const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14 };
+// Hard compounds steeper still — the same network that cleared Medium bleeds by wave 6.
+const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 };
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
-const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES };
+// Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
+// commander all but ends the run (virus 60, leak 80, warden 120, overseer 250).
+const MODE_BOSS_LEAK = { hard: 10 };
+const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES };
 function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
 
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
-const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75 };
+const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75, hexbug: 0.7, juggernaut: 2.2, phantom: 0.8, warden: 3.0 };
 const BASE_MAX = 100;
 
 // --- Foundry rules: free placement + clearance boxes ---------------------------------
@@ -256,6 +304,28 @@ function shapeFor(key, t) {
     add('line', { class: 'e-plate', x1: -7, y1: -7, x2: 7, y2: 7 });
     add('line', { class: 'e-plate', x1: 7, y1: -7, x2: -7, y2: 7 });
     add('circle', { class: 'e-core', r: 3 });
+  } else if (key === 'hexbug') {
+    add('polygon', { class: 'e-ghost', points: hexPoints(0, 0, 13) });
+    add('polygon', { class: 'e-body', points: hexPoints(0, 0, 9) });
+    add('circle', { class: 'e-core', r: 3 });
+  } else if (key === 'juggernaut') {
+    add('rect', { class: 'e-ghost', x: -14, y: -12, width: 28, height: 24 });
+    add('rect', { class: 'e-body', x: -10, y: -8, width: 20, height: 16 });
+    add('line', { class: 'e-plate', x1: -6, y1: 0, x2: 6, y2: 0 });
+    add('rect', { class: 'e-core', x: -3, y: -4, width: 6, height: 8 });
+  } else if (key === 'phantom') {
+    add('circle', { class: 'e-ghost e-ghost-2', r: 11 });
+    add('polygon', { class: 'e-body', points: '0,-9 8,0 0,9 -8,0' });
+    add('circle', { class: 'e-core', r: 2.5 });
+  } else if (key === 'warden') {
+    add('circle', { class: 'e-orbit', r: 24 });
+    add('polygon', { class: 'e-ghost', points: hexPoints(0, 0, 20) });
+    add('polygon', { class: 'e-body', points: hexPoints(0, 0, 16) });
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI / 3) * i;
+      add('line', { class: 'e-plate', x1: Math.cos(a) * 8, y1: Math.sin(a) * 8, x2: Math.cos(a) * 15, y2: Math.sin(a) * 15 });
+    }
+    add('circle', { class: 'e-core', r: 5.5 });
   } else if (key === 'virus') {
     for (let i = 0; i < 8; i++) {
       const a = (Math.PI / 4) * i;
@@ -441,6 +511,9 @@ function spawnSummon(enemy, tower, stained) {
     summon.fy = py;
   }
   g.setAttribute('transform', `translate(${summon.fx.toFixed(1)} ${summon.fy.toFixed(1)})`);
+  const bloom = svgNode('circle', { class: 'fx-ring fx-bloom', cx: summon.fx, cy: summon.fy, r: 6 });
+  state.layers.fx.appendChild(bloom);
+  setTimeout(() => bloom.remove(), 720);
   g.classList.add('spawn-in');
   setTimeout(() => g.classList.remove('spawn-in'), 420);
   state.layers.enemies.appendChild(g);
@@ -511,12 +584,13 @@ function leakEnemy(enemy) {
   enemy.alive = false;
   hideTip(enemy);
   enemy.node.remove();
-  state.baseHp = Math.max(0, state.baseHp - enemy.t.dmg);
+  const leakDmg = Math.round(enemy.t.dmg * (enemy.t.boss ? (MODE_BOSS_LEAK[state.protocol] || 1) : 1));
+  state.baseHp = Math.max(0, state.baseHp - leakDmg);
   board.classList.remove('core-hit');
   void board.offsetWidth;
   board.classList.add('core-hit');
   setTimeout(() => board.classList.remove('core-hit'), 550);
-  floatText(...corePos(), `-${enemy.t.dmg} CORE`, 'core-float');
+  floatText(...corePos(), `-${leakDmg} CORE`, 'core-float');
   updateHud();
   if (enemy.t.boss) updateBossBar();
   if (state.baseHp <= 0 && state.mode === 'waves') endMission(false);
@@ -549,6 +623,45 @@ function fxRing(x, y, cls) {
   const ring = svgNode('circle', { class: `fx-ring ${cls}`, cx: x, cy: y, r: 6 });
   state.layers.fx.appendChild(ring);
   setTimeout(() => ring.remove(), 650);
+}
+
+// Cinematic Nuclear Fall Out impact: white-out flash over the whole board +
+// twin expanding shockwave rings + the lingering fallout pool.
+function fxNukeBlast(x, y) {
+  const flash = document.createElement('div');
+  flash.className = 'nuke-flash';
+  battlefield.appendChild(flash);
+  setTimeout(() => flash.remove(), 900);
+  for (const [cls, delay] of [['fx-nuke-ring', 0], ['fx-nuke-ring slow', 150]]) {
+    setTimeout(() => {
+      const ring = svgNode('circle', { class: `fx-ring ${cls}`, cx: x, cy: y, r: 10 });
+      state.layers.fx.appendChild(ring);
+      setTimeout(() => ring.remove(), 1400);
+    }, delay);
+  }
+  fxRing(x, y, 'fx-ring-red');
+}
+
+// Blood Purge: crimson shockwave swells to the full curse radius.
+function fxPurgeBlast(tower) {
+  const ring = svgNode('circle', { class: 'fx-ring fx-purge-ring', cx: tower.x, cy: tower.y, r: 8 });
+  state.layers.fx.appendChild(ring);
+  setTimeout(() => ring.remove(), 950);
+  fxRing(tower.x, tower.y, 'fx-ring-virus');
+}
+
+// Blood Scream: screen-edge crimson vignette + every enraged summon shudders.
+function fxScreamBlast(tower, buffed) {
+  const vignette = document.createElement('div');
+  vignette.className = 'scream-vignette';
+  battlefield.appendChild(vignette);
+  setTimeout(() => vignette.remove(), 1100);
+  for (const summon of state.enemies) {
+    if (!summon.alive || !summon.friendly) continue;
+    summon.node.classList.add('screamed-flash');
+    setTimeout(() => summon.node.classList.remove('screamed-flash'), 900);
+  }
+  fxRing(tower.x, tower.y, 'fx-ring-virus');
 }
 
 function floatText(x, y, text, cls) {
@@ -612,6 +725,28 @@ function moveEnemy(enemy, dt) {
     enemy.pulseTimer -= dt;
     if (enemy.pulseTimer <= 0) { enemy.pulseTimer = 8; fxRing(...posOf(enemy), 'fx-ring-virus'); }
   }
+  if (enemy.t.regen && enemy.hp < enemy.maxHp) {
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * enemy.t.regen * dt);
+    paintBars(enemy);
+  }
+  if (enemy.t.blink) {
+    enemy.blinkTimer = (enemy.blinkTimer === undefined ? enemy.t.blink.every : enemy.blinkTimer) - dt;
+    if (enemy.blinkTimer <= 0) {
+      enemy.blinkTimer = enemy.t.blink.every;
+      fxRing(...posOf(enemy), 'fx-ring-phantom');
+      enemy.dist += enemy.t.blink.jump;
+    }
+  }
+  if (enemy.t.boss && enemy.key === 'warden' && !enemy.stormed && enemy.hp <= enemy.maxHp * 0.6) {
+    enemy.stormed = true;
+    const lane = state.samplers[enemy.pathIdx];
+    fxRing(...posOf(enemy), 'fx-ring-amber');
+    for (let i = 0; i < 4; i++) {
+      const spawn = spawnEnemy('hexbug', enemy.pathIdx);
+      spawn.dist = Math.min(lane.len - 8, Math.max(0, enemy.dist - 18 + i * 9));
+    }
+    banner('FIREWALL WARDEN', '// PACKET STORM — HEX CRAWLERS SPILLED', 'banner-red');
+  }
   enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
   enemy.dist += enemy.speed * haste * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
   const sampler = state.samplers[enemy.pathIdx];
@@ -657,10 +792,15 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
-    const bonus = 30 + (state.waveIndex + 1) * 7 + rigYield;
+    const hardMult = state.protocol === 'hard' ? 1.15 : 1; // hard pays slightly better per wave — torture needs funding
+    const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
     state.earned += bonus;
     const cleared = state.waveIndex + 1;
+    if (window.CBZPerks && CBZPerks.has('fieldrep') && state.baseHp < BASE_MAX) {
+      state.baseHp = Math.min(BASE_MAX, state.baseHp + 2);
+      floatText(...corePos(), '+2 FIELD REPAIRS', 'repair-float');
+    }
     if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
@@ -750,7 +890,7 @@ function ensureHud() {
     btn.hidden = true;
     btn.addEventListener('click', () => {
       const rig = readyRig();
-      if (!rig) return;
+      if (!rig) { playSound('alarm'); showToast('Nuclear strike needs the rig at Tier 6 — Nuclear Fall Out.'); return; }
       if (state.nukeAim) { setNukeAim(false); return; }
       if ((rig.nukeCd || 0) > 0) { playSound('alarm'); showToast(`Nuke recharging — ${Math.ceil(rig.nukeCd)}s left.`); return; }
       if (state.cash < NUKE_COST) { playSound('alarm'); showToast(`Need $${NUKE_COST} salvage to call the nuke.`); return; }
@@ -819,14 +959,20 @@ function setNukeAim(on) {
 }
 
 function paintNukeButton() {
-  const rig = readyRig();
   if (!state.nukeBtn) return;
+  const rig = state.towers.find((tower) => tower.id === 'zeroday') || null;
+  const armed = readyRig();
   state.nukeBtn.hidden = !rig;
+  state.nukeBtn.disabled = Boolean(rig) && !armed; // visible the moment a rig deploys — locked until Tier 6
   if (!rig) return;
-  const cd = rig.nukeCd || 0;
-  state.nukeBtn.textContent = state.nukeAim ? 'CLICK TARGET — ESC CANCELS' : cd > 0 ? `NUKE ${Math.ceil(cd)}s` : `NUKE READY — $${NUKE_COST}`;
+  const cd = armed ? (armed.nukeCd || 0) : 0;
+  state.nukeBtn.textContent = state.nukeAim ? 'CLICK TARGET — ESC CANCELS'
+    : !armed ? 'NUKE — RIG TIER 6 REQUIRED'
+    : cd > 0 ? `NUKE ${Math.ceil(cd)}s`
+    : `NUKE READY — $${NUKE_COST}`;
   state.nukeBtn.classList.toggle('on', state.nukeAim);
   state.nukeBtn.classList.toggle('cd', cd > 0 && !state.nukeAim);
+  state.nukeBtn.classList.toggle('lock', Boolean(rig) && !armed);
 }
 
 function fireNuke(x, y) {
@@ -845,7 +991,7 @@ function fireNuke(x, y) {
   const node = svgNode('circle', { class: 'fx-waste', cx: x, cy: y, r: WASTE_RADIUS });
   state.layers.fx.appendChild(node);
   state.wasteZones.push({ x, y, r: WASTE_RADIUS, until: state.clock + WASTE_SECONDS, node });
-  fxRing(x, y, 'fx-ring-red');
+  fxNukeBlast(x, y);
   floatText(x, y - NUKE_RADIUS - 20, 'NUCLEAR FALL OUT', 'core-float');
   playSound('alarm');
   updateHud();
@@ -864,7 +1010,7 @@ function bloodPurge(tower) {
     if (Math.hypot(px - tower.x, py - tower.y) <= rng) { damageEnemy(enemy, lust, { src: 'purge' }); hits += 1; }
   }
   tower.lust = 0;
-  fxRing(tower.x, tower.y, 'fx-ring-virus');
+  fxPurgeBlast(tower);
   floatText(tower.x, tower.y - 52, `BLOOD PURGE — ${lust} DMG`, 'lust-float');
   playSound();
   openTowerPanel(tower);
@@ -885,7 +1031,7 @@ function bloodScream(tower) {
     buffed += 1;
   }
   tower.screamCd = 200;
-  fxRing(tower.x, tower.y, 'fx-ring-virus');
+  fxScreamBlast(tower, buffed);
   banner('BLOOD SCREAM', buffed ? `// ${buffed} SUMMONS ENRAGED — 2x HP · +150% SPEED` : '// NO SUMMONS ON THE FIELD', 'banner-red');
   playSound();
   openTowerPanel(tower);
@@ -968,7 +1114,7 @@ function banner(title, sub, cls) {
 const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
-  { id: 'hard', label: 'HARD', sub: 'DUAL LANE SIEGE', ready: false },
+  { id: 'hard', label: 'HARD', sub: '30 WAVES // NEW HOSTILES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
 ];
@@ -1018,7 +1164,7 @@ function startMission(map, skipVote = false, forcedProtocol = null) {
   // Flat point cloud of every lane — placement checks + drone spawn gates use it.
   state.trackPts = state.samplers.flatMap((sampler) => sampler.pts);
   prepMechanics(map, state.samplers);
-  state.cash = debugCash || START_SALVAGE;
+  state.cash = (debugCash || START_SALVAGE) + (window.CBZPerks && CBZPerks.has('deeppockets') ? 150 : 0);
   state.baseHp = BASE_MAX;
   state.enemies = [];
   state.towers = [];
@@ -1454,6 +1600,7 @@ function buyTrack(tower) {
   if (state.cash < tier.cost) { playSound('alarm'); showToast(`Need $${tier.cost} salvage for ${tier.label}.`); return; }
   state.cash -= tier.cost;
   tower.lvl = lvl + 1;
+  if (tower.id === 'zeroday' && tower.lvl >= 6) { showToast('NUCLEAR FALL OUT ARMED — the rig can call the strike.'); playSound('alarm'); }
   paintTowerRange(tower);
   floatText(tower.x, tower.y - 42, `${tier.label} ONLINE`, 'up-float');
   fxRing(tower.x, tower.y, 'fx-ring-white');
@@ -1578,6 +1725,9 @@ function updateTowers(dt) {
           if (pool.length) {
             const target = pool[Math.floor(Math.random() * pool.length)];
             const [tx, ty] = posOf(target);
+            const burst = svgNode('circle', { class: 'fx-ring fx-veins-burst', cx: tx, cy: ty, r: 6 });
+            state.layers.fx.appendChild(burst);
+            setTimeout(() => burst.remove(), 620);
             fxRing(tx, ty, 'fx-ring-virus');
             for (const enemy of pool) {
               const [px, py] = posOf(enemy);
@@ -1591,8 +1741,9 @@ function updateTowers(dt) {
   }
   paintNukeButton();
   // Fire control.
+  const overclockMult = window.CBZPerks && CBZPerks.has('overclock') ? 1.05 : 1;
   for (const tower of state.towers) {
-    const rate = effStats(tower).rate * tower.boost;
+    const rate = effStats(tower).rate * tower.boost * overclockMult;
     if (rate <= 0) continue;
     tower.cd -= dt;
     if (tower.cd > 0) continue;

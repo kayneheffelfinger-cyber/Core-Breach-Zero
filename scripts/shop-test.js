@@ -119,6 +119,16 @@ async function api(path, payload) {
     const bogusWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'easy', map: 'notamap' });
     check('unknown map win does not touch mapWins', bogusWin.data.profile.mapWins['notamap:easy'] === undefined, JSON.stringify(bogusWin.data.profile.mapWins));
 
+    // HARD protocol payouts + HARDLINE achievement + perk multipliers (post-unlock).
+    const hardWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'hard', map: 'easy' });
+    check('hard win nc = (20*12 + 5*15 + 150) * 1.1 salvage perk = 512', hardWin.data.rewards.nc === 512, JSON.stringify(hardWin.data.rewards));
+    check('hard win xp = 20*18 + 5*50 + 200 = 810', hardWin.data.rewards.xp === 810, `xp=${hardWin.data.rewards.xp}`);
+    check('HARDLINE unlocked on first hard win', Array.isArray(hardWin.data.unlocked) && hardWin.data.unlocked.includes('hardline'), JSON.stringify(hardWin.data.unlocked));
+    check('mapWins easy:hard recorded', hardWin.data.profile.mapWins['easy:hard'] === 1, JSON.stringify(hardWin.data.profile.mapWins));
+    check('spirebreaker/grandslam still locked after one easy-map hard win', hardWin.data.profile.achievements.spirebreaker === false && hardWin.data.profile.achievements.grandslam === false, JSON.stringify(hardWin.data.profile.achievements));
+    const hardLoss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
+    check('hard loss nc = (10*12 + 2*15) * 1.1 = 165 (salvage perk now live)', hardLoss.data.rewards.nc === 165, JSON.stringify(hardLoss.data.rewards));
+
     // Salvage codes — /api/redeem grants once per commander account per code.
     const sealed = await api('/api/profile', { token });
     const beforeNc = sealed.data.profile.nc;
@@ -182,9 +192,9 @@ async function api(path, payload) {
     const rigNc = rigWallet.data.profile.nc;
     const rigBt = rigWallet.data.profile.bt;
     const rig = await api('/api/shop/purchase', { token, itemId: 'zeroday' });
-    check('zeroday purchase deducts 3000 NC + 20 BT (L15 gate open)', rig.data.ok && rig.data.profile.owned.includes('zeroday') && rig.data.profile.nc === rigNc - 3000 && rig.data.profile.bt === rigBt - 20, JSON.stringify(rig.data));
+    check('zeroday purchase deducts 3600 NC + 30 BT (L15 gate open)', rig.data.ok && rig.data.profile.owned.includes('zeroday') && rig.data.profile.nc === rigNc - 3600 && rig.data.profile.bt === rigBt - 30, JSON.stringify(rig.data));
     const blossom = await api('/api/shop/purchase', { token, itemId: 'corpseblossom' });
-    check('corpseblossom purchase deducts 6666 NC + 666 BT (L20 gate open)', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3000 - 6666 && blossom.data.profile.bt === rigBt - 20 - 666, JSON.stringify(blossom.data));
+    check('corpseblossom purchase deducts 7777 NC + 777 BT (L20 gate open)', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3600 - 7777 && blossom.data.profile.bt === rigBt - 30 - 777, JSON.stringify(blossom.data));
     const quint = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     check('5-bay unique loadout accepted', quint.data.ok && quint.data.profile.loadout.length === 5, JSON.stringify(quint.data));
     const sept = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper', 'zeroday', 'corpseblossom'] });
@@ -200,8 +210,8 @@ async function api(path, payload) {
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes, repeatable skips ledger)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
-    check('persisted achievement overdrive', p.achievements && p.achievements.overdrive === true, JSON.stringify(p.achievements));
-    check('persisted mapWins spire ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2, JSON.stringify(p.mapWins));
+    check('persisted achievement overdrive + hardline', p.achievements && p.achievements.overdrive === true && p.achievements.hardline === true, JSON.stringify(p.achievements));
+    check('persisted mapWins spire + hard ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2 && p.mapWins['easy:hard'] === 1, JSON.stringify(p.mapWins));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }
