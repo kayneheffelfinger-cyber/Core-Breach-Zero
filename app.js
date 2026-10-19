@@ -94,6 +94,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000 }, // admin test grant — heavy wallet + XP
 };
 
 // --- Achievements & perks -------------------------------------------------------
@@ -347,10 +348,20 @@ const LOCAL = (() => {
       account.meta.redeemed.push(code);
       account.meta.nc += grant.nc;
       account.meta.bt += grant.bt;
+      const meta = account.meta;
+      const before = meta.level;
+      if (grant.xp) {
+        meta.xp += grant.xp;
+        while (meta.level < MAX_LEVEL && meta.xp >= xpToNext(meta.level)) {
+          meta.xp -= xpToNext(meta.level);
+          meta.level += 1;
+        }
+        if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
+      }
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, granted: { nc: grant.nc, bt: grant.bt }, profile: profilePayload(account) };
+      return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(account) };
     }
     throw new Error('Unknown API endpoint.');
   }
@@ -1673,6 +1684,8 @@ function renderSettingsPanel(item) {
       const parts = [];
       if (granted.nc) parts.push(`+${Number(granted.nc).toLocaleString('en-US')} NC`);
       if (granted.bt) parts.push(`+${granted.bt} BT`);
+      if (granted.xp) parts.push(`+${Number(granted.xp).toLocaleString('en-US')} XP`);
+      if (granted.levelsGained) parts.push(`LEVEL UP +${granted.levelsGained}`);
       const amount = parts.join(' / ') || 'NOTHING?!';
       showToast(`SALVAGE CODE ${code} — ${amount} INJECTED`);
       paintStatus(`CODE ACCEPTED — ${amount}.`, false);

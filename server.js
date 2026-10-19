@@ -72,6 +72,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000 }, // admin test grant — heavy wallet + XP
 };
 
 function profilePayload(account) {
@@ -278,8 +279,17 @@ async function handleApi(request, response, pathname) {
     meta.redeemed.push(code);
     meta.nc += grant.nc;
     meta.bt += grant.bt;
+    const before = meta.level;
+    if (grant.xp) {
+      meta.xp += grant.xp;
+      while (meta.level < MAX_LEVEL && meta.xp >= xpToNext(meta.level)) {
+        meta.xp -= xpToNext(meta.level);
+        meta.level += 1;
+      }
+      if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
+    }
     saveAccounts();
-    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt }, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
   }
 
   return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });

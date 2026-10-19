@@ -138,6 +138,18 @@ async function api(path, payload) {
     const zeroday = await api('/api/redeem', { token, code: 'zeroday' });
     check('ZERODAY (lowercase) grants +5000 NC +500 BT', zeroday.data.ok && zeroday.data.profile.nc === beforeNc + 10500 && zeroday.data.profile.bt === beforeBt + 675, JSON.stringify(zeroday.data));
 
+    // ADMINLOG101011 — admin test grant: 10000 NC + 1000 BT + 5000 XP (level-up loop applies).
+    const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
+    let expLevel = sealed.data.profile.level;
+    let expXp = sealed.data.profile.xp + 5000;
+    while (expLevel < 30 && expXp >= xpToNext(expLevel)) { expXp -= xpToNext(expLevel); expLevel += 1; }
+    if (expLevel >= 30) expXp = Math.min(expXp, xpToNext(30));
+    const adminlog = await api('/api/redeem', { token, code: 'adminlog101011' });
+    check('ADMINLOG101011 (lowercase) grants +10000 NC +1000 BT +5000 XP', adminlog.data.ok && adminlog.data.profile.nc === beforeNc + 20500 && adminlog.data.profile.bt === beforeBt + 1675 && adminlog.data.granted.xp === 5000, JSON.stringify(adminlog.data));
+    check('ADMINLOG101011 level-up loop matches simulation', adminlog.data.profile.level === expLevel && adminlog.data.profile.xp === expXp && adminlog.data.granted.levelsGained === expLevel - sealed.data.profile.level, JSON.stringify(adminlog.data));
+    const dupeAdmin = await api('/api/redeem', { token, code: 'ADMINLOG101011' });
+    check('second ADMINLOG101011 rejected 409', dupeAdmin.status === 409, JSON.stringify(dupeAdmin.data));
+
     // Shotgunner — clearance level 3 gate + dual-currency 800 NC + 10 BT.
     const freshreg = await api('/api/register', { name: 'SHOPCMDR2', email: 'shop2@test.io', passcode: 'test1234' });
     let freshToken = freshreg.data.token;
@@ -153,6 +165,8 @@ async function api(path, payload) {
     check('level-15 clearance gate blocks fresh account 403', freshBuyRig.status === 403, JSON.stringify(freshBuyRig.data));
     const freshBuyBlossom = await api('/api/shop/purchase', { token: freshToken, itemId: 'corpseblossom' });
     check('level-20 clearance gate blocks fresh account 403', freshBuyBlossom.status === 403, JSON.stringify(freshBuyBlossom.data));
+    const freshAdmin = await api('/api/redeem', { token: freshToken, code: 'ADMINLOG101011' });
+    check('ADMINLOG101011 on fresh account jumps past L10', freshAdmin.data.ok && freshAdmin.data.profile.level >= 10 && freshAdmin.data.granted.levelsGained >= 10 && freshAdmin.data.profile.nc === 750 + 10000, JSON.stringify(freshAdmin.data));
     const rich = await api('/api/profile', { token });
     const sgBeforeNc = rich.data.profile.nc;
     const sgBeforeBt = rich.data.profile.bt;
@@ -181,7 +195,7 @@ async function api(path, payload) {
     check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper') && p.owned.includes('zeroday') && p.owned.includes('corpseblossom'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
-    check('persisted redeemed ledger (4 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
+    check('persisted redeemed ledger (5 codes)', Array.isArray(p.redeemed) && p.redeemed.length === 5, JSON.stringify(p.redeemed));
     check('persisted achievement overdrive', p.achievements && p.achievements.overdrive === true, JSON.stringify(p.achievements));
     check('persisted mapWins spire ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2, JSON.stringify(p.mapWins));
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
