@@ -804,3 +804,18 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 /* Peer-net health line in the bay browser */
 .lobby-state.net-ok { color: #a5d58b; }
 .lobby-state.net-bad { color: #ff8a96; border: 1px solid rgba(255,77,94,.4); padding: 8px 12px; }
+
+/* Update log panel (PATCH RECORDS) */
+.log-list { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.log-entry { border: 1px solid #26383d; background: rgba(6,12,15,.65); padding: 12px 14px; }
+.log-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.log-version { color: var(--cyan); font: 700 15px var(--display); letter-spacing: 1px; }
+.log-tag { color: var(--muted); font: 10px var(--mono); letter-spacing: 1px; }
+.log-items { margin: 8px 0 0; padding-left: 2px; list-style: none; display: grid; gap: 7px; }
+.log-items li { color: #b8c6bf; font: 12px/1.55 var(--body); }
+.log-kind { display: inline-block; min-width: 46px; margin-right: 9px; padding: 1px 6px; font: 700 10px var(--mono); letter-spacing: 1px; border: 1px solid currentColor; }
+.log-new { color: var(--green); }
+.log-fix { color: var(--amber); }
+.log-net { color: var(--cyan); }
+.log-fx { color: var(--violet); }
+.log-econ { color: var(--amber); }

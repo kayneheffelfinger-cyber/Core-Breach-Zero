@@ -8,16 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261020a">
+  <link rel="stylesheet" href="styles.css?v=20261021a">
   <!-- PeerJS powers the peer-net room relay on static hosts (GitHub Pages): the
        room lead's browser becomes the authority over WebRTC data channels. The
        library is VENDORED locally so a blocked or flaky CDN can never kill
        cross-device multiplayer again; the bays degrade to same-browser tab
        linking only if this file itself fails to load. -->
-  <script src="assets/vendor/peerjs.min.js?v=20261020a" defer></script>
-  <script src="app.js?v=20261020a" defer></script>
-  <script src="combat.js?v=20261020a" defer></script>
-  <script src="shop.js?v=20261020a" defer></script>
+  <script src="assets/vendor/peerjs.min.js?v=20261021a" defer></script>
+  <script src="assets/vendor/mqtt.min.js?v=20261021a" defer></script>
+  <script src="app.js?v=20261021a" defer></script>
+  <script src="combat.js?v=20261021a" defer></script>
+  <script src="shop.js?v=20261021a" defer></script>
 </head>
 <body>
   <div class="auth-overlay" id="auth-overlay">
@@ -74,17 +75,20 @@
             <span class="menu-icon green" aria-hidden="true">＋</span><span class="menu-copy"><strong>NEXUS SHOP</strong><small>Turret blueprints, Nexus Coins &amp; Breach Tokens</small></span><span class="menu-arrow">›</span>
           </button>
           <button class="menu-item" type="button" data-menu="settings">
-            <span class="menu-icon white" aria-hidden="true">⚙</span><span class="menu-copy"><strong>SETTINGS &amp; LOGS</strong><small>Audio controls, network port &amp; lore archives</small></span><span class="menu-arrow">›</span>
+            <span class="menu-icon white" aria-hidden="true">⚙</span><span class="menu-copy"><strong>SETTINGS &amp; LOGS</strong><small>Audio controls, salvage codes &amp; network config</small></span><span class="menu-arrow">›</span>
+          </button>
+          <button class="menu-item" type="button" data-menu="changelog">
+            <span class="menu-icon amber" aria-hidden="true">▤</span><span class="menu-copy"><strong>UPDATE LOG</strong><small>Every deployment to the grid, newest first</small></span><span class="menu-arrow">›</span>
           </button>
         </nav>
-        <div class="home-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE</span><span>BUILD 0.9.4-ALPHA</span></div>
+        <div class="home-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE</span><span>BUILD 2026.10.21 // RELAY NET</span></div>
       </section>
 
       <aside class="intel-panel" aria-live="polite">
         <div class="panel-head"><span><i class="crosshair">+</i> TACTICAL PREVIEW</span><span class="tag" id="preview-tag">DEPLOYMENT</span></div>
         <div class="sector-art" aria-hidden="true"><div class="art-orbit"></div><div class="art-core">09</div><span class="art-coordinate">SECTOR 09 // REACTOR CHAMBER</span><span class="art-warning">BREACH ACTIVITY DETECTED</span></div>
         <h2 id="preview-title">PLAY MENU</h2>
-        <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Combat protocols: EASY (20 waves) and MEDIUM (25 waves) with boss encounters and base defense.</p>
+        <p class="preview-copy" id="preview-desc">Recon flyovers of all five battle maps are live. Combat protocols: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of torture) with boss encounters and base defense.</p>
         <div class="intel-stats" id="preview-stats">
           <div><span>MAP RECON</span><b>5 SECTORS</b></div>
           <div><span>ROOMS</span><b>4 BAYS // UP TO 4</b></div>
@@ -93,7 +97,7 @@
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
       </aside>
     </main>
-    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>MAP RECON ONLINE // EASY + MEDIUM + HARD MODES LIVE // NEXUS SHOP LIVE</span></footer>
+    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>PEER NET + RELAY NET LIVE // EASY + MEDIUM + HARD MODES // NEXUS SHOP LIVE</span></footer>
   </div>
 
   <div class="battlefield" id="battlefield" hidden>

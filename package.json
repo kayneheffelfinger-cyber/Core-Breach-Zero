@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "mqtt": "^5.16.1"
   }
 }

@@ -13,6 +13,62 @@ let authMode = 'login';
 document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
+// --- Update log: every deployment to the grid, newest first ----------------------
+const BUILD = '2026.10.21';
+const UPDATE_LOG = [
+  {
+    version: '2026.10.21', tag: 'RELAY NET',
+    items: [
+      ['NEW', 'RELAY NET fallback — bays auto-fall back to a public relay grid when peer-to-peer cannot punch through (dorm, hotel, hotspot and CGNAT networks). Multiplayer now works for everyone, not just easy NATs.'],
+      ['NEW', 'This UPDATE LOG panel — every deployment to the grid, newest first.'],
+      ['NET', 'Dead TURN relays removed from the ICE ladder; Cloudflare STUN added for faster peer discovery. The bays view now shows which net lanes are live.'],
+    ],
+  },
+  {
+    version: '2026.10.20', tag: 'LOADOUT + CLASSIFIED',
+    items: [
+      ['NEW', 'Perk loadout — equip at most 2 perks at a time from the earned pool (TOWER & PERKS panel).'],
+      ['NEW', 'CORPSE BLOSSOM is now CLASSIFIED — visible and purchasable by the site admin only.'],
+      ['FIX', 'Upgrade panels clamp to the screen and scroll when they would run off the edge.'],
+      ['FIX', 'Sniper purchase flow — the shortfall toast names the exact missing currency and the confirm step no longer expires mid-click.'],
+      ['NET', 'PeerJS vendored into the site — a flaky CDN can never break multiplayer again.'],
+    ],
+  },
+  {
+    version: '2026.10.19', tag: 'HARD PROTOCOL',
+    items: [
+      ['NEW', 'HARD combat protocol — 30 waves of torture with boss breaches that deal x10 core damage.'],
+      ['NEW', '4 new hostiles: HEXBUG (regenerates), JUGGERNAUT (armored), PHANTOM (blinks), FIREWALL WARDEN (shield boss + packet storm).'],
+      ['NEW', '5 achievements (hardline, ironcommander, spirebreaker, grandslam, apexpredator) + 5 perks with real combat effects.'],
+      ['FIX', 'Nuke button visible the moment a Zero Day Rig is placed (locked until Tier 6).'],
+      ['FX', 'Nuke blast, Blood Purge/Scream, Veins burst and summon bloom effects.'],
+      ['ECON', 'Zero Day-Exploit Rig 3,600 NC / 30 BT — Corpse Blossom 7,777 NC / 777 BT.'],
+    ],
+  },
+  {
+    version: '2026.10.18', tag: 'SALVAGE CODES',
+    items: [
+      ['NEW', 'ADMINLOG101011 salvage code — +10,000 NC / +1,000 BT / +5,000 XP, repeatable.'],
+      ['FIX', 'Cache-busting on every asset — deploys always serve fresh code, no more stale menus.'],
+    ],
+  },
+  {
+    version: '2026.10.17', tag: 'EXPANSION',
+    items: [
+      ['NEW', 'ZERO DAY-EXPLOIT RIG — wave-income economy with an aimable nuclear at Tier 6.'],
+      ['NEW', 'CORPSE BLOSSOM — kills feed its blood lust; purge and scream to command the risen.'],
+      ['NEW', 'MEDIUM protocol extended to 30 waves + room combat-protocol picker (per-room EASY/MEDIUM/HARD).'],
+    ],
+  },
+  {
+    version: '2026.10.16', tag: 'FOUNDATION',
+    items: [
+      ['NEW', 'MEDIUM combat protocol, skill matrix (perks + achievements) and the OVERDRIVE 2x perk.'],
+      ['FIX', 'Easy-mode boss relief + cheaper Sentinel tiers + tower decals.'],
+    ],
+  },
+];
+
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
@@ -46,6 +102,11 @@ const menus = {
     tag: 'SYSTEM CONFIG', title: 'SETTINGS & LOGS',
     description: 'The mission server is live. Choose a port with the PORT environment variable. Commander accounts (name + email) persist in accounts.json beside the server.',
     stats: [['MENU SERVER', `PORT ${port}`], ['ROOM SIZE', 'UP TO 4 COMMANDERS'], ['ACCOUNT LEDGER', 'ACTIVE']],
+  },
+  changelog: {
+    tag: 'PATCH RECORDS', title: 'UPDATE LOG',
+    description: 'Every deployment to the Core Breach grid, newest first. The grid keeps receipts.',
+    stats: [['ENTRIES', `${UPDATE_LOG.length}`], ['LATEST', UPDATE_LOG[0].version], ['BUILD', BUILD]],
   },
 };
 
@@ -634,6 +695,7 @@ function openMenu(key) {
   else if (key === 'shop') renderNexusShop();
   else if (key === 'perks') renderPerksMenu(item);
   else if (key === 'settings') renderSettingsPanel(item);
+  else if (key === 'changelog') renderUpdateLog(item);
   else renderDetails(item);
   dialog.showModal();
 }
@@ -1006,17 +1068,27 @@ const P2P_ROOMS = (() => {
   const VIEW_TTL = 30000;  // scanned snapshots expire, like server room lists
   const CHAT_HISTORY = 50;
 
-  // ICE ladder: Google STUN for ordinary NATs + OpenRelay TURN as the fallback
-  // path for symmetric NAT / CGNAT players whom STUN alone can never link.
-  // A dead TURN server costs nothing — ICE simply skips unreachable relays.
+  // Relay lane: public MQTT brokers over WSS. WebRTC cannot punch symmetric
+  // NAT / CGNAT (every free TURN relay on the open grid is dead — verified
+  // 2026-10-21), so when the peer link fails the bay keeps running through
+  // the relay: plain outbound TCP, identical room protocol, per-seat
+  // adapters. P2P stays primary; the relay is the safety net that makes
+  // cross-device multiplayer work for EVERYONE, not just easy NATs.
+  const RELAY_URLS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+  const FORCE_RELAY = /[?&]cbzrelay\b/.test(location.search); // QA hook: skip P2P, ride the relay lane
+  const STATE_PUB_MS = 3000;   // bay heartbeat on the relay (drives guest scans)
+  const RELAY_SYNC_MS = 240;   // coop sync throttle per relay seat (~4Hz)
+  const RELAY_JOIN_MS = 14000; // relay handshake window
+
+  // ICE ladder: Google STUN + Cloudflare STUN for ordinary NATs. Every free
+  // public TURN relay is dead (OpenRelay/AnyFirewall verified dead 2026-10-21),
+  // so hard-NAT players no longer try a doomed relay hop — the relay LANE
+  // below carries them instead, which no NAT can block (outbound TCP).
   const PEER_CONFIG = {
     debug: 0,
     config: {
       iceServers: [
-        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] },
       ],
       iceCandidatePoolSize: 2,
     },
@@ -1025,7 +1097,16 @@ const P2P_ROOMS = (() => {
   let clientPeer = null;   // random-id peer: bay scans + guest links ride on it
   let hubPeer = null;      // bay-id peer claimed while hosting a bay
   let clientReady = false;
-  let broken = false;      // broker unusable this session — degrade to LOCAL_ROOMS
+  let p2pBroken = false;     // PeerJS lane unusable this session (broker dead)
+  let relayDead = false;     // mqtt lib missing — relay lane impossible
+  let relay = null;          // {client} — shared public-broker connection
+  let relayReady = false;    // broker session live right now
+  const cid = Math.random().toString(36).slice(2, 10); // per-tab relay identity
+  let relayIdx = 0;          // RELAY_URLS cursor across reconnect cycles
+  let relayTries = 0;        // failed connect cycles on the current URL
+  const relayHandlers = new Map(); // topic -> handler(message)
+  let relayWatching = false; // subscribed to the four bay state topics
+  let stateTimer = 0;        // host bay heartbeat interval
   let callsign = '';
   let myBay = null;        // HOST: {id, name, map, started, launchId, players:[{callsign, conn}]}
   let guestLink = null;    // GUEST: {id, conn, room}
@@ -1039,12 +1120,20 @@ const P2P_ROOMS = (() => {
 
   const peerId = (bay) => `${NS}-${HOST_KEY}-${bay}`;
   const bayName = (bay) => (BAYS.find(([id]) => id === bay) || [bay, bay])[1];
-  const usable = () => !broken && typeof window.Peer === 'function';
+  const p2pUsable = () => !p2pBroken && typeof window.Peer === 'function';
+  const relayUsable = () => !relayDead && typeof window.mqtt === 'object' && Boolean(window.mqtt) && typeof window.mqtt.connect === 'function';
+  const usable = () => p2pUsable() || relayUsable();
   const inRoom = () => Boolean(myBay || guestLink);
   const guestConns = () => (myBay ? myBay.players.slice(1).map((player) => player.conn) : []);
 
   function send(conn, message) {
-    try { if (conn && conn.open) conn.send(JSON.stringify(message)); } catch { /* link already gone. */ }
+    if (!conn || !conn.open) return;
+    try {
+      // Relay seats are adapters that take the raw object and publish it
+      // addressed; peer seats speak JSON over the data channel.
+      if (conn.lane === 'mqtt') conn.send(message);
+      else conn.send(JSON.stringify(message));
+    } catch { /* link already gone. */ }
   }
 
   function closeConn(conn) { try { if (conn) conn.close(); } catch { /* ignore. */ } }
@@ -1068,7 +1157,7 @@ const P2P_ROOMS = (() => {
     try {
       clientPeer = new window.Peer(PEER_CONFIG);
     } catch {
-      broken = true;
+      p2pBroken = true;
       return null;
     }
     clientPeer.on('open', () => {
@@ -1095,7 +1184,7 @@ const P2P_ROOMS = (() => {
         return;
       }
       if (type === 'browser-incompatible' || type === 'server-error' || type === 'socket-error') {
-        broken = true;
+        p2pBroken = true;
         paintBays();
       }
     });
@@ -1120,7 +1209,7 @@ const P2P_ROOMS = (() => {
   // bays browser is on screen — probes fired before the broker handshake
   // finishes are dropped, so the tick retries until real results land.
   function scan(force) {
-    if (!usable() || myBay || guestLink) return;
+    if (!p2pUsable() || myBay || guestLink) return;
     const peer = ensureClient();
     if (!peer) return;
     const now = Date.now();
@@ -1176,7 +1265,7 @@ const P2P_ROOMS = (() => {
     if (wired) {
       // Re-arm the peer net each time the play menu wakes up — a broker hiccup
       // or a dead Wi-Fi moment must never permanently disable multiplayer.
-      if (broken && !myBay && !guestLink) broken = false;
+      if (p2pBroken && !myBay && !guestLink) p2pBroken = false;
       return;
     }
     wired = true;
@@ -1185,13 +1274,16 @@ const P2P_ROOMS = (() => {
     // so every guest link closes immediately, exactly like the server would.
     const dropBay = () => {
       if (hubPeer) { try { hubPeer.destroy(); } catch { /* ignore */ } hubPeer = null; }
+      if (myBay) relayDropBay(myBay.id);
     };
     window.addEventListener('pagehide', dropBay);
     window.addEventListener('beforeunload', dropBay);
     ensureClient();
+    if (relayUsable()) ensureRelay();
     // Bay scan heartbeat: only acts while the bays browser is on screen.
     setInterval(() => {
       if (dialog.open && showingBays && !currentRoom && usable()) scan();
+      relayWatch(dialog.open && showingBays && !currentRoom && !myBay && !guestLink);
     }, 1200);
     // Seat keepalive: WebRTC fires no timely close when a tab dies (consent
     // expiry can lag 30s+), so both ends ping every 5s and sweep silent links.
@@ -1241,6 +1333,7 @@ const P2P_ROOMS = (() => {
   function enterBay(bay) {
     if (!BAYS.some(([id]) => id === bay)) return handleServiceMessage({ type: 'error', message: 'Room not found.' });
     if (myBay || guestLink) return handleServiceMessage({ type: 'error', message: 'Leave your current room before switching.' });
+    if (FORCE_RELAY) return joinRelay(bay); // QA hook: exercise the relay lane directly
     claim(bay, 0);
   }
 
@@ -1249,7 +1342,7 @@ const P2P_ROOMS = (() => {
   // way, ENTER ROOM lands you inside the bay.
   function claim(bay, attempt) {
     let peer;
-    try { peer = new window.Peer(peerId(bay), PEER_CONFIG); } catch { broken = true; return; }
+    try { peer = new window.Peer(peerId(bay), PEER_CONFIG); } catch { p2pBroken = true; return; }
     let settled = false;
     let timer = 0;
     const settle = (fn) => {
@@ -1260,16 +1353,18 @@ const P2P_ROOMS = (() => {
     };
     timer = setTimeout(() => settle(() => {
       try { peer.destroy(); } catch { /* ignore */ }
-      // The broker never answered: ONE retry (brokers hiccup) before degrading
-      // so the bays fall back to tab linking.
+      // The broker never answered: ONE retry (brokers hiccup) before the peer
+      // lane is marked dead and the relay lane takes over hosting.
       if (attempt < 1) { scan(true); claim(bay, attempt + 1); return; }
-      broken = true;
+      p2pBroken = true;
+      if (relayUsable()) { mqttHost(bay); return; }
       handleServiceMessage({ type: 'error', message: 'PEER NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
     }), CLAIM_MS);
     peer.on('open', () => settle(() => {
       hubPeer = peer;
       myBay = { id: bay, name: bayName(bay), map: null, protocol: null, started: false, launchId: null, players: [{ callsign, conn: null, lastSeen: Date.now() }] };
       wireHub(peer);
+      relayServeBay(bay); // dual-home the bay: relay guests can scan + join too
       handleServiceMessage({ type: 'joined', you: callsign, room: hostSnapshot() });
     }));
     peer.on('error', (error) => {
@@ -1304,6 +1399,9 @@ const P2P_ROOMS = (() => {
       if (settled) return;
       finish();
       closeConn(conn);
+      // Peer link never opened (typical hard-NAT outcome): fall through to the
+      // relay lane instead of dead-ending with an error.
+      if (relayUsable()) { joinRelay(bay); return; }
       handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
     }, LINK_MS);
     conn.on('open', () => send(conn, { type: 'join', callsign }));
@@ -1335,7 +1433,7 @@ const P2P_ROOMS = (() => {
       if (attempt < 2) claim(bay, attempt + 1);
       else handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
     });
-    conn.on('error', () => { if (!settled) { finish(); closeConn(conn); } });
+    conn.on('error', () => { if (!settled) { finish(); closeConn(conn); if (relayUsable()) joinRelay(bay); } });
   }
 
   // Everything a linked guest can receive once the handshake is done. Same
@@ -1366,6 +1464,211 @@ const P2P_ROOMS = (() => {
       setStatus('ROOM SERVICE ONLINE');
       if (dialog.open) renderBays();
     }
+  }
+
+  // --- Relay lane: public MQTT brokers over WSS --------------------------------
+  // Same room protocol, different pipe. Host adapters live inside
+  // myBay.players like any peer seat, so hubMessage/pushRoomUpdate/
+  // startMission all run unmodified for relay guests.
+  const relayTopic = (bay, kind) => `cbz0/${HOST_KEY}/${bay}/${kind}`;
+
+  function ensureRelay() {
+    if (relay) return relay;
+    const lib = window.mqtt;
+    if (!lib || typeof lib.connect !== 'function') { relayDead = true; return null; }
+    try {
+      const client = lib.connect(RELAY_URLS[relayIdx], {
+        clientId: `cbz-${cid}-${Math.random().toString(36).slice(2, 6)}`,
+        clean: true,
+        connectTimeout: 8000,
+        reconnectPeriod: 6000,
+        keepalive: 30,
+      });
+      client.on('connect', () => {
+        relayReady = true;
+        relayTries = 0;
+        // Re-arm every subscription this session owns (fresh broker session).
+        for (const topic of relayHandlers.keys()) { try { client.subscribe(topic); } catch { /* retried on next watch tick */ } }
+        paintBays();
+      });
+      client.on('close', () => { relayReady = false; });
+      client.on('error', () => { /* mqtt.js keeps retrying; relayPub no-ops while down */ });
+      client.on('message', (topic, raw) => {
+        const handler = relayHandlers.get(topic);
+        if (!handler) return;
+        let message;
+        try { message = JSON.parse(raw.toString()); } catch { return; }
+        handler(message);
+      });
+      relay = { client };
+      // Cycle URLs when this broker stays unreachable (2 failed cycles = swap).
+      setInterval(() => {
+        if (!relay || relay.client.connected || relay.client.disconnecting) return;
+        relayTries += 1;
+        if (relayTries < 2) return;
+        relayTries = 0;
+        relayIdx = (relayIdx + 1) % RELAY_URLS.length;
+        try { relay.client.end(true); } catch { /* ignore */ }
+        relay = null;
+        relayWatching = false;
+      }, 12000);
+    } catch {
+      relayDead = true;
+      relay = null;
+    }
+    return relay;
+  }
+
+  function relaySub(topic, handler) {
+    const r = ensureRelay();
+    if (!r) return;
+    relayHandlers.set(topic, handler);
+    try { if (r.client.connected) r.client.subscribe(topic); } catch { /* re-armed on connect */ }
+  }
+
+  function relayUnsub(topic) {
+    relayHandlers.delete(topic);
+    try { if (relay && relay.client.connected) relay.client.unsubscribe(topic); } catch { /* ignore */ }
+  }
+
+  function relayPub(topic, message) {
+    const r = ensureRelay();
+    if (!r || !r.client.connected) return;
+    try { r.client.publish(topic, JSON.stringify(message)); } catch { /* link blip; next tick re-sends */ }
+  }
+
+  // Bay discovery over the relay: while the bays browser is on screen we
+  // subscribe to every bay's state heartbeat. Live-only (no retained
+  // messages) — a dead room lead's bay simply goes quiet and drops out.
+  function relayWatch(open) {
+    if (!relayUsable()) { if (relayWatching) dropWatch(); return; }
+    if (open && !relayWatching) {
+      relayWatching = true;
+      for (const [bay] of BAYS) {
+        relaySub(relayTopic(bay, 'state'), (message) => {
+          if (myBay || guestLink) return;
+          if (message && message.offline) { views.delete(bay); paintBays(); return; }
+          if (message && message.id === bay) { views.set(bay, { room: message, seen: Date.now() }); paintBays(); }
+        });
+      }
+      paintBays();
+    } else if (!open && relayWatching) dropWatch();
+  }
+
+  function dropWatch() {
+    relayWatching = false;
+    for (const [bay] of BAYS) relayUnsub(relayTopic(bay, 'state'));
+  }
+
+  // HOST: serve one bay over the relay — guest joins ride the up topic, every
+  // reply is addressed back through the down topic, and the bay heartbeat
+  // publishes on the state topic so relay scanners can find the room.
+  function relayServeBay(bay) {
+    const up = relayTopic(bay, 'up');
+    const dn = relayTopic(bay, 'dn');
+    relaySub(up, (message) => {
+      if (!myBay || myBay.id !== bay || !message || typeof message.cid !== 'string') return;
+      if (message.type === 'join') { mqttGuestJoin(bay, message); return; }
+      const seat = myBay.players.find((player) => player.conn && player.conn.lane === 'mqtt' && player.conn.cid === message.cid);
+      if (seat) hubMessage(seat.conn, message);
+    });
+    clearInterval(stateTimer);
+    stateTimer = setInterval(() => {
+      if (myBay && myBay.id === bay) relayPub(relayTopic(bay, 'state'), hostSnapshot());
+    }, STATE_PUB_MS);
+  }
+
+  function relayDropBay(bay) {
+    clearInterval(stateTimer);
+    stateTimer = 0;
+    relayPub(relayTopic(bay, 'state'), { offline: true });
+    relayUnsub(relayTopic(bay, 'up'));
+    relayUnsub(relayTopic(bay, 'state'));
+  }
+
+  function mqttGuestJoin(bay, message) {
+    if (!myBay || myBay.id !== bay) return;
+    const dn = relayTopic(bay, 'dn');
+    // Duplicate knocks (public-broker latency) must never spawn phantom seats.
+    const existing = myBay.players.find((player) => player.conn && player.conn.lane === 'mqtt' && player.conn.cid === message.cid);
+    if (existing) return send(existing.conn, { type: 'joined', you: existing.callsign, room: hostSnapshot(), chat: chatLog });
+    const seat = {
+      lane: 'mqtt',
+      cid: message.cid,
+      open: true,
+      lastSeen: Date.now(),
+      send: (reply) => relayPub(dn, { ...reply, to: message.cid }),
+      close: () => { try { relayPub(dn, { to: message.cid, type: 'error', message: 'ROOM LEAD CLOSED THE BAY.' }); } catch { /* ignore */ } },
+    };
+    hubMessage(seat, { type: 'join', callsign: message.callsign });
+  }
+
+  // HOST fallback: the peer broker never answered, so hold the bay purely on
+  // the relay. Scanners on either lane still find it; guests join via relay.
+  function mqttHost(bay) {
+    if (myBay || guestLink) return;
+    if (!relayUsable()) return handleServiceMessage({ type: 'error', message: 'PEER NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
+    myBay = { id: bay, name: bayName(bay), map: null, protocol: null, started: false, launchId: null, players: [{ callsign, conn: null, lastSeen: Date.now() }] };
+    relayServeBay(bay);
+    handleServiceMessage({ type: 'joined', you: callsign, room: hostSnapshot() });
+  }
+
+  // GUEST relay link: subscribe the bay's down topic, knock on the up topic
+  // until the lead answers. Once joined, the SAME link carries the full room
+  // protocol (room updates, launch, chat, coop sync) — adapters keep the
+  // runtime code lane-agnostic.
+  function joinRelay(bay) {
+    if (myBay || guestLink) return;
+    if (!relayUsable()) return handleServiceMessage({ type: 'error', message: 'RELAY NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
+    const up = relayTopic(bay, 'up');
+    const dn = relayTopic(bay, 'dn');
+    let settled = false;
+    let knocks = 0;
+    const link = {
+      lane: 'mqtt',
+      open: true,
+      send: (message) => relayPub(up, { ...message, cid }),
+      close: () => {
+        try { relayPub(up, { type: 'leave', cid }); } catch { /* ignore */ }
+        relayUnsub(dn);
+      },
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      clearInterval(knock);
+      relayUnsub(dn);
+      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+    }, RELAY_JOIN_MS);
+    const knock = setInterval(() => {
+      if (settled || knocks > 10) return;
+      knocks += 1;
+      relayPub(up, { type: 'join', callsign, cid });
+    }, 1400);
+    relaySub(dn, (message) => {
+      if (!message || (message.to && message.to !== cid)) return;
+      if (!settled) {
+        if (message.type === 'joined') {
+          settled = true;
+          clearTimeout(timer);
+          clearInterval(knock);
+          guestLink = { id: bay, lane: 'mqtt', conn: link, room: message.room };
+          callsign = message.you || callsign;
+          lastPong = Date.now();
+          handleServiceMessage({ type: 'joined', you: callsign, room: message.room });
+          if (Array.isArray(message.chat)) message.chat.forEach(appendChat);
+        } else if (message.type === 'error') {
+          settled = true;
+          clearTimeout(timer);
+          clearInterval(knock);
+          relayUnsub(dn);
+          handleServiceMessage({ type: 'error', message: message.message });
+        }
+        return;
+      }
+      if (guestLink && guestLink.conn === link) guestMessages(link, message);
+    });
+    relayPub(up, { type: 'join', callsign, cid });
   }
 
   function wireHub(peer) {
@@ -1486,6 +1789,7 @@ const P2P_ROOMS = (() => {
       for (const conn of guestConns()) send(conn, { type: 'error', message: 'ROOM LEAD CLOSED THE BAY.' });
       try { hubPeer.destroy(); } catch { /* ignore */ }
       hubPeer = null;
+      relayDropBay(myBay.id);
       myBay = null;
     }
   }
@@ -1495,8 +1799,15 @@ const P2P_ROOMS = (() => {
   function relayOut(kind, data) {
     if (myBay && myBay.started) {
       if (kind !== 'sync' && kind !== 'over') return;
-      const payload = JSON.stringify({ type: 'coop', kind, data, from: callsign });
-      for (const conn of guestConns()) { try { if (conn.open) conn.send(payload); } catch { /* ignore */ } }
+      const now = Date.now();
+      for (const conn of guestConns()) {
+        // Relay seats ride a public broker: throttle snapshot spam to ~4Hz.
+        if (conn.lane === 'mqtt') {
+          if (kind === 'sync' && now - (conn.lastSync || 0) < RELAY_SYNC_MS) continue;
+          conn.lastSync = now;
+        }
+        send(conn, { type: 'coop', kind, data, from: callsign });
+      }
       return;
     }
     if (guestLink && guestLink.conn) send(guestLink.conn, { type: 'coop', kind, data, from: callsign });
@@ -1527,7 +1838,7 @@ const P2P_ROOMS = (() => {
     };
   }
 
-  return { usable, wake, handle, snapshots, scan, role, inRoom, bridge, chat };
+  return { usable, p2pUsable, relayUsable, wake, handle, snapshots, scan, role, inRoom, bridge, chat };
 })();
 
 function sendToService(message) {
@@ -1607,9 +1918,13 @@ function renderBays() {
     return;
   }
   const netLine = LOCAL.down()
-    ? (P2P_ROOMS.usable()
-      ? '<p class="lobby-state net-ok">PEER NET ONLINE // COMMANDERS LINK UP ACROSS THE OPEN GRID</p>'
-      : '<p class="lobby-state net-bad">PEER NET OFFLINE // BAYS LINK TABS ON THIS MACHINE ONLY — REOPEN THE PLAY MENU TO RETRY THE GRID</p>')
+    ? (P2P_ROOMS.p2pUsable() && P2P_ROOMS.relayUsable()
+      ? '<p class="lobby-state net-ok">PEER NET ONLINE // RELAY NET ARMED — EVERY COMMANDER GETS IN, EVEN BEHIND STUBBORN NATS</p>'
+      : P2P_ROOMS.p2pUsable()
+        ? '<p class="lobby-state net-ok">PEER NET ONLINE // COMMANDERS LINK UP ACROSS THE OPEN GRID</p>'
+        : P2P_ROOMS.relayUsable()
+          ? '<p class="lobby-state net-ok">RELAY NET ONLINE // LINKING THROUGH THE PUBLIC RELAY GRID</p>'
+          : '<p class="lobby-state net-bad">NET OFFLINE // BAYS LINK TABS ON THIS MACHINE ONLY — REOPEN THE PLAY MENU TO RETRY THE GRID</p>')
     : '';
   body.innerHTML = `
     <p class="dialog-copy">Enter an open room for up to four commanders. Choose a map, wait for at least one teammate, and let the room lead start when ready.</p>
@@ -1841,6 +2156,16 @@ function renderDetails(item) {
 }
 
 // Settings & Logs carries one interactive extra: salvage-code redemption.
+function renderUpdateLog(item) {
+  body.innerHTML = `
+    <p class="dialog-copy">${escapeHtml(item.description)}</p>
+    <div class="log-list">${UPDATE_LOG.map((entry) => `
+      <article class="log-entry">
+        <header class="log-head"><span class="log-version">v${escapeHtml(entry.version)}</span><span class="log-tag">// ${escapeHtml(entry.tag)}</span></header>
+        <ul class="log-items">${entry.items.map(([kind, text]) => `<li><b class="log-kind log-${escapeHtml(kind.toLowerCase())}">${escapeHtml(kind)}</b>${escapeHtml(text)}</li>`).join('')}</ul>
+      </article>`).join('')}</div>`;
+}
+
 function renderSettingsPanel(item) {
   body.innerHTML = `<p class="dialog-copy">${escapeHtml(item.description)}</p><div class="detail-list">${item.stats.map(([label, value]) => `<div class="detail-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`).join('')}</div>
     <div class="redeem-block">
