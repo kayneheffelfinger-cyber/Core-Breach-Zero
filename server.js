@@ -40,8 +40,16 @@ const SHOP = {
   shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
   sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
   zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
-  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed' },
+  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed', adminOnly: true },
 };
+
+// Admin surface: accounts flagged by redeeming the admin key code (ADMINLOG101011)
+// or listed here by exact name. Admins see/purchase CLASSIFIED blueprints.
+const ADMIN_NAMES = new Set(['JACKSONLOOMIS-COMMITS']);
+function isAdmin(name) {
+  const account = accounts[name];
+  return Boolean(account && (account.meta.admin || ADMIN_NAMES.has(String(name).toUpperCase())));
+}
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
   medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
@@ -65,13 +73,38 @@ function achievementsFrom(mapWins) {
 }
 
 function defaultMeta() {
-  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {} };
+  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [] };
+}
+
+// Perk loadout: id -> achievement that decrypts it. Mirrored in app.js LOCAL.
+const PERK_ACH = {
+  overdrive: 'overdrive',
+  salvage: 'hardline',
+  deeppockets: 'ironcommander',
+  fieldrep: 'spirebreaker',
+  bounty: 'grandslam',
+  overclock: 'apexpredator',
+};
+
+// Enforce access rules on a meta: perk-slot default + CLASSIFIED ownership strip.
+// Non-admins never hold the Corpse Blossom — it was yanked from general issue.
+function sanitizeMeta(name) {
+  const account = accounts[name];
+  if (!account) return;
+  const meta = account.meta;
+  if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
+  if (!isAdmin(name)) {
+    if (Array.isArray(meta.owned) && meta.owned.includes('corpseblossom')) meta.owned = meta.owned.filter((id) => id !== 'corpseblossom');
+    if (Array.isArray(meta.loadout) && meta.loadout.includes('corpseblossom')) meta.loadout = meta.loadout.filter((id) => id !== 'corpseblossom');
+  }
 }
 
 // Grant legacy accounts the Nexus wallet without touching their credentials.
-for (const account of Object.values(accounts)) {
-  account.meta = { ...defaultMeta(), ...(account.meta && typeof account.meta === 'object' ? account.meta : {}) };
+for (const name of Object.keys(accounts)) {
+  accounts[name].meta = { ...defaultMeta(), ...(accounts[name].meta && typeof accounts[name].meta === 'object' ? accounts[name].meta : {}) };
+  sanitizeMeta(name);
 }
+saveAccounts();
 
 // Salvage codes — redeemable once per commander account, in SETTINGS & LOGS.
 const REDEEM_CODES = {
@@ -79,12 +112,13 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
-  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true }, // admin test grant — heavy wallet + XP, redeemable unlimited times
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true }, // admin key — heavy wallet + XP + CLASSIFIED clearance, repeatable
 };
 
 function profilePayload(account) {
   const meta = account.meta;
-  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins) };
+  sanitizeMeta(account.name);
+  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins), equippedPerks: meta.equippedPerks || [], admin: isAdmin(account.name) };
 }
 
 function saveAccounts() {
@@ -196,6 +230,7 @@ async function handleApi(request, response, pathname) {
     const itemId = String(body.itemId || '');
     const item = SHOP[itemId];
     if (!item) return sendJson(response, 404, { ok: false, error: 'Unknown blueprint.' });
+    if (item.adminOnly && !isAdmin(name)) return sendJson(response, 404, { ok: false, error: 'Unknown blueprint.' }); // CLASSIFIED — admins only
     const meta = accounts[name].meta;
     if (meta.owned.includes(itemId)) return sendJson(response, 409, { ok: false, error: 'Blueprint already in your armory.' });
     if (meta.level < item.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
@@ -257,11 +292,11 @@ async function handleApi(request, response, pathname) {
       meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
     }
     const afterAch = achievementsFrom(meta.mapWins);
-    // Perk multipliers — post-unlock: the win that decrypts a perk already
-    // benefits from it. SALVAGE PROTOCOL perk (hardline ach) = +10% NC;
-    // BOUNTY HUNTER perk (grandslam ach) = +25% commander bounty NC.
-    if (afterAch.hardline) nc = Math.round(nc * 1.1);
-    if (afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
+    // Perk multipliers — perk loadout is explicit: only EQUIPPED perks (max 2)
+    // run. SALVAGE PROTOCOL = +10% NC; BOUNTY HUNTER = +25% commander bounty NC.
+    const equipped = Array.isArray(meta.equippedPerks) ? meta.equippedPerks : [];
+    if (equipped.includes('salvage') && afterAch.hardline) nc = Math.round(nc * 1.1);
+    if (equipped.includes('bounty') && afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
     const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
     const before = meta.level;
     meta.nc += nc;
@@ -293,6 +328,7 @@ async function handleApi(request, response, pathname) {
     }
     meta.nc += grant.nc;
     meta.bt += grant.bt;
+    if (grant.admin) meta.admin = true; // admin key codes promote the commander permanently
     const before = meta.level;
     if (grant.xp) {
       meta.xp += grant.xp;
@@ -304,6 +340,27 @@ async function handleApi(request, response, pathname) {
     }
     saveAccounts();
     return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
+  }
+
+  // Perk loadout — two tactical slots, server-validated against earned achievements.
+  if (pathname === '/api/perks' && request.method === 'POST') {
+    const body = await readBody(request);
+    const name = sessionName(body ? String(body.token || '') : '');
+    if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
+    const meta = accounts[name].meta;
+    const list = Array.isArray(body.perks) ? body.perks.map((id) => String(id || '')) : null;
+    if (!list) return sendJson(response, 400, { ok: false, error: 'Perk payload must be a list of perk ids.' });
+    const clean = [...new Set(list)].filter(Boolean);
+    if (clean.length > 2) return sendJson(response, 400, { ok: false, error: 'Only two perk slots are wired into the mission HUD — unequip one first.' });
+    const ach = achievementsFrom(meta.mapWins);
+    for (const id of clean) {
+      const achId = PERK_ACH[id];
+      if (!achId) return sendJson(response, 404, { ok: false, error: 'Unknown perk protocol.' });
+      if (!ach[achId]) return sendJson(response, 403, { ok: false, error: 'That perk is still encrypted — earn its achievement first.' });
+    }
+    meta.equippedPerks = clean;
+    saveAccounts();
+    return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
   }
 
   return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });

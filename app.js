@@ -94,7 +94,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
-  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true }, // admin test grant — heavy wallet + XP, redeemable unlimited times
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true }, // admin key — wallet + XP + CLASSIFIED clearance, repeatable
 };
 
 // --- Achievements & perks -------------------------------------------------------
@@ -192,7 +192,10 @@ window.CBZPerks = {
     if (!perk) return false;
     const shop = window.CBZShop;
     const profile = shop && shop.profile ? shop.profile() : null;
-    return Boolean(profile && profile.achievements && profile.achievements[perk.ach]);
+    if (!profile || !profile.achievements || !profile.achievements[perk.ach]) return false;
+    // Perk loadout is explicit: only EQUIPPED perks (max 2) run in missions.
+    const equipped = profile.equippedPerks;
+    return Array.isArray(equipped) ? equipped.includes(id) : false;
   },
 };
 
@@ -212,7 +215,7 @@ const LOCAL = (() => {
     shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
     sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
     zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
-    corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed' },
+    corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed', adminOnly: true },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -229,7 +232,29 @@ const LOCAL = (() => {
   }
   const readAccounts = () => readJson(ACCOUNTS_KEY, {});
   const readSessions = () => readJson(SESSIONS_KEY, {});
-  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {} });
+  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [] });
+
+  // Mirror of server.js PERK_ACH + admin surface — keep in sync.
+  const PERK_ACH = {
+    overdrive: 'overdrive',
+    salvage: 'hardline',
+    deeppockets: 'ironcommander',
+    fieldrep: 'spirebreaker',
+    bounty: 'grandslam',
+    overclock: 'apexpredator',
+  };
+  const ADMIN_NAMES = new Set(['JACKSONLOOMIS-COMMITS']);
+  const isAdminName = (name) => ADMIN_NAMES.has(String(name || '').toUpperCase());
+  // Enforce access rules on a LOCAL meta: perk-slot default + CLASSIFIED strip.
+  function sanitizeMeta(account) {
+    if (!account || !account.meta) return;
+    const meta = account.meta;
+    if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
+    if (!isAdminName(account.name)) {
+      if (Array.isArray(meta.owned) && meta.owned.includes('corpseblossom')) meta.owned = meta.owned.filter((id) => id !== 'corpseblossom');
+      if (Array.isArray(meta.loadout) && meta.loadout.includes('corpseblossom')) meta.loadout = meta.loadout.filter((id) => id !== 'corpseblossom');
+    }
+  }
 
   function randomHex(bytes) {
     const array = new Uint8Array(bytes);
@@ -279,7 +304,8 @@ const LOCAL = (() => {
 
   function profilePayload(account) {
     const meta = account.meta;
-    return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins) };
+    sanitizeMeta(account);
+    return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins), equippedPerks: meta.equippedPerks || [], admin: Boolean(meta.admin) || isAdminName(account.name) };
   }
 
   function requireAccount(body) {
@@ -329,6 +355,7 @@ const LOCAL = (() => {
       const account = requireAccount(body);
       const item = SHOP[String(body.itemId || '')];
       if (!item) throw new Error('Unknown blueprint.');
+      if (item.adminOnly && !account.meta.admin && !isAdminName(account.name)) throw new Error('Unknown blueprint.'); // CLASSIFIED — admins only
       const meta = account.meta;
       if (meta.owned.includes(String(body.itemId || ''))) throw new Error('Blueprint already in your armory.');
       if (meta.level < item.unlock) throw new Error(`Clearance level ${item.unlock} required.`);
@@ -386,11 +413,11 @@ const LOCAL = (() => {
         meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
       }
       const afterAch = achievementsFrom(meta.mapWins);
-      // Perk multipliers — post-unlock: the win that decrypts a perk already
-      // benefits from it. SALVAGE PROTOCOL perk (hardline ach) = +10% NC;
-      // BOUNTY HUNTER perk (grandslam ach) = +25% commander bounty NC.
-      if (afterAch.hardline) nc = Math.round(nc * 1.1);
-      if (afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
+      // Perk multipliers — perk loadout is explicit: only EQUIPPED perks (max 2)
+      // run. SALVAGE PROTOCOL = +10% NC; BOUNTY HUNTER = +25% commander bounty NC.
+      const equippedPerks = Array.isArray(meta.equippedPerks) ? meta.equippedPerks : [];
+      if (equippedPerks.includes('salvage') && afterAch.hardline) nc = Math.round(nc * 1.1);
+      if (equippedPerks.includes('bounty') && afterAch.grandslam) nc += Math.round(bosses * table.bossNC * 0.25);
       const unlocked = Object.keys(afterAch).filter((id) => afterAch[id] && !beforeAch[id]);
       const before = meta.level;
       meta.nc += nc;
@@ -419,6 +446,7 @@ const LOCAL = (() => {
       }
       account.meta.nc += grant.nc;
       account.meta.bt += grant.bt;
+      if (grant.admin) account.meta.admin = true; // admin key codes promote the commander permanently
       const meta = account.meta;
       const before = meta.level;
       if (grant.xp) {
@@ -433,6 +461,26 @@ const LOCAL = (() => {
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
       return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(account) };
+    }
+    if (path === '/api/perks') {
+      // Perk loadout — two tactical slots, validated against earned achievements.
+      const account = requireAccount(body);
+      const meta = account.meta;
+      const list = Array.isArray(body.perks) ? body.perks.map((id) => String(id || '')) : null;
+      if (!list) throw new Error('Perk payload must be a list of perk ids.');
+      const clean = [...new Set(list)].filter(Boolean);
+      if (clean.length > 2) throw new Error('Only two perk slots are wired into the mission HUD — unequip one first.');
+      const ach = achievementsFrom(meta.mapWins);
+      for (const id of clean) {
+        const achId = PERK_ACH[id];
+        if (!achId) throw new Error('Unknown perk protocol.');
+        if (!ach[achId]) throw new Error('That perk is still encrypted — earn its achievement first.');
+      }
+      meta.equippedPerks = clean;
+      const accounts = readAccounts();
+      accounts[account.name] = account;
+      writeJson(ACCOUNTS_KEY, accounts);
+      return { ok: true, profile: profilePayload(account) };
     }
     throw new Error('Unknown API endpoint.');
   }
@@ -600,6 +648,7 @@ function renderPerksMenu(item) {
     const panel = body.querySelector('#matrix-panel');
     if (!panel) return;
     panel.innerHTML = tab === 'achievements' ? achievementsPanelHtml(achievements, mapWins) : perksPanelHtml(achievements);
+    if (tab !== 'achievements') wirePerkSlots(panel);
   };
   body.innerHTML = `
     <p class="dialog-copy">${escapeHtml(item.description)}</p>
@@ -619,16 +668,25 @@ function renderPerksMenu(item) {
 }
 
 function perksPanelHtml(achievements) {
+  const shop = window.CBZShop;
+  const profile = shop && shop.profile ? shop.profile() : null;
+  const equipped = (profile && Array.isArray(profile.equippedPerks)) ? profile.equippedPerks : [];
   const cards = PERKS.map((perk) => {
     const earned = Boolean(achievements[perk.ach]);
+    const on = earned && equipped.includes(perk.id);
+    const state = on ? 'EQUIPPED' : earned ? 'STANDBY' : 'LOCKED';
+    const action = !earned ? '' : `
+      <button class="perk-slot-btn${on ? ' on' : ''}" type="button" data-perk="${escapeHtml(perk.id)}">${on ? 'UNEQUIP SLOT' : 'EQUIP SLOT'}</button>`;
     return `
-      <article class="perk-card${earned ? ' earned' : ''}">
-        <div class="perk-head"><b>${escapeHtml(perk.name)}</b><span class="perk-state">${earned ? 'ACTIVE' : 'LOCKED'}</span></div>
+      <article class="perk-card${earned ? ' earned' : ''}${on ? ' on' : ''}" data-perk-card="${escapeHtml(perk.id)}">
+        <div class="perk-head"><b>${escapeHtml(perk.name)}</b><span class="perk-state">${state}</span></div>
         <p>${escapeHtml(perk.desc)}</p>
-        <div class="perk-req">${earned ? '>> REQUIREMENT MET — the perk is wired into every mission HUD.' : `>> REQUIREMENT: ${escapeHtml(perk.req)}`}</div>
+        ${action}
+        <div class="perk-req">${on ? '>> WIRED INTO THE MISSION HUD.' : earned ? '>> ON STANDBY — EQUIP INTO ONE OF TWO SLOTS.' : `>> REQUIREMENT: ${escapeHtml(perk.req)}`}</div>
       </article>`;
   }).join('');
   return `
+    <div class="perk-slots-head"><span>// TACTICAL SLOTS</span><b class="perk-slot-count${equipped.length >= 2 ? ' full' : ''}">${equipped.length} / 2 EQUIPPED</b><small>ONLY EQUIPPED PERKS RUN IN MISSIONS — PICK TWO</small></div>
     <div class="perk-grid">
       ${cards}
       <article class="perk-card placeholder">
@@ -636,6 +694,43 @@ function perksPanelHtml(achievements) {
         <p>The skill matrix expands as new achievement records decrypt. Keep clearing sectors.</p>
       </article>
     </div>`;
+}
+
+function wirePerkSlots(panel) {
+  panel.addEventListener('click', async (event) => {
+    const button = event.target.closest('[data-perk]');
+    if (!button) return;
+    const shop = window.CBZShop;
+    const profile = shop && shop.profile ? shop.profile() : null;
+    if (!profile) return;
+    const perkId = button.dataset.perk;
+    const equipped = Array.isArray(profile.equippedPerks) ? profile.equippedPerks.slice() : [];
+    const next = equipped.includes(perkId) ? equipped.filter((id) => id !== perkId) : [...equipped, perkId];
+    if (!equipped.includes(perkId) && equipped.length >= 2) {
+      playSound('alarm');
+      showToast('ONLY TWO PERK SLOTS — UNEQUIP ONE FIRST.');
+      const card = button.closest('.perk-card');
+      if (card) { card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
+      return;
+    }
+    button.disabled = true;
+    try {
+      await shop.setPerks(next);
+      playSound();
+      const count = next.length;
+      showToast(count ? `PERK LOADOUT UPDATED — ${count}/2 SLOTS WIRED.` : 'PERK SLOTS CLEARED.');
+    } catch (error) {
+      playSound('alarm');
+      showToast(String(error.message || 'Perk loadout rejected.').toUpperCase());
+    } finally {
+      const panelNow = body.querySelector('#matrix-panel');
+      if (panelNow) {
+        const achievements = (profile && profile.achievements) || {};
+        panelNow.innerHTML = perksPanelHtml(achievements);
+        wirePerkSlots(panelNow);
+      }
+    }
+  });
 }
 
 function achievementsPanelHtml(achievements, mapWins) {
@@ -904,12 +999,28 @@ const P2P_ROOMS = (() => {
     ['room-04', 'ROOM 04 // DELTA'],
   ];
   const MAX_PLAYERS = 4;
-  const CLAIM_MS = 6000;   // broker registration window for a bay claim
-  const LINK_MS = 6000;    // guest handshake window
+  const CLAIM_MS = 10000;  // broker registration window for a bay claim
+  const LINK_MS = 10000;   // guest handshake window
   const PROBE_MS = 4500;   // bay scan window
   const SCAN_GAP = 2500;   // minimum gap between scans of one bay
   const VIEW_TTL = 30000;  // scanned snapshots expire, like server room lists
   const CHAT_HISTORY = 50;
+
+  // ICE ladder: Google STUN for ordinary NATs + OpenRelay TURN as the fallback
+  // path for symmetric NAT / CGNAT players whom STUN alone can never link.
+  // A dead TURN server costs nothing — ICE simply skips unreachable relays.
+  const PEER_CONFIG = {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+        { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+        { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
+      ],
+      iceCandidatePoolSize: 2,
+    },
+  };
 
   let clientPeer = null;   // random-id peer: bay scans + guest links ride on it
   let hubPeer = null;      // bay-id peer claimed while hosting a bay
@@ -955,7 +1066,7 @@ const P2P_ROOMS = (() => {
     }
     clientReady = false;
     try {
-      clientPeer = new window.Peer({ debug: 0 });
+      clientPeer = new window.Peer(PEER_CONFIG);
     } catch {
       broken = true;
       return null;
@@ -1062,7 +1173,12 @@ const P2P_ROOMS = (() => {
   }
 
   function wake() {
-    if (wired) return;
+    if (wired) {
+      // Re-arm the peer net each time the play menu wakes up — a broker hiccup
+      // or a dead Wi-Fi moment must never permanently disable multiplayer.
+      if (broken && !myBay && !guestLink) broken = false;
+      return;
+    }
     wired = true;
     callsign = (myName || 'COMMANDER').toUpperCase();
     // Dropping the page must free the bay for everyone — destroy the hub peer
@@ -1133,7 +1249,7 @@ const P2P_ROOMS = (() => {
   // way, ENTER ROOM lands you inside the bay.
   function claim(bay, attempt) {
     let peer;
-    try { peer = new window.Peer(peerId(bay), { debug: 0 }); } catch { broken = true; return; }
+    try { peer = new window.Peer(peerId(bay), PEER_CONFIG); } catch { broken = true; return; }
     let settled = false;
     let timer = 0;
     const settle = (fn) => {
@@ -1144,7 +1260,9 @@ const P2P_ROOMS = (() => {
     };
     timer = setTimeout(() => settle(() => {
       try { peer.destroy(); } catch { /* ignore */ }
-      // The broker never answered: degrade so the bays fall back to tab linking.
+      // The broker never answered: ONE retry (brokers hiccup) before degrading
+      // so the bays fall back to tab linking.
+      if (attempt < 1) { scan(true); claim(bay, attempt + 1); return; }
       broken = true;
       handleServiceMessage({ type: 'error', message: 'PEER NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
     }), CLAIM_MS);
@@ -1488,8 +1606,10 @@ function renderBays() {
     document.querySelector('#map-recon').addEventListener('click', renderMapSelect);
     return;
   }
-  const netLine = LOCAL.down() && P2P_ROOMS.usable()
-    ? '<p class="lobby-state">PEER NET ONLINE // COMMANDERS LINK UP ACROSS THE OPEN GRID</p>'
+  const netLine = LOCAL.down()
+    ? (P2P_ROOMS.usable()
+      ? '<p class="lobby-state net-ok">PEER NET ONLINE // COMMANDERS LINK UP ACROSS THE OPEN GRID</p>'
+      : '<p class="lobby-state net-bad">PEER NET OFFLINE // BAYS LINK TABS ON THIS MACHINE ONLY — REOPEN THE PLAY MENU TO RETRY THE GRID</p>')
     : '';
   body.innerHTML = `
     <p class="dialog-copy">Enter an open room for up to four commanders. Choose a map, wait for at least one teammate, and let the room lead start when ready.</p>

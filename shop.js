@@ -82,7 +82,7 @@ window.CBZShop = (() => {
         { label: 'NUCLEAR FALL OUT', cost: 500, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
       ],
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
-    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, price: { nc: 7777, bt: 777 }, cost: 350, currency: 'mixed', limit: 1,
+    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, price: { nc: 7777, bt: 777 }, cost: 350, currency: 'mixed', limit: 1, adminOnly: true,
       tagline: 'Grave warden — anything that dies near it rises and walks the lane backwards.',
       stats: { dmg: 0, rate: 0, rng: 180, summon: 30, tgt: 'SPAWNER // NO ATTACK · ONE PER COMMANDER' },
       special: '>> When anything dies inside its ring, a weakened copy rises and marches back down the track, detonating on the first hostile it touches for damage equal to its hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain.',
@@ -108,7 +108,7 @@ window.CBZShop = (() => {
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
 
-  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {} };
+  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], admin: false };
   const MAX_BAYS = 5;
 
   // Dual-currency prices arrive as { nc, bt }; single-currency as a number.
@@ -155,6 +155,9 @@ window.CBZShop = (() => {
   }
 
   function visibility(entry) {
+    // CLASSIFIED blueprints exist only for flagged admin commanders — everyone
+    // else never sees the card, the counter, or the buy path.
+    if (entry.adminOnly && !profile.admin && !profile.owned.includes(entry.id)) return 'hidden';
     if (profile.owned.includes(entry.id)) return 'owned';
     if (entry.reward && !profile.firstClear) return 'reward-locked';
     if (profile.level >= entry.unlock) return 'buy';
@@ -163,7 +166,7 @@ window.CBZShop = (() => {
   }
 
   function hiddenCount() {
-    return TOWERS.filter((entry) => visibility(entry) === 'hidden').length;
+    return TOWERS.filter((entry) => visibility(entry) === 'hidden' && !(entry.adminOnly && !profile.admin)).length;
   }
 
   // --- Deployment loadout: the blueprints carried into a mission -----------------
@@ -254,6 +257,7 @@ window.CBZShop = (() => {
     }
     const owned = vis === 'owned';
     const affordable = canAfford(entry);
+    const arming = !owned && affordable && armed === entry.id;
     return `
       <article class="tower-card state-${owned ? 'owned' : 'buy'} cat-${entry.cat}" data-id="${entry.id}">
         <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">${owned ? 'DEPLOYED' : `CLEARANCE ${entry.unlock}`}</span></div>
@@ -264,7 +268,7 @@ window.CBZShop = (() => {
         <div class="tc-target">${entry.stats.tgt}</div>
         <p class="tc-special">${entry.special}</p>
         ${trackHtml(entry)}
-        ${owned ? `<button class="tc-equip${profile.loadout.includes(entry.id) ? ' on' : ''}" type="button" data-equip="${entry.id}">${profile.loadout.includes(entry.id) ? 'UNEQUIP FROM LOADOUT' : 'EQUIP TO LOADOUT'}</button>` : `<button class="tc-buy${affordable ? '' : ' cant'}" type="button" data-buy="${entry.id}">${priceLabel(entry)}</button>`}
+        ${owned ? `<button class="tc-equip${profile.loadout.includes(entry.id) ? ' on' : ''}" type="button" data-equip="${entry.id}">${profile.loadout.includes(entry.id) ? 'UNEQUIP FROM LOADOUT' : 'EQUIP TO LOADOUT'}</button>` : `<button class="tc-buy${affordable ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-buy="${entry.id}">${arming ? 'CONFIRM PURCHASE?' : priceLabel(entry)}</button>`}
       </article>`;
   }
 
@@ -345,15 +349,16 @@ window.CBZShop = (() => {
       playSound('alarm');
       const card = button.closest('.tower-card');
       if (card) { card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake'); }
-      showToast('Not enough Nexus Coins / Breach Tokens for that blueprint.');
+      const cost = priceOf(entry);
+      const short = [];
+      if (profile.nc < (cost.nc || 0)) short.push(`${format((cost.nc || 0) - profile.nc)} NC`);
+      if (profile.bt < (cost.bt || 0)) short.push(`${format((cost.bt || 0) - profile.bt)} BT`);
+      showToast(`SHORT ON SALVAGE FOR ${entry.name}: NEED ${short.join(' + ')} MORE. Boss kills, flawless defenses and first clearances pay Breach Tokens.`);
       return;
     }
     if (armed !== entry.id) {
       armed = entry.id;
-      button.classList.add('arm');
-      button.textContent = 'CONFIRM PURCHASE?';
-      clearTimeout(armedTimer);
-      armedTimer = setTimeout(() => { armed = null; repaint(); }, 2600);
+      repaint();
       return;
     }
     clearTimeout(armedTimer);
@@ -391,11 +396,18 @@ window.CBZShop = (() => {
   // Salvage-code redemption — server route + LOCAL mirror share the same contract.
   // Codes validate server-side (and in LOCAL mode) against a one-time-per-commander
   // ledger, so there is no admin surface to abuse.
+  // Perk loadout — persist the two tactical slots through the Nexus link.
+  async function setPerks(perks) {
+    const data = await apiRequest('/api/perks', { token: localStorage.getItem('cbz-token') || '', perks });
+    setProfile(data.profile);
+    return data.profile;
+  }
+
   async function redeemCode(code) {
     const data = await apiRequest('/api/redeem', { token: localStorage.getItem('cbz-token') || '', code });
     setProfile(data.profile);
     return data.granted || null;
   }
 
-  return { render, setProfile, submitMission, redeemCode, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_LEVEL, MAX_BAYS };
+  return { render, setProfile, submitMission, redeemCode, setPerks, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_LEVEL, MAX_BAYS };
 })();

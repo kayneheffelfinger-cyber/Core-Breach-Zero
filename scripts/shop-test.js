@@ -119,15 +119,33 @@ async function api(path, payload) {
     const bogusWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'easy', map: 'notamap' });
     check('unknown map win does not touch mapWins', bogusWin.data.profile.mapWins['notamap:easy'] === undefined, JSON.stringify(bogusWin.data.profile.mapWins));
 
-    // HARD protocol payouts + HARDLINE achievement + perk multipliers (post-unlock).
+    // HARD protocol payouts + HARDLINE achievement. Perk loadout is explicit:
+    // nothing equipped yet, so the fresh HARDLINE win pays NO salvage bonus.
     const hardWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'hard', map: 'easy' });
-    check('hard win nc = (20*12 + 5*15 + 150) * 1.1 salvage perk = 512', hardWin.data.rewards.nc === 512, JSON.stringify(hardWin.data.rewards));
+    check('hard win nc = 20*12 + 5*15 + 150 = 465 (no perks equipped yet)', hardWin.data.rewards.nc === 465, JSON.stringify(hardWin.data.rewards));
     check('hard win xp = 20*18 + 5*50 + 200 = 810', hardWin.data.rewards.xp === 810, `xp=${hardWin.data.rewards.xp}`);
     check('HARDLINE unlocked on first hard win', Array.isArray(hardWin.data.unlocked) && hardWin.data.unlocked.includes('hardline'), JSON.stringify(hardWin.data.unlocked));
     check('mapWins easy:hard recorded', hardWin.data.profile.mapWins['easy:hard'] === 1, JSON.stringify(hardWin.data.profile.mapWins));
     check('spirebreaker/grandslam still locked after one easy-map hard win', hardWin.data.profile.achievements.spirebreaker === false && hardWin.data.profile.achievements.grandslam === false, JSON.stringify(hardWin.data.profile.achievements));
     const hardLoss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
-    check('hard loss nc = (10*12 + 2*15) * 1.1 = 165 (salvage perk now live)', hardLoss.data.rewards.nc === 165, JSON.stringify(hardLoss.data.rewards));
+    check('hard loss nc = 10*12 + 2*15 = 150 (perks off until equipped)', hardLoss.data.rewards.nc === 150, JSON.stringify(hardLoss.data.rewards));
+
+    // Perk loadout — two tactical slots, equip-gated mission payouts.
+    // Commander has HARDLINE (one hard win) + OVERDRIVE (spire easy+medium) by here.
+    const perksBad = await api('/api/perks', { token, perks: ['salvage', 'overdrive', 'deeppockets'] });
+    check('three perk slots rejected 400', perksBad.status === 400, JSON.stringify(perksBad.data));
+    const perksLocked = await api('/api/perks', { token, perks: ['deeppockets'] });
+    check('unearned perk equip rejected 403 (IRONCOMMANDER pending)', perksLocked.status === 403, JSON.stringify(perksLocked.data));
+    const perksNope = await api('/api/perks', { token, perks: ['notaperk'] });
+    check('unknown perk rejected 404', perksNope.status === 404, JSON.stringify(perksNope.data));
+    const perksSet = await api('/api/perks', { token, perks: ['salvage', 'overdrive'] });
+    check('equip salvage + overdrive into 2 slots', perksSet.data.ok && perksSet.data.profile.equippedPerks.length === 2 && perksSet.data.profile.equippedPerks.includes('salvage'), JSON.stringify(perksSet.data));
+    const hardLossPerked = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
+    check('hard loss with SALVAGE equipped = 150 * 1.1 = 165', hardLossPerked.data.rewards.nc === 165, JSON.stringify(hardLossPerked.data.rewards));
+    const perksClear = await api('/api/perks', { token, perks: [] });
+    check('perk slots clear to empty', perksClear.data.ok && perksClear.data.profile.equippedPerks.length === 0, JSON.stringify(perksClear.data));
+    const hardLossBare = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
+    check('hard loss after clearing slots = 150 again', hardLossBare.data.rewards.nc === 150, JSON.stringify(hardLossBare.data.rewards));
 
     // Salvage codes — /api/redeem grants once per commander account per code.
     const sealed = await api('/api/profile', { token });
@@ -160,6 +178,7 @@ async function api(path, payload) {
     const adminlog = await api('/api/redeem', { token, code: 'adminlog101011' });
     check('ADMINLOG101011 (lowercase) grants +10000 NC +1000 BT +5000 XP', adminlog.data.ok && adminlog.data.profile.nc === beforeNc + 20500 && adminlog.data.profile.bt === beforeBt + 1675 && adminlog.data.granted.xp === 5000, JSON.stringify(adminlog.data));
     check('ADMINLOG101011 level-up loop matches simulation', adminlog.data.profile.level === expLevel1 && adminlog.data.profile.xp === expXp1 && adminlog.data.granted.levelsGained === expLevel1 - sealed.data.profile.level, JSON.stringify(adminlog.data));
+    check('ADMINLOG101011 is the admin key — flags profile.admin', adminlog.data.ok && adminlog.data.profile.admin === true, JSON.stringify(adminlog.data.profile));
     const [expLevel2, expXp2] = applyXp(sealed.data.profile.level, sealed.data.profile.xp, 10000);
     const adminlog2 = await api('/api/redeem', { token, code: 'ADMINLOG101011' });
     check('ADMINLOG101011 re-redeemable (repeat grant, no 409)', adminlog2.data.ok && adminlog2.data.profile.nc === beforeNc + 30500 && adminlog2.data.profile.bt === beforeBt + 2675 && adminlog2.data.profile.level === expLevel2 && adminlog2.data.profile.xp === expXp2, JSON.stringify(adminlog2.data));
@@ -177,10 +196,12 @@ async function api(path, payload) {
     check('level-5 clearance gate blocks fresh account 403', freshBuySniper.status === 403, JSON.stringify(freshBuySniper.data));
     const freshBuyRig = await api('/api/shop/purchase', { token: freshToken, itemId: 'zeroday' });
     check('level-15 clearance gate blocks fresh account 403', freshBuyRig.status === 403, JSON.stringify(freshBuyRig.data));
+    // CLASSIFIED blueprint: fresh non-admin account gets a flat 404 — the grid
+    // pretends the Corpse Blossom does not exist. Admin log comes further below.
     const freshBuyBlossom = await api('/api/shop/purchase', { token: freshToken, itemId: 'corpseblossom' });
-    check('level-20 clearance gate blocks fresh account 403', freshBuyBlossom.status === 403, JSON.stringify(freshBuyBlossom.data));
+    check('CLASSIFIED blossom: non-admin flat 404 (no leak)', freshBuyBlossom.status === 404, JSON.stringify(freshBuyBlossom.data));
     const freshAdmin = await api('/api/redeem', { token: freshToken, code: 'ADMINLOG101011' });
-    check('ADMINLOG101011 on fresh account jumps past L10', freshAdmin.data.ok && freshAdmin.data.profile.level >= 10 && freshAdmin.data.granted.levelsGained >= 10 && freshAdmin.data.profile.nc === 750 + 10000, JSON.stringify(freshAdmin.data));
+    check('ADMINLOG101011 on fresh account jumps past L10 + flags admin', freshAdmin.data.ok && freshAdmin.data.profile.level >= 10 && freshAdmin.data.granted.levelsGained >= 10 && freshAdmin.data.profile.nc === 750 + 10000 && freshAdmin.data.profile.admin === true, JSON.stringify(freshAdmin.data));
     const rich = await api('/api/profile', { token });
     const sgBeforeNc = rich.data.profile.nc;
     const sgBeforeBt = rich.data.profile.bt;
@@ -194,7 +215,16 @@ async function api(path, payload) {
     const rig = await api('/api/shop/purchase', { token, itemId: 'zeroday' });
     check('zeroday purchase deducts 3600 NC + 30 BT (L15 gate open)', rig.data.ok && rig.data.profile.owned.includes('zeroday') && rig.data.profile.nc === rigNc - 3600 && rig.data.profile.bt === rigBt - 30, JSON.stringify(rig.data));
     const blossom = await api('/api/shop/purchase', { token, itemId: 'corpseblossom' });
-    check('corpseblossom purchase deducts 7777 NC + 777 BT (L20 gate open)', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3600 - 7777 && blossom.data.profile.bt === rigBt - 30 - 777, JSON.stringify(blossom.data));
+    check('blossom purchase (admin key flag) deducts 7777 NC + 777 BT', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3600 - 7777 && blossom.data.profile.bt === rigBt - 30 - 777, JSON.stringify(blossom.data));
+    // Non-admin who never touched the admin key: registered clean, still blocked.
+    const civreg = await api('/api/register', { name: 'SHOPCIVILIAN', email: 'civ@test.io', passcode: 'test1234' });
+    const civToken = civreg.data.token;
+    const civAdminFlag = await api('/api/profile', { token: civToken });
+    check('civilian profile.admin stays false', civAdminFlag.data.ok && civAdminFlag.data.profile.admin === false, JSON.stringify(civAdminFlag.data));
+    const civBlossom = await api('/api/shop/purchase', { token: civToken, itemId: 'corpseblossom' });
+    check('civilian blossom purchase blocked 404', civBlossom.status === 404, JSON.stringify(civBlossom.data));
+    const civPerks = await api('/api/perks', { token: civToken, perks: ['salvage'] });
+    check('civilian perk equip without HARDLINE rejected 403', civPerks.status === 403, JSON.stringify(civPerks.data));
     const quint = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     check('5-bay unique loadout accepted', quint.data.ok && quint.data.profile.loadout.length === 5, JSON.stringify(quint.data));
     const sept = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper', 'zeroday', 'corpseblossom'] });

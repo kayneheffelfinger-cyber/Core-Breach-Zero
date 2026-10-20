@@ -511,7 +511,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .tw-ghost.bad .tw-ghost-note { fill: #ff8a96; }
 .tw-ghost.bad .tw-ghost-reason { fill: #ff8a96; }
 /* Tower intel panel */
-.tower-panel { --twc: var(--cyan); position: fixed; z-index: 14; width: 224px; padding: 12px 13px 11px; border: 1px solid var(--line); border-left: 3px solid var(--twc); background: rgba(9,16,20,.97); box-shadow: 0 14px 50px #000c; animation: panel-pop .16s ease-out; }
+.tower-panel { --twc: var(--cyan); position: fixed; z-index: 14; width: 224px; max-height: calc(100vh - 20px); overflow-y: auto; overscroll-behavior: contain; padding: 12px 13px 11px; border: 1px solid var(--line); border-left: 3px solid var(--twc); background: rgba(9,16,20,.97); box-shadow: 0 14px 50px #000c; animation: panel-pop .16s ease-out; scrollbar-width: thin; }
 .tower-panel.tw-control { --twc: var(--violet); }
 .tower-panel.tw-support { --twc: var(--green); }
 .tower-panel.tw-special { --twc: var(--amber); }
@@ -686,6 +686,18 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .perk-state { padding: 3px 8px; border: 1px solid rgba(255,77,94,.5); color: #ff8a96; font: 9px var(--mono); letter-spacing: 1.5px; white-space: nowrap; }
 .perk-card.earned .perk-state { border-color: rgba(165,213,139,.6); color: #a5d58b; }
 .perk-req { color: var(--amber); font: 9.5px/1.5 var(--mono); letter-spacing: .5px; }
+.perk-slots-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 12px; border: 1px solid rgba(255,190,68,.4); background: rgba(255,190,68,.05); }
+.perk-slots-head span { color: var(--amber); font: 9px var(--mono); letter-spacing: 2px; }
+.perk-slots-head b { color: var(--text); font: 700 13px var(--display); }
+.perk-slots-head b.full { color: var(--amber); }
+.perk-slots-head small { color: var(--muted); font: 9px var(--mono); letter-spacing: 1px; }
+.perk-card.on { border-color: rgba(255,190,68,.7); background: rgba(255,190,68,.06); }
+.perk-card.on .perk-state { border-color: rgba(255,190,68,.7); color: var(--amber); }
+.perk-card.shake { animation: card-shake .3s ease-out; }
+.perk-slot-btn { width: 100%; padding: 8px 10px; margin-bottom: 8px; border: 1px solid rgba(165,213,139,.55); background: rgba(165,213,139,.08); color: #a5d58b; font: 700 10px var(--mono); letter-spacing: 1.5px; cursor: pointer; transition: background .15s, color .15s; }
+.perk-slot-btn:hover { background: rgba(165,213,139,.18); }
+.perk-slot-btn.on { border-color: rgba(255,190,68,.7); background: rgba(255,190,68,.1); color: var(--amber); }
+.perk-slot-btn:disabled { opacity: .55; cursor: wait; }
 .ach-list { display: grid; gap: 12px; }
 .ach-card { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--line); background: var(--panel); }
 .ach-card.earned { border-color: rgba(165,213,139,.55); background: rgba(165,213,139,.05); }
@@ -788,3 +800,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 /* Nuke button locked state — visible but gated until the rig hits Tier 6 */
 .nuke-toggle.lock { opacity: .55; border-color: rgba(255,110,130,.28); cursor: not-allowed; }
 .repair-float { fill: #8de867; }
+
+/* Peer-net health line in the bay browser */
+.lobby-state.net-ok { color: #a5d58b; }
+.lobby-state.net-bad { color: #ff8a96; border: 1px solid rgba(255,77,94,.4); padding: 8px 12px; }

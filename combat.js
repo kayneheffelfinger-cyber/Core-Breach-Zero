@@ -1664,9 +1664,16 @@ function openTowerPanel(tower) {
     <button class="tp-sell" type="button">SALVAGE BACK +$${refund}</button>
     <p class="tp-note">UPGRADES ARE SCRAPPED ON SELL &amp; WHEN THE MISSION ENDS</p>`;
   battlefield.appendChild(panel);
+  // Clamp with MEASURED panel size — 5/6-tier tracks + ability buttons make the
+  // panel far taller than the old 330px guess, which pushed menus off-screen.
   const [sx, sy] = toScreen(tower.x, tower.y);
-  panel.style.left = `${Math.max(10, Math.min(window.innerWidth - 238, sx + 26))}px`;
-  panel.style.top = `${Math.max(10, Math.min(window.innerHeight - 330, sy - 120))}px`;
+  const margin = 10;
+  const pw = panel.offsetWidth || 224;
+  const ph = panel.offsetHeight || 330;
+  let left = sx + 26;
+  if (left + pw > window.innerWidth - margin) left = sx - pw - 26; // flip left near the right edge
+  panel.style.left = `${Math.max(margin, Math.min(window.innerWidth - pw - margin, left))}px`;
+  panel.style.top = `${Math.max(margin, Math.min(window.innerHeight - ph - margin, sy - 120))}px`;
   state.towerPanel = panel;
   state.panelTower = tower;
   tower.node.classList.add('selected');
