@@ -1122,6 +1122,16 @@ const P2P_ROOMS = (() => {
   let lastPong = 0;        // last heartbeat echo from the room lead
 
   const peerId = (bay) => `${NS}-${HOST_KEY}-${bay}`;
+  // Zombie escape: a crashed or suspended session can leave its deterministic
+  // bay ID registered on the public signaling cloud. The dead holder blocks
+  // both the claim (unavailable-id) and the join (peer-unavailable) forever.
+  // Hosts escape to suffixed IDs (-r, -rr); relay dual-homing keeps those bays
+  // discoverable because relay topics derive from the bay, not the peer ID.
+  const HOST_SUFFIXES = ['', '-r', '-rr'];
+  const nextSuffix = (suffix) => {
+    const at = HOST_SUFFIXES.indexOf(suffix);
+    return at >= 0 && at < HOST_SUFFIXES.length - 1 ? HOST_SUFFIXES[at + 1] : null;
+  };
   const bayName = (bay) => (BAYS.find(([id]) => id === bay) || [bay, bay])[1];
   const p2pUsable = () => !p2pBroken && typeof window.Peer === 'function';
   const relayUsable = () => !relayDead && typeof window.mqtt === 'object' && Boolean(window.mqtt) && typeof window.mqtt.connect === 'function';
@@ -1343,9 +1353,9 @@ const P2P_ROOMS = (() => {
   // First handshake: try to claim the bay as room lead. If another commander
   // already holds the peer ID, fall through and join as crew instead — either
   // way, ENTER ROOM lands you inside the bay.
-  function claim(bay, attempt) {
+  function claim(bay, attempt, suffix = '') {
     let peer;
-    try { peer = new window.Peer(peerId(bay), PEER_CONFIG); } catch { p2pBroken = true; return; }
+    try { peer = new window.Peer(peerId(bay) + suffix, PEER_CONFIG); } catch { p2pBroken = true; return; }
     let settled = false;
     let timer = 0;
     const settle = (fn) => {
@@ -1358,7 +1368,7 @@ const P2P_ROOMS = (() => {
       try { peer.destroy(); } catch { /* ignore */ }
       // The broker never answered: ONE retry (brokers hiccup) before the peer
       // lane is marked dead and the relay lane takes over hosting.
-      if (attempt < 1) { scan(true); claim(bay, attempt + 1); return; }
+      if (attempt < 1) { scan(true); claim(bay, attempt + 1, suffix); return; }
       p2pBroken = true;
       if (relayUsable()) { mqttHost(bay); return; }
       handleServiceMessage({ type: 'error', message: 'PEER NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
@@ -1372,7 +1382,7 @@ const P2P_ROOMS = (() => {
     }));
     peer.on('error', (error) => {
       if (error && error.type === 'unavailable-id') {
-        settle(() => { try { peer.destroy(); } catch { /* ignore */ } join(bay, attempt); });
+        settle(() => { try { peer.destroy(); } catch { /* ignore */ } join(bay, attempt, suffix); });
         return;
       }
       if (!settled) settle(() => { try { peer.destroy(); } catch { /* ignore */ } });
@@ -1385,29 +1395,66 @@ const P2P_ROOMS = (() => {
     for (let i = 2; ; i += 1) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
   }
 
-  function join(bay, attempt) {
+  function join(bay, attempt, suffix = '') {
     const peer = ensureClient();
     if (!peer) return;
     if (!clientReady) {
       // Broker handshake still running — queue the join for the moment it lands.
-      onClientOpen = () => join(bay, attempt);
+      onClientOpen = () => join(bay, attempt, suffix);
       return;
     }
     let conn;
-    try { conn = peer.connect(peerId(bay), { reliable: true }); } catch { return; }
+    try { conn = peer.connect(peerId(bay) + suffix, { reliable: true }); } catch { return; }
     let settled = false;
     let timer = 0;
-    const finish = () => { if (settled) return; settled = true; clearTimeout(timer); };
+    let zombieProbe = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (zombieProbe && typeof peer.off === 'function') { try { peer.off('error', zombieProbe); } catch { /* listener stays; it no-ops once settled */ } }
+    };
+    // The holder never answered — a zombie registration or hard NAT. Escape to
+    // a free suffixed ID (as a future claim) before leaning on the relay.
+    const zombieEscape = () => {
+      const next = nextSuffix(suffix);
+      if (next) { scan(true); claim(bay, 0, next); return true; }
+      return false;
+    };
+    const bayDead = () => {
+      // A real (dual-homed) host answers on the relay regardless of which
+      // signaling instance holds the peer ID — try the relay join FIRST so a
+      // live room is joined, not shadow-hosted. Only when the relay cannot
+      // deliver us does a suffixed claim give the player a room of their own.
+      if (relayUsable()) { joinRelay(bay, suffix); return; }
+      if (zombieEscape()) return;
+      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN OR PICK ANOTHER ROOM' });
+    };
     timer = setTimeout(() => {
       if (settled) return;
       finish();
       closeConn(conn);
-      // Peer link never opened (typical hard-NAT outcome): fall through to the
-      // relay lane instead of dead-ending with an error.
-      if (relayUsable()) { joinRelay(bay); return; }
-      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+      // Peer link never opened (typical hard-NAT or zombie-holder outcome):
+      // escape to a suffixed claim first, then fall through to the relay.
+      bayDead();
     }, LINK_MS);
     conn.on('open', () => send(conn, { type: 'join', callsign }));
+    // A dead registration answers nothing but errors fast: three
+    // peer-unavailable signals on this exact target mean zombie — no need to
+    // burn the whole handshake window.
+    let deadSignals = 0;
+    zombieProbe = (error) => {
+      if (settled) return;
+      if (error && error.type === 'peer-unavailable' && String(error.message || '').includes(peerId(bay) + suffix)) {
+        deadSignals += 1;
+        if (deadSignals >= 3) {
+          finish();
+          closeConn(conn);
+          bayDead();
+        }
+      }
+    };
+    peer.on('error', zombieProbe);
     conn.on('data', (raw) => {
       let message;
       try { message = JSON.parse(raw); } catch { return; }
@@ -1433,10 +1480,10 @@ const P2P_ROOMS = (() => {
       if (settled) return;
       finish();
       // The lead vanished between our scan and join — try claiming the bay.
-      if (attempt < 2) claim(bay, attempt + 1);
-      else handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+      if (attempt < 2) claim(bay, attempt + 1, suffix);
+      else handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN OR PICK ANOTHER ROOM' });
     });
-    conn.on('error', () => { if (!settled) { finish(); closeConn(conn); if (relayUsable()) joinRelay(bay); } });
+    conn.on('error', () => { if (!settled) { finish(); closeConn(conn); if (relayUsable()) joinRelay(bay, suffix); else zombieEscape(); } });
   }
 
   // Everything a linked guest can receive once the handshake is done. Same
@@ -1620,7 +1667,7 @@ const P2P_ROOMS = (() => {
   // until the lead answers. Once joined, the SAME link carries the full room
   // protocol (room updates, launch, chat, coop sync) — adapters keep the
   // runtime code lane-agnostic.
-  function joinRelay(bay) {
+  function joinRelay(bay, suffix = '') {
     if (myBay || guestLink) return;
     if (!relayUsable()) return handleServiceMessage({ type: 'error', message: 'RELAY NET UNREACHABLE // BAYS LINK TABS ON THIS MACHINE ONLY' });
     const up = relayTopic(bay, 'up');
@@ -1641,7 +1688,11 @@ const P2P_ROOMS = (() => {
       settled = true;
       clearInterval(knock);
       relayUnsub(dn);
-      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN' });
+      // Nobody answered on the relay either: the holder is dead or unreachable.
+      // Escape to a free suffixed peer ID (host there) before giving up.
+      const next = nextSuffix(suffix);
+      if (next) { scan(true); claim(bay, 0, next); return; }
+      handleServiceMessage({ type: 'error', message: 'BAY DID NOT ANSWER // TRY AGAIN OR PICK ANOTHER ROOM' });
     }, RELAY_JOIN_MS);
     const knock = setInterval(() => {
       if (settled || knocks > 10) return;
