@@ -175,9 +175,12 @@ window.CBZShop = (() => {
   }
 
   // --- Deployment loadout: the blueprints carried into a mission -----------------
+  const loadoutHeadText = () => `${profile.loadout.length}/${MAX_BAYS} BAYS ARMED // ${profile.owned.length} BLUEPRINT${profile.owned.length === 1 ? '' : 'S'} OWNED — EARN OR BUY MORE TO FILL EVERY BAY`;
   function paintBays() {
     const wrap = container && container.querySelector('#ls-bays');
     if (!wrap) return;
+    const head = container.querySelector('.ls-head small');
+    if (head) head.textContent = loadoutHeadText();
     const bays = [0, 1, 2, 3, 4].map((index) => {
       const entry = (profile.loadout || [])[index] && towerById(profile.loadout[index]);
       if (!entry) return `<div class="ls-bay ls-empty"><small>BAY ${index + 1}</small><b>EMPTY</b><small>EQUIP BELOW</small></div>`;
@@ -297,7 +300,7 @@ window.CBZShop = (() => {
         </div>
       </div>
       <div class="loadout-strip" id="loadout-strip">
-        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small>CARRY UP TO ${MAX_BAYS} BLUEPRINTS INTO EVERY MISSION</small></div>
+        <div class="ls-head"><span>// DEPLOYMENT LOADOUT</span><small></small></div>
         <div class="ls-bays" id="ls-bays"></div>
       </div>
       <p class="shop-note">Nexus Coins flow from every wave, boss and cleared sector. <b>Breach Tokens</b> drop only from boss kills, flawless defenses and first clearances. New blueprints decrypt 10 clearance levels before they unlock — beyond that range, their signals stay hidden. Equipped blueprints deploy from the loadout bar in battle; towers you place claim a clearance box on the grid that blocks overlapping builds.</p>

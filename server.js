@@ -112,7 +112,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
-  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true }, // admin key — heavy wallet + XP + CLASSIFIED clearance, repeatable
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true, firstClear: true }, // admin key — heavy wallet + XP + CLASSIFIED clearance + reward decryption, repeatable
 };
 
 function profilePayload(account) {
@@ -329,6 +329,7 @@ async function handleApi(request, response, pathname) {
     meta.nc += grant.nc;
     meta.bt += grant.bt;
     if (grant.admin) meta.admin = true; // admin key codes promote the commander permanently
+    if (grant.firstClear) meta.firstClear = true; // admin key decrypts reward blueprints (Lazer Mortar)
     const before = meta.level;
     if (grant.xp) {
       meta.xp += grant.xp;
@@ -339,7 +340,7 @@ async function handleApi(request, response, pathname) {
       if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     }
     saveAccounts();
-    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin) }, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin), firstClear: Boolean(grant.firstClear) }, profile: profilePayload(accounts[name]) });
   }
 
   // Perk loadout — two tactical slots, server-validated against earned achievements.

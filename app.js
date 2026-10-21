@@ -155,7 +155,7 @@ const REDEEM_CODES = {
   GHOSTWIRE: { nc: 0, bt: 75 },
   DATACACHE: { nc: 4000, bt: 100 },
   ZERODAY: { nc: 5000, bt: 500 },
-  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true }, // admin key — wallet + XP + CLASSIFIED clearance, repeatable
+  ADMINLOG101011: { nc: 10000, bt: 1000, xp: 5000, repeat: true, admin: true, firstClear: true }, // admin key — wallet + XP + CLASSIFIED clearance + reward decryption, repeatable
 };
 
 // --- Achievements & perks -------------------------------------------------------
@@ -510,6 +510,7 @@ const LOCAL = (() => {
       account.meta.nc += grant.nc;
       account.meta.bt += grant.bt;
       if (grant.admin) account.meta.admin = true; // admin key codes promote the commander permanently
+      if (grant.firstClear) account.meta.firstClear = true; // admin key decrypts reward blueprints (Lazer Mortar)
       const meta = account.meta;
       const before = meta.level;
       if (grant.xp) {
@@ -523,7 +524,7 @@ const LOCAL = (() => {
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin) }, profile: profilePayload(account) };
+      return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin), firstClear: Boolean(grant.firstClear) }, profile: profilePayload(account) };
     }
     if (path === '/api/perks') {
       // Perk loadout — two tactical slots, validated against earned achievements.
@@ -2205,6 +2206,7 @@ function renderSettingsPanel(item) {
       if (granted.xp) parts.push(`+${Number(granted.xp).toLocaleString('en-US')} XP`);
       if (granted.levelsGained) parts.push(`LEVEL UP +${granted.levelsGained}`);
       if (granted.admin) parts.push('CLASSIFIED CLEARANCE GRANTED');
+      if (granted.firstClear) parts.push('REWARD BLUEPRINTS DECRYPTED');
       const amount = parts.join(' / ') || 'NOTHING?!';
       showToast(`SALVAGE CODE ${code} — ${amount} INJECTED`);
       paintStatus(`CODE ACCEPTED — ${amount}.`, false);
