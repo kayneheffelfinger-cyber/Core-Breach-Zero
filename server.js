@@ -339,7 +339,7 @@ async function handleApi(request, response, pathname) {
       if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     }
     saveAccounts();
-    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin) }, profile: profilePayload(accounts[name]) });
   }
 
   // Perk loadout — two tactical slots, server-validated against earned achievements.

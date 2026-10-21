@@ -521,7 +521,7 @@ const LOCAL = (() => {
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before }, profile: profilePayload(account) };
+      return { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin) }, profile: profilePayload(account) };
     }
     if (path === '/api/perks') {
       // Perk loadout — two tactical slots, validated against earned achievements.
@@ -2202,6 +2202,7 @@ function renderSettingsPanel(item) {
       if (granted.bt) parts.push(`+${granted.bt} BT`);
       if (granted.xp) parts.push(`+${Number(granted.xp).toLocaleString('en-US')} XP`);
       if (granted.levelsGained) parts.push(`LEVEL UP +${granted.levelsGained}`);
+      if (granted.admin) parts.push('CLASSIFIED CLEARANCE GRANTED');
       const amount = parts.join(' / ') || 'NOTHING?!';
       showToast(`SALVAGE CODE ${code} — ${amount} INJECTED`);
       paintStatus(`CODE ACCEPTED — ${amount}.`, false);

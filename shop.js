@@ -109,6 +109,11 @@ window.CBZShop = (() => {
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], admin: false };
+  // Belt-and-braces: a profile snapshot may predate the admin flag (login race,
+  // old cache), so the shop ALSO honors the admin roster by commander name —
+  // mirrors server.js ADMIN_NAMES. Server still enforces purchases.
+  const ADMIN_NAMES = new Set(['JACKSONLOOMIS-COMMITS']);
+  const isAdminProfile = (p) => Boolean(p && (p.admin || ADMIN_NAMES.has(String(p.name || '').toUpperCase())));
   const MAX_BAYS = 5;
 
   // Dual-currency prices arrive as { nc, bt }; single-currency as a number.
@@ -157,7 +162,7 @@ window.CBZShop = (() => {
   function visibility(entry) {
     // CLASSIFIED blueprints exist only for flagged admin commanders — everyone
     // else never sees the card, the counter, or the buy path.
-    if (entry.adminOnly && !profile.admin && !profile.owned.includes(entry.id)) return 'hidden';
+    if (entry.adminOnly && !isAdminProfile(profile) && !profile.owned.includes(entry.id)) return 'hidden';
     if (profile.owned.includes(entry.id)) return 'owned';
     if (entry.reward && !profile.firstClear) return 'reward-locked';
     if (profile.level >= entry.unlock) return 'buy';
@@ -166,7 +171,7 @@ window.CBZShop = (() => {
   }
 
   function hiddenCount() {
-    return TOWERS.filter((entry) => visibility(entry) === 'hidden' && !(entry.adminOnly && !profile.admin)).length;
+    return TOWERS.filter((entry) => visibility(entry) === 'hidden' && !(entry.adminOnly && !isAdminProfile(profile))).length;
   }
 
   // --- Deployment loadout: the blueprints carried into a mission -----------------
