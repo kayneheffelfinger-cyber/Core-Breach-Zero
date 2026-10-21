@@ -307,11 +307,13 @@ const LOCAL = (() => {
   const ADMIN_NAMES = new Set(['JACKSONLOOMIS-COMMITS']);
   const isAdminName = (name) => ADMIN_NAMES.has(String(name || '').toUpperCase());
   // Enforce access rules on a LOCAL meta: perk-slot default + CLASSIFIED strip.
+  // Flag-admins (redeemed the key) keep the Blossom even if their commander
+  // name is not on the roster — mirrors the shop/purchase gates.
   function sanitizeMeta(account) {
     if (!account || !account.meta) return;
     const meta = account.meta;
     if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
-    if (!isAdminName(account.name)) {
+    if (!isAdminName(account.name) && !meta.admin) {
       if (Array.isArray(meta.owned) && meta.owned.includes('corpseblossom')) meta.owned = meta.owned.filter((id) => id !== 'corpseblossom');
       if (Array.isArray(meta.loadout) && meta.loadout.includes('corpseblossom')) meta.loadout = meta.loadout.filter((id) => id !== 'corpseblossom');
     }
