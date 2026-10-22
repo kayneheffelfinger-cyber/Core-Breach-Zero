@@ -14,8 +14,19 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.21';
+const BUILD = '2026.10.22';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.22', tag: 'HELL PROTOCOL',
+    items: [
+      ['NEW', 'HARD rebalance — hull pressure now COMPOUNDS every wave (was linear). Wave 10 hostiles roll at ~2.2x hull, wave 20 at ~5x, wave 30 at ~12x. The run escalates, it never plateaus.'],
+      ['NEW', 'HELLFIRE SURGE — a new +65% hull / +20% speed modifier stacked onto the ugliest HARD waves, including a final escort of 2 Firewalls + 2 Viruses + 2 Leaks behind the overseer.'],
+      ['BAL', 'HARD hostiles move 12% faster across the board — less reaction time on every lane, every wave.'],
+      ['BAL', 'HARD economy squeezed: opening salvage cut 20%, wave payouts down 15%, rebuild windows cut 7s → 4.5s.'],
+      ['BAL', 'Denser HARD ladders — +20-40% hostile counts, armor columns from wave 7, Juggernaut packs from wave 10, doubled boss stacks mid-ladder.'],
+      ['ECON', 'Beating HARD pays proper hell-wages: win bounty 150 → 250 NC, win XP 200 → 260, bigger boss and flawless payouts.'],
+    ],
+  },
   {
     version: '2026.10.21', tag: 'RELAY NET',
     items: [
@@ -72,7 +83,7 @@ const UPDATE_LOG = [
 const menus = {
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of torture — boss breaches near-kill the core).',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of pure hell — compounding hulls, 12% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
@@ -281,7 +292,7 @@ const LOCAL = (() => {
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
     medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
-    hard: { waveNC: 12, waveXP: 18, bossNC: 15, bossBT: 1, bossXP: 50, winNC: 150, winXP: 200, flawlessNC: 60, flawlessBT: 4, flawlessXP: 100, firstClearBT: 5 },
+    hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
   };
   let down = false;
 

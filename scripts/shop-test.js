@@ -122,13 +122,13 @@ async function api(path, payload) {
     // HARD protocol payouts + HARDLINE achievement. Perk loadout is explicit:
     // nothing equipped yet, so the fresh HARDLINE win pays NO salvage bonus.
     const hardWin = await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 5, difficulty: 'hard', map: 'easy' });
-    check('hard win nc = 20*12 + 5*15 + 150 = 465 (no perks equipped yet)', hardWin.data.rewards.nc === 465, JSON.stringify(hardWin.data.rewards));
-    check('hard win xp = 20*18 + 5*50 + 200 = 810', hardWin.data.rewards.xp === 810, `xp=${hardWin.data.rewards.xp}`);
+    check('hard win nc = 20*12 + 5*18 + 250 = 580 (no perks equipped yet)', hardWin.data.rewards.nc === 580, JSON.stringify(hardWin.data.rewards));
+    check('hard win xp = 20*18 + 5*65 + 260 = 945', hardWin.data.rewards.xp === 945, `xp=${hardWin.data.rewards.xp}`);
     check('HARDLINE unlocked on first hard win', Array.isArray(hardWin.data.unlocked) && hardWin.data.unlocked.includes('hardline'), JSON.stringify(hardWin.data.unlocked));
     check('mapWins easy:hard recorded', hardWin.data.profile.mapWins['easy:hard'] === 1, JSON.stringify(hardWin.data.profile.mapWins));
     check('spirebreaker/grandslam still locked after one easy-map hard win', hardWin.data.profile.achievements.spirebreaker === false && hardWin.data.profile.achievements.grandslam === false, JSON.stringify(hardWin.data.profile.achievements));
     const hardLoss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
-    check('hard loss nc = 10*12 + 2*15 = 150 (perks off until equipped)', hardLoss.data.rewards.nc === 150, JSON.stringify(hardLoss.data.rewards));
+    check('hard loss nc = 10*12 + 2*18 = 156 (perks off until equipped)', hardLoss.data.rewards.nc === 156, JSON.stringify(hardLoss.data.rewards));
 
     // Perk loadout — two tactical slots, equip-gated mission payouts.
     // Commander has HARDLINE (one hard win) + OVERDRIVE (spire easy+medium) by here.
@@ -141,11 +141,11 @@ async function api(path, payload) {
     const perksSet = await api('/api/perks', { token, perks: ['salvage', 'overdrive'] });
     check('equip salvage + overdrive into 2 slots', perksSet.data.ok && perksSet.data.profile.equippedPerks.length === 2 && perksSet.data.profile.equippedPerks.includes('salvage'), JSON.stringify(perksSet.data));
     const hardLossPerked = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
-    check('hard loss with SALVAGE equipped = 150 * 1.1 = 165', hardLossPerked.data.rewards.nc === 165, JSON.stringify(hardLossPerked.data.rewards));
+    check('hard loss with SALVAGE equipped = 156 * 1.1 = 172', hardLossPerked.data.rewards.nc === 172, JSON.stringify(hardLossPerked.data.rewards));
     const perksClear = await api('/api/perks', { token, perks: [] });
     check('perk slots clear to empty', perksClear.data.ok && perksClear.data.profile.equippedPerks.length === 0, JSON.stringify(perksClear.data));
     const hardLossBare = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 10, bossesKilled: 2, difficulty: 'hard' });
-    check('hard loss after clearing slots = 150 again', hardLossBare.data.rewards.nc === 150, JSON.stringify(hardLossBare.data.rewards));
+    check('hard loss after clearing slots = 156 again', hardLossBare.data.rewards.nc === 156, JSON.stringify(hardLossBare.data.rewards));
 
     // Salvage codes — /api/redeem grants once per commander account per code.
     const sealed = await api('/api/profile', { token });

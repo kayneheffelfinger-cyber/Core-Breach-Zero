@@ -33,6 +33,7 @@ const SURGE_MODS = {
   overclock: { hp: 1, speed: 1.25, label: 'OVERCLOCK SURGE', note: 'HOSTILES RUN 25% FASTER' },
   hardened: { hp: 1.4, speed: 1, label: 'HARDENED HULLS', note: 'HOSTILES +40% HP' },
   crush: { hp: 1.5, speed: 1.15, label: 'CRUSH PROTOCOL', note: 'HOSTILES +50% HP · 15% FASTER' },
+  hellfire: { hp: 1.65, speed: 1.2, label: 'HELLFIRE SURGE', note: 'HOSTILES +65% HP · 20% FASTER' },
 };
 const EASY_WAVES = [
   { groups: [['glitched', 16]] },
@@ -94,48 +95,54 @@ const MEDIUM_WAVES = [
   { groups: [['shielded', 26], ['nullcore', 13], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 26]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
-// --- Hard Protocol: 30 waves of pure torture ---------------------------------------
-// The pressure dials snap off: HARD ladders the Medium roster with four new
-// hostile classes (Hex Crawlers regen, Data Juggernauts tank, Phantom Packets
-// blink past chokepoints, Firewall Wardens spill swarms), overlapping boss
-// waves every few indices and the steepest HP curve in the game. The catch:
-// payouts scale up slightly — you will need every salvage point.
+// --- Hard Protocol: 30 waves of pure hell -------------------------------------------
+// The HELL PROTOCOL pass: HARD ladders the Medium roster with four elite
+// classes (Hex Crawlers regen, Data Juggernauts tank, Phantom Packets blink
+// past chokepoints, Firewall Wardens spill swarms) and cranks every dial past
+// the stops: +20-40% hostile counts per wave, armor columns from wave 7,
+// Juggernaut packs from wave 10, doubled boss stacks mid-ladder, HELLFIRE
+// surges on the ugliest indices and a final escort of 2 Wardens + 2 Viruses
+// + 2 Leaks behind the overseer. The compounding hull curve does the rest.
 const HARD_WAVES = [
-  { groups: [['glitched', 26], ['runner', 16]] },
-  { groups: [['glitched', 24], ['file', 22], ['runner', 16]] },
-  { groups: [['shielded', 20], ['glitched', 24], ['hexbug', 6]], phase: 'NANITE DEBUT', mod: 'hardened' },
-  { groups: [['runner', 34], ['drone', 14], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
-  { groups: [['drone', 20], ['glitched', 26], ['phantom', 8]], phase: 'PHASE PRESSURE' },
-  { groups: [['nullcore', 10], ['file', 38], ['hexbug', 8]], mod: 'overclock' },
-  { groups: [['shielded', 26], ['drone', 22], ['runner', 20]] },
-  { groups: [['nullcore', 12], ['leak', 1], ['file', 30], ['phantom', 8]], phase: 'MINI-BOSS // MEMORY LEAK' },
-  { groups: [['file', 50], ['runner', 26], ['hexbug', 10]], phase: 'SWARM STORM', mod: 'overclock' },
-  { groups: [['virus', 1], ['leak', 1], ['shielded', 22], ['juggernaut', 2]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
-  { groups: [['nullcore', 16], ['drone', 26], ['runner', 24]] },
-  { groups: [['drone', 36], ['runner', 30], ['phantom', 10]], phase: 'AIR ARMADA', mod: 'overclock' },
-  { groups: [['shielded', 30], ['nullcore', 14], ['glitched', 36], ['hexbug', 10]], mod: 'crush' },
-  { groups: [['virus', 2], ['file', 52], ['drone', 24], ['juggernaut', 2]], phase: 'VIRULENT SURGE' },
-  { groups: [['leak', 2], ['nullcore', 16], ['drone', 28]], phase: 'LEAK STORM', mod: 'hardened' },
-  { groups: [['runner', 42], ['drone', 26], ['file', 38], ['phantom', 10]], phase: 'BLITZ RUN', mod: 'overclock' },
-  { groups: [['nullcore', 18], ['shielded', 28], ['virus', 1], ['juggernaut', 3]], phase: 'ARMOR COLUMN', mod: 'hardened' },
-  { groups: [['drone', 38], ['runner', 32], ['glitched', 40]], mod: 'overclock' },
-  { groups: [['virus', 2], ['leak', 2], ['shielded', 26], ['warden', 1]], phase: 'FIREWALL RISING' },
-  { groups: [['nullcore', 20], ['drone', 30], ['file', 48]], phase: 'DENSE ASSAULT' },
-  { groups: [['runner', 48], ['drone', 30], ['hexbug', 12]], phase: 'FULL SPRINT', mod: 'overclock' },
-  { groups: [['virus', 2], ['leak', 2], ['nullcore', 16], ['juggernaut', 3]], phase: 'TRIPLE THREAT', mod: 'crush' },
-  { groups: [['shielded', 34], ['drone', 32], ['runner', 34], ['file', 44]], mod: 'overclock' },
-  { groups: [['nullcore', 18], ['virus', 2], ['leak', 2], ['drone', 30], ['warden', 1]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
-  { groups: [['file', 56], ['nullcore', 18], ['drone', 28], ['phantom', 12]], phase: 'GRID LOCK', mod: 'overclock' },
-  { groups: [['shielded', 34], ['nullcore', 18], ['runner', 34], ['juggernaut', 4]], mod: 'crush' },
-  { groups: [['virus', 3], ['leak', 3], ['drone', 32], ['hexbug', 12]], phase: 'SIEGE WALL', mod: 'overclock' },
-  { groups: [['nullcore', 20], ['file', 56], ['glitched', 44], ['warden', 1]], phase: 'DEAD STACK' },
-  { groups: [['runner', 46], ['drone', 34], ['shielded', 30], ['phantom', 12]], phase: 'LAST BREACH', mod: 'overclock' },
-  { groups: [['shielded', 30], ['nullcore', 16], ['warden', 1], ['overseer', 1], ['virus', 1], ['leak', 1], ['drone', 30], ['juggernaut', 3]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+  { groups: [['glitched', 30], ['runner', 20]] },
+  { groups: [['glitched', 28], ['file', 28], ['runner', 20]] },
+  { groups: [['shielded', 24], ['glitched', 30], ['hexbug', 8]], phase: 'NANITE DEBUT', mod: 'hardened' },
+  { groups: [['runner', 40], ['drone', 18], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 24], ['glitched', 32], ['phantom', 10]], phase: 'PHASE PRESSURE' },
+  { groups: [['nullcore', 12], ['file', 44], ['hexbug', 10]], mod: 'overclock' },
+  { groups: [['shielded', 30], ['drone', 26], ['runner', 24]], mod: 'hardened' },
+  { groups: [['nullcore', 14], ['leak', 1], ['file', 36], ['phantom', 10]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 58], ['runner', 30], ['hexbug', 14]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 1], ['shielded', 26], ['juggernaut', 3]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
+  { groups: [['nullcore', 20], ['drone', 30], ['runner', 28]], mod: 'overclock' },
+  { groups: [['drone', 42], ['runner', 34], ['phantom', 12]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 34], ['nullcore', 16], ['glitched', 42], ['hexbug', 12]], mod: 'hellfire' },
+  { groups: [['virus', 2], ['leak', 2], ['file', 56], ['drone', 28], ['juggernaut', 3]], phase: 'VIRULENT SURGE', mod: 'hardened' },
+  { groups: [['leak', 2], ['nullcore', 18], ['drone', 32]], phase: 'LEAK STORM', mod: 'hellfire' },
+  { groups: [['runner', 48], ['drone', 30], ['file', 44], ['phantom', 12]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 20], ['shielded', 32], ['virus', 2], ['juggernaut', 4]], phase: 'ARMOR COLUMN', mod: 'hardened' },
+  { groups: [['drone', 44], ['runner', 36], ['glitched', 48]], mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 2], ['shielded', 30], ['warden', 1]], phase: 'FIREWALL RISING', mod: 'hardened' },
+  { groups: [['nullcore', 22], ['drone', 34], ['file', 54], ['juggernaut', 3]], phase: 'DENSE ASSAULT' },
+  { groups: [['runner', 54], ['drone', 34], ['hexbug', 16]], phase: 'FULL SPRINT', mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 3], ['nullcore', 18], ['juggernaut', 4]], phase: 'TRIPLE THREAT', mod: 'hellfire' },
+  { groups: [['shielded', 38], ['drone', 36], ['runner', 38], ['file', 50]], mod: 'overclock' },
+  { groups: [['nullcore', 20], ['virus', 3], ['leak', 3], ['drone', 34], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['file', 62], ['nullcore', 20], ['drone', 32], ['phantom', 14]], phase: 'GRID LOCK', mod: 'overclock' },
+  { groups: [['shielded', 38], ['nullcore', 20], ['runner', 38], ['juggernaut', 5]], mod: 'hellfire' },
+  { groups: [['virus', 4], ['leak', 3], ['drone', 36], ['hexbug', 16]], phase: 'SIEGE WALL', mod: 'overclock' },
+  { groups: [['nullcore', 22], ['file', 62], ['glitched', 50], ['warden', 2]], phase: 'DEAD STACK', mod: 'hardened' },
+  { groups: [['runner', 52], ['drone', 38], ['shielded', 34], ['phantom', 14]], phase: 'LAST BREACH', mod: 'overclock' },
+  { groups: [['shielded', 34], ['nullcore', 20], ['warden', 2], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 36], ['juggernaut', 4], ['phantom', 10]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
 // Per-protocol pressure: Medium compounds HP faster than Easy on top of denser waves.
-// Hard compounds steeper still — the same network that cleared Medium bleeds by wave 6.
-const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 };
+// HARD dials snap off twice — hull pressure now COMPOUNDS every wave
+// ((1.09)^index: wave 10 ≈ 2.2x, wave 20 ≈ 5.1x, wave 30 ≈ 12.2x roster hull —
+// the run escalates, it never plateaus) and every hostile moves 12% faster.
+const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 }; // legacy linear curve (easy/medium)
+const MODE_HP_GROWTH = { hard: 0.09 }; // HARD ONLY: compounding hull curve — hell is exponential
+const MODE_SPEED = { hard: 1.12 };     // HARD ONLY: all hostiles run 12% faster — less reaction window
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
 // Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
@@ -373,7 +380,7 @@ function spawnEnemy(key, pathIdx) {
     // Wave pressure: HP scales per wave index, surge modifiers stack on top.
     // Easy relief: commanders (bosses) spawn with slightly less hull on EASY.
     hp: Math.round(t.hp * (t.boss ? state.bossHpMult : 1) * (state.hpScale || 1)), maxHp: Math.round(t.hp * (t.boss ? state.bossHpMult : 1) * (state.hpScale || 1)), shield: 0, maxShield: t.shield || 0,
-    pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed * (state.surgeSpeed || 1), alive: true,
+    pathIdx, dist: debugFreeze ? 260 + Math.random() * 480 : 0, speed: t.speed * (state.surgeSpeed || 1) * (MODE_SPEED[state.protocol] || 1), alive: true,
     usedGates: new Set(), pulseTimer: 8, replicated: false, shielded: false, angle: 0,
   };
   if (t.flying) {
@@ -792,7 +799,7 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
-    const hardMult = state.protocol === 'hard' ? 1.15 : 1; // hard pays slightly better per wave — torture needs funding
+    const hardMult = state.protocol === 'hard' ? 0.85 : 1; // HELL PASS: hard pays WORSE per wave — salvage is blood in HARD
     const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
     state.earned += bonus;
@@ -804,7 +811,7 @@ function runWaves(dt) {
     if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
-    state.intermission = 7; // pace pass: a real build/upgrade window between waves
+    state.intermission = state.protocol === 'hard' ? 4.5 : 7; // HELL PASS: hard rebuild windows cut 7s → 4.5s — the swarm never waits
     updateHud();
   }
   if (state.intermission > 0) {
@@ -818,7 +825,10 @@ function beginWave(index) {
   state.waveIndex = index;
   const waves = missionWaves();
   const wave = waves[index];
-  state.hpScale = 1 + (MODE_HP_SCALE[state.protocol] || WAVE_HP_SCALE) * index;
+  const growth = MODE_HP_GROWTH[state.protocol] || 0;
+  state.hpScale = growth
+    ? Math.pow(1 + growth, index) // HARD: compounding hull curve — every wave prices in the last
+    : 1 + (MODE_HP_SCALE[state.protocol] || WAVE_HP_SCALE) * index;
   state.bossHpMult = state.protocol === 'easy' ? EASY_BOSS_RELIEF : 1;
   const surge = wave.mod ? SURGE_MODS[wave.mod] : null;
   state.surgeSpeed = surge ? surge.speed : 1;
@@ -1114,7 +1124,7 @@ function banner(title, sub, cls) {
 const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
-  { id: 'hard', label: 'HARD', sub: '30 WAVES // NEW HOSTILES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
+  { id: 'hard', label: 'HARD', sub: '30 WAVES // COMPOUNDING HULLS · +12% SPEED · HELLFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
 ];
@@ -1197,6 +1207,7 @@ function startMission(map, skipVote = false, forcedProtocol = null) {
 function launchCombat(mode) {
   closeVote();
   state.protocol = mode;
+  if (mode === 'hard') state.cash = Math.round(state.cash * 0.8); // HELL PASS: the grid strips 20% of opening salvage — you deploy wounded
   const proto = document.querySelector('#combat-protocol');
   if (proto) proto.textContent = String(mode).toUpperCase();
   state.mode = 'countdown';

@@ -53,7 +53,7 @@ function isAdmin(name) {
 const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
   medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
-  hard: { waveNC: 12, waveXP: 18, bossNC: 15, bossBT: 1, bossXP: 50, winNC: 150, winXP: 200, flawlessNC: 60, flawlessBT: 4, flawlessXP: 100, firstClearBT: 5 },
+  hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
 };
 const PROTOCOLS = Object.keys(REWARDS);
 
