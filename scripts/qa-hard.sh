@@ -18,7 +18,7 @@ register() {
   $B wait --fn "document.querySelector('#auth-overlay').hidden === true" --timeout 8000
 }
 vote_hard() {
-  $B find first ".menu-item" click; sleep 0.4
+  $B find first "[data-menu=\"play\"]" click; sleep 0.4
   $B find text "SOLO MAP RECON" click; sleep 0.4
   $B find first ".map-card" click; sleep 0.4
   $B find first "#deploy-mission" click; sleep 0.5
@@ -36,17 +36,17 @@ $B set viewport 1440 900
 $B open "http://127.0.0.1:3111/?cbzwave=30&freeze=1&cash=9999" > /dev/null
 $B wait --load networkidle; sleep 0.8
 register "HELLQA" "hellqa@mail.com"
-echo "--- wave 30: final-wave fodder under 12.17x hull"
+echo "--- wave 30: final-wave fodder under 15.86x hull"
 vote_hard
 $B wait --fn "document.querySelectorAll('.enemy').length >= 1" --timeout 15000
 $B wait --fn "document.querySelector('.e-shielded') !== null" --timeout 20000
 echo "wave label: $($B eval "document.querySelector('#combat-wave').textContent")"
 TIP=$(hover_hp ".e-shielded")
 echo "shielded tip: $TIP"
-echo "$TIP" | rg -q "548 HP" && echo "PASS compounding: shielded 45 -> 548 at wave 30 (1.09^29)" || echo "FAIL compounding mismatch"
+echo "$TIP" | rg -q "714 HP" && echo "PASS compounding: shielded 45 -> 714 at wave 30 (1.10^29)" || echo "FAIL compounding mismatch"
 $B screenshot "$SS/41-hard-wave30-hull.png"
 
-echo "--- wave 19: FIREWALL RISING warden under 4.72x hull"
+echo "--- wave 19: FIREWALL RISING warden under 5.56x hull"
 $B open "http://127.0.0.1:3111/?cbzwave=19&freeze=1&cash=9999" > /dev/null
 $B wait --load networkidle; sleep 0.8
 register "HELLQA2" "hellqa2@mail.com"
@@ -55,7 +55,7 @@ $B wait --fn "document.querySelector('.e-warden') !== null" --timeout 40000
 sleep 0.5
 WTIP=$(hover_hp ".e-warden")
 echo "warden tip: $WTIP"
-echo "$WTIP" | rg -q "15850 HP" && echo "PASS warden 2400 x 4.72 curve x 1.40 hardened = 15850 at wave 19" || echo "FAIL warden hull (curve x mod) mismatch"
+echo "$WTIP" | rg -q "18681 HP" && echo "PASS warden 2400 x 5.56 curve x 1.40 hardened = 18681 at wave 19" || echo "FAIL warden hull (curve x mod) mismatch"
 echo "boss bar: $($B eval "document.querySelector('#boss-name') ? document.querySelector('#boss-name').textContent : 'none'")"
 $B screenshot "$SS/42-hard-warden.png"
 echo "QA-HARD-DONE"

@@ -28,7 +28,7 @@ function extractLiteral(src, name) {
 
 console.log('--- Crimson clock (app.js) ---');
 const appjs = read('app.js');
-check('BUILD bumped to 2026.10.23', appjs.includes("const BUILD = '2026.10.23';"));
+check('BUILD bumped to 2026.10.24', appjs.includes("const BUILD = '2026.10.24';"));
 check('deadline is a fixed UTC instant (static-host safe)', appjs.includes("Date.parse('2026-10-30T18:00:00Z')"));
 check('192h gate: window is 7 days after unlock', appjs.includes("Date.parse('2026-11-06T18:00:00Z')"));
 check('phase machine: sealed -> live -> passed', /now >= CRIMSON_END\).*passed[\s\S]*?now >= CRIMSON_DEADLINE\).*live[\s\S]*?return 'sealed'/.test(appjs));
@@ -44,8 +44,8 @@ const combat = read('combat.js');
 const CRIMSON_WAVES = extractLiteral(combat, 'CRIMSON_WAVES');
 const ENEMY_TYPES = extractLiteral(combat, 'ENEMY_TYPES');
 const SURGE_MODS = extractLiteral(combat, 'SURGE_MODS');
-check('MODE_HP_GROWTH.crimson = 0.13 (1.13x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.09, crimson: 0.13 }'));
-check('MODE_SPEED.crimson = 1.18 (+18% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.12, crimson: 1.18 }'));
+check('MODE_HP_GROWTH.crimson = 0.13 (1.13x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, crimson: 0.13 }'));
+check('MODE_SPEED.crimson = 1.18 (+18% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.15, crimson: 1.18 }'));
 check('MODE_BOSS_LEAK.crimson = 10', combat.includes('MODE_BOSS_LEAK = { hard: 10, crimson: 10 }'));
 check('DAWNFIRE SURGE defined (+80% HP / +25% speed)', SURGE_MODS && SURGE_MODS.dawnfire && SURGE_MODS.dawnfire.hp === 1.8 && SURGE_MODS.dawnfire.speed === 1.25);
 check('crimson pays 0.7x wave salvage', combat.includes("state.protocol === 'hard' ? 0.85 : state.protocol === 'crimson' ? 0.7 : 1"));
@@ -97,11 +97,12 @@ const indexhtml = read('index.html');
 const styles = read('styles.css');
 check('menu button ??? with crimson subtext', indexhtml.includes('data-menu="crimson"') && indexhtml.includes('???</strong>') && indexhtml.includes('The Crimson Dawn Approaches'));
 check('countdown line lives on the button', indexhtml.includes('id="crimson-count"'));
-check('all 6 assets cache-busted to 20261023a', (indexhtml.match(/\?v=20261023a/g) || []).length === 6);
+check('all 6 assets cache-busted to 20261023b', (indexhtml.match(/\?v=20261023b/g) || []).length === 6);
 check('eerie glow styles: menu pulse + big countdown + deploy button', styles.includes('.menu-item.menu-crimson') && styles.includes('.crimson-big') && styles.includes('.crimson-deploy'));
 check('dawn beam style for the relic', styles.includes('.fx-dawn'));
 check('footer brands the signal', indexhtml.includes('CRIMSON SIGNAL DETECTED'));
-check('UPDATE LOG leads with CRIMSON SIGNAL entry', appjs.indexOf('CRIMSON SIGNAL') < appjs.indexOf('HELL PROTOCOL'));
+check('UPDATE LOG leads with IRON RAIN, then CRIMSON SIGNAL', appjs.indexOf('IRON RAIN') < appjs.indexOf('CRIMSON SIGNAL') && appjs.indexOf('CRIMSON SIGNAL') < appjs.indexOf('HELL PROTOCOL'));
+check('private early-access gate exists and never leaks to non-admins', appjs.includes('function crimsonEarlyAccess()') && appjs.includes("if (crimsonEarlyAccess()) return 'live';"));
 
 console.log('--- Syntax gates ---');
 for (const f of ['app.js', 'combat.js', 'server.js', 'shop.js']) {

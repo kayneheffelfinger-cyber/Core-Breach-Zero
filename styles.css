@@ -563,7 +563,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .fx-beam-phase { stroke: #ffb45a; }
 @keyframes line-fade { from { stroke-opacity: 1; } to { stroke-opacity: 0; } }
 .fx-shell { fill: #ffb45a; stroke: rgba(255,180,90,.5); stroke-width: 2; }
-.fx-missile { fill: #ffb45a; }
+.fx-missile { fill: #ff7a45; stroke: rgba(255,110,60,.7); stroke-width: 2.5; filter: drop-shadow(0 0 6px rgba(255,100,50,.85)); }
 .fx-flak { fill: none; stroke: #eafffa; stroke-width: 2; animation: ring-burst .42s ease-out forwards; }
 .fx-sing { fill: rgba(196,155,239,.22); stroke: #c49bef; stroke-width: 2; animation: sing-collapse .62s ease-in forwards; }
 @keyframes sing-collapse { from { r: 74; opacity: 1; } to { r: 6; opacity: .1; } }

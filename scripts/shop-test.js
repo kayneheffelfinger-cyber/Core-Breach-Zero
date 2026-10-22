@@ -200,6 +200,11 @@ async function api(path, payload) {
     // pretends the Corpse Blossom does not exist. Admin log comes further below.
     const freshBuyBlossom = await api('/api/shop/purchase', { token: freshToken, itemId: 'corpseblossom' });
     check('CLASSIFIED blossom: non-admin flat 404 (no leak)', freshBuyBlossom.status === 404, JSON.stringify(freshBuyBlossom.data));
+    // IRON RAIN endgame chassis: clearance gates hold for fresh accounts.
+    const freshBuyDrone = await api('/api/shop/purchase', { token: freshToken, itemId: 'dronespawner' });
+    check('level-20 clearance gate blocks fresh account 403 (DRONE SPAWNER)', freshBuyDrone.status === 403, JSON.stringify(freshBuyDrone.data));
+    const freshBuySilo = await api('/api/shop/purchase', { token: freshToken, itemId: 'missilesilo' });
+    check('level-30 clearance gate blocks fresh account 403 (MISSILE SILO)', freshBuySilo.status === 403, JSON.stringify(freshBuySilo.data));
     const freshAdmin = await api('/api/redeem', { token: freshToken, code: 'ADMINLOG101011' });
     check('ADMINLOG101011 on fresh account jumps past L10 + flags admin', freshAdmin.data.ok && freshAdmin.data.profile.level >= 10 && freshAdmin.data.granted.levelsGained >= 10 && freshAdmin.data.profile.nc === 750 + 10000 && freshAdmin.data.profile.admin === true, JSON.stringify(freshAdmin.data));
     const rich = await api('/api/profile', { token });

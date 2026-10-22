@@ -90,5 +90,37 @@ OWNGRP2=$(echo "$WIN" | python3 -c "import sys,json; d=json.load(sys.stdin); pri
 [ "$OWNGRP2" = "True" ] && echo "PASS dawnbreaker in owned armory" || echo "FAIL relic missing from armory"
 AGAIN=$(curl -s -X POST http://127.0.0.1:3111/api/mission/complete -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\",\"result\":\"win\",\"wavesCleared\":20,\"bossesKilled\":14,\"difficulty\":\"crimson\",\"map\":\"cbz\"}")
 echo "$AGAIN" | rg -q '"relic":false' && echo "PASS relic is one-time (second win: no duplicate)" || echo "FAIL duplicate relic grant"
+
+echo "--- phase 5: private early dawn (admin deploy signature only, sealed countdown still running)"
+$B open "http://127.0.0.1:3111/" > /dev/null
+$B wait --load networkidle
+sleep 1.2
+$B find first "#tab-register" click; sleep 0.3
+$B find first "#auth-name" fill "DAWNADMIN"
+$B find first "#auth-email" fill "dawnadmin@mail.com"
+$B find first "#auth-passcode" fill "corebreach"
+$B find first "#auth-confirm" fill "corebreach"
+$B find first "#auth-submit" click
+$B wait --fn "document.querySelector('#auth-overlay').hidden === true" --timeout 8000
+sleep 0.8
+FRESH=$($B eval "document.querySelector('#crimson-title').textContent" | tr -d '"')
+echo "fresh commander button title: $FRESH"
+[ "$FRESH" = "???" ] && echo "PASS dawn still sealed for a fresh commander" || echo "FAIL seal leaked to fresh commander"
+$B eval "window.CBZShop.setProfile({ name: 'DAWNADMIN', level: 30, admin: true }); 'flagged'" > /dev/null
+sleep 1.4
+TITLE=$($B eval "document.querySelector('#crimson-title').textContent" | tr -d '"')
+echo "button title after admin signature: $TITLE"
+[ "$TITLE" = "CRIMSON DAWN" ] && echo "PASS admin signature forces the dawn open ahead of T-0" || echo "FAIL early access did not flip"
+$B find first "[data-menu=\"crimson\"]" click
+sleep 0.8
+echo "panel title: $($B eval "document.querySelector('#dialog-title').textContent")"
+echo "early field test line present: $($B eval "Boolean(document.querySelector('.crimson-faded') && document.body.innerHTML.includes('EARLY FIELD TEST'))")"
+$B screenshot "$SS/54-crimson-early-access.png"
+$B find first "#crimson-deploy" click
+sleep 1.0
+$B wait --fn "document.querySelector('#combat-protocol').textContent === 'CRIMSON'" --timeout 9000
+echo "protocol HUD: $($B eval "document.querySelector('#combat-protocol').textContent")"
+$B wait --fn "document.querySelectorAll('.enemy').length >= 1" --timeout 15000
+echo "enemies on board: $($B eval "document.querySelectorAll('.enemy').length")"
 echo "QA-CRIMSON-DONE"
 pkill -f "node server.js" 2>/dev/null

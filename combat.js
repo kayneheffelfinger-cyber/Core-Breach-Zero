@@ -97,13 +97,13 @@ const MEDIUM_WAVES = [
 ];
 
 // --- Hard Protocol: 30 waves of pure hell -------------------------------------------
-// The HELL PROTOCOL pass: HARD ladders the Medium roster with four elite
-// classes (Hex Crawlers regen, Data Juggernauts tank, Phantom Packets blink
-// past chokepoints, Firewall Wardens spill swarms) and cranks every dial past
-// the stops: +20-40% hostile counts per wave, armor columns from wave 7,
+// The HELL PROTOCOL pass (escalated twice): HARD ladders the Medium roster with
+// four elite classes (Hex Crawlers regen, Data Juggernauts tank, Phantom Packets
+// blink past chokepoints, Firewall Wardens spill swarms) and cranks every dial
+// past the stops: +20-40% hostile counts per wave, armor columns from wave 7,
 // Juggernaut packs from wave 10, doubled boss stacks mid-ladder, HELLFIRE
-// surges on the ugliest indices and a final escort of 2 Wardens + 2 Viruses
-// + 2 Leaks behind the overseer. The compounding hull curve does the rest.
+// surges on SIX of the ugliest indices and a final escort of 3 Wardens + 2
+// Viruses + 2 Leaks behind the overseer. The compounding hull curve does the rest.
 const HARD_WAVES = [
   { groups: [['glitched', 30], ['runner', 20]] },
   { groups: [['glitched', 28], ['file', 28], ['runner', 20]] },
@@ -124,17 +124,17 @@ const HARD_WAVES = [
   { groups: [['nullcore', 20], ['shielded', 32], ['virus', 2], ['juggernaut', 4]], phase: 'ARMOR COLUMN', mod: 'hardened' },
   { groups: [['drone', 44], ['runner', 36], ['glitched', 48]], mod: 'overclock' },
   { groups: [['virus', 3], ['leak', 2], ['shielded', 30], ['warden', 1]], phase: 'FIREWALL RISING', mod: 'hardened' },
-  { groups: [['nullcore', 22], ['drone', 34], ['file', 54], ['juggernaut', 3]], phase: 'DENSE ASSAULT' },
+  { groups: [['nullcore', 22], ['drone', 34], ['file', 54], ['juggernaut', 3], ['phantom', 10]], phase: 'DENSE ASSAULT', mod: 'hellfire' },
   { groups: [['runner', 54], ['drone', 34], ['hexbug', 16]], phase: 'FULL SPRINT', mod: 'overclock' },
   { groups: [['virus', 3], ['leak', 3], ['nullcore', 18], ['juggernaut', 4]], phase: 'TRIPLE THREAT', mod: 'hellfire' },
   { groups: [['shielded', 38], ['drone', 36], ['runner', 38], ['file', 50]], mod: 'overclock' },
   { groups: [['nullcore', 20], ['virus', 3], ['leak', 3], ['drone', 34], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
-  { groups: [['file', 62], ['nullcore', 20], ['drone', 32], ['phantom', 14]], phase: 'GRID LOCK', mod: 'overclock' },
+  { groups: [['file', 62], ['nullcore', 20], ['drone', 32], ['phantom', 14]], phase: 'GRID LOCK', mod: 'hellfire' },
   { groups: [['shielded', 38], ['nullcore', 20], ['runner', 38], ['juggernaut', 5]], mod: 'hellfire' },
   { groups: [['virus', 4], ['leak', 3], ['drone', 36], ['hexbug', 16]], phase: 'SIEGE WALL', mod: 'overclock' },
   { groups: [['nullcore', 22], ['file', 62], ['glitched', 50], ['warden', 2]], phase: 'DEAD STACK', mod: 'hardened' },
   { groups: [['runner', 52], ['drone', 38], ['shielded', 34], ['phantom', 14]], phase: 'LAST BREACH', mod: 'overclock' },
-  { groups: [['shielded', 34], ['nullcore', 20], ['warden', 2], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 36], ['juggernaut', 4], ['phantom', 10]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+  { groups: [['shielded', 34], ['nullcore', 20], ['warden', 3], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 36], ['juggernaut', 5], ['phantom', 10]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
 // --- Crimson Dawn: 20 waves of the impossible (LIMITED-TIME EVENT) ------------------
@@ -168,14 +168,14 @@ const CRIMSON_WAVES = [
 ];
 
 // Per-protocol pressure: Medium compounds HP faster than Easy on top of denser waves.
-// HARD dials snap off twice — hull pressure now COMPOUNDS every wave
-// ((1.09)^index: wave 10 ≈ 2.2x, wave 20 ≈ 5.1x, wave 30 ≈ 12.2x roster hull —
-// the run escalates, it never plateaus) and every hostile moves 12% faster.
+// HARD dials snap off twice — hull pressure COMPOUNDS every wave
+// ((1.10)^index: wave 10 ≈ 2.4x, wave 20 ≈ 6.1x, wave 30 ≈ 15.9x roster hull —
+// the run escalates, it never plateaus) and every hostile moves 15% faster.
 // CRIMSON DAWN (event) compounds steeper still at 1.13x — wave 20 ≈ 21.7x hull —
 // and every hostile moves 18% faster. Nothing comes back from that.
 const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 }; // legacy linear curve (easy/medium)
-const MODE_HP_GROWTH = { hard: 0.09, crimson: 0.13 }; // compounding hull curves — hell and the dawn are exponential
-const MODE_SPEED = { hard: 1.12, crimson: 1.18 };     // hostile protocol speed multipliers
+const MODE_HP_GROWTH = { hard: 0.1, crimson: 0.13 }; // compounding hull curves — hell and the dawn are exponential
+const MODE_SPEED = { hard: 1.15, crimson: 1.18 };     // hostile protocol speed multipliers
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
 // Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
@@ -215,10 +215,12 @@ const TOWER_RULES = {
   zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
   corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
   dawnbreaker: { air: 'yes' },  // CRIMSON RELIC — dawn-forged lance tracks air natively
+  missilesilo: { air: 'yes' },  // MISSILE SILO — warheads track air and ground without a pad
+  dronespawner: { air: 'no' },  // spawner — never targets; strike drones hit anything they intercept
 };
 
 // One-off rigs: only a single unit of these chassis may deploy per commander.
-const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom']);
+const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner']);
 const NUKE_DAMAGE = 2200;      // Nuclear Fall Out: flat strike damage inside the blast
 const NUKE_RADIUS = 240;       // strike decimates everything inside this ring
 const NUKE_COST = 500;         // salvage price per cast
@@ -609,6 +611,63 @@ function moveSummon(summon, dt) {
   summon.fy = y;
   summon.node.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
   contactDamage(summon);
+}
+
+// --- Drone Spawner: the carrier fabricates one-way strike drones ---------------------
+// Every launchEvery seconds (while a hostile stands inside its ring) the
+// carrier rolls a strike drone off the line: a friendly flyer that rockets
+// across the grid with target lead and detonates on the first hostile it
+// touches for its full payload. Rides the summon pipeline (flight + kamikaze
+// contact), so it engages walkers and flyers alike and respects SUMMON_CAP.
+function launchStrikeDrone(tower) {
+  if (state.enemies.filter((item) => item.friendly && item.alive).length >= SUMMON_CAP) return false;
+  const es = effStats(tower);
+  const pool = state.enemies.filter((enemy) => {
+    if (!enemy.alive || enemy.friendly) return false;
+    const [px, py] = posOf(enemy);
+    return Math.hypot(px - tower.x, py - tower.y) <= es.rng;
+  });
+  if (!pool.length) return false;
+  const prey = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
+  // Lead the target: aim where the prey will be roughly one flight-time from now.
+  const lead = 0.9;
+  let aimX;
+  let aimY;
+  if (prey.flight) {
+    const [fx, fy] = flightPos(prey, prey.dist + prey.speed * lead);
+    aimX = fx;
+    aimY = fy;
+  } else {
+    const future = Math.min(state.samplers[prey.pathIdx].len, prey.dist + prey.speed * (1 - (prey.slow || 0)) * lead);
+    [aimX, aimY] = state.samplers[prey.pathIdx].at(future);
+  }
+  const t = { ...ENEMY_TYPES.drone, hp: Math.max(1, Math.round(es.drone || 70)), bounty: 0, dmg: 0, name: 'STRIKE DRONE', ability: 'One-way strike unit — detonates on the first hostile it intercepts.' };
+  const g = svgNode('g', { class: 'enemy e-summon e-drone e-strike' });
+  const chassis = svgNode('g', { class: 'e-chassis' });
+  for (const node of shapeFor('drone', t)) chassis.appendChild(node);
+  g.appendChild(chassis);
+  const barY = -(t.size + 13);
+  g.appendChild(svgNode('rect', { class: 'hp-bg', x: -11, y: barY, width: 22, height: 3.4 }));
+  const fill = svgNode('rect', { class: 'hp-fill', x: -11, y: barY, width: 22, height: 3.4 });
+  g.appendChild(fill);
+  const total = Math.max(1, Math.hypot(aimX - tower.x, aimY - tower.y));
+  const drone = {
+    key: 'drone', t, node: g, fill, shieldFill: fill, nid: ++state.nidSeq,
+    hp: t.hp, maxHp: t.hp, shield: 0, maxShield: 0,
+    pathIdx: prey.pathIdx, dist: 0,
+    speed: Math.max(110, t.speed * 1.5), alive: true, friendly: true, reverse: true,
+    usedGates: new Set(), angle: 0,
+    flight: { sx: tower.x, sy: tower.y, tx: aimX, ty: aimY, total },
+    fx: tower.x, fy: tower.y,
+  };
+  g.setAttribute('transform', `translate(${tower.x.toFixed(1)} ${tower.y.toFixed(1)})`);
+  const bloom = svgNode('circle', { class: 'fx-ring fx-bloom', cx: tower.x, cy: tower.y, r: 6 });
+  state.layers.fx.appendChild(bloom);
+  setTimeout(() => bloom.remove(), 720);
+  state.layers.enemies.appendChild(g);
+  state.enemies.push(drone);
+  paintBars(drone);
+  return true;
 }
 
 function replicateLeak(enemy) {
@@ -1159,7 +1218,7 @@ function banner(title, sub, cls) {
 const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
-  { id: 'hard', label: 'HARD', sub: '30 WAVES // COMPOUNDING HULLS · +12% SPEED · HELLFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
+  { id: 'hard', label: 'HARD', sub: '30 WAVES // COMPOUNDING HULLS · +15% SPEED · HELLFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
   { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
 ];
@@ -1684,6 +1743,10 @@ function openTowerPanel(tower) {
     specials.push(`<div class="tp-abil-row"><span>SUMMON HP</span><b>${Math.round((es.summonHp || 0.3) * 100)}%</b></div>`);
     if (trackLevel(tower) >= 4) specials.push(`<div class="tp-abil-row lust"><span>BLOOD LUST</span><b>${tower.lust || 0}</b></div>`);
   }
+  if (entry.id === 'dronespawner') {
+    specials.push(`<div class="tp-abil-row"><span>STRIKE DRONE</span><b>${Math.round(es.drone || 70)} DMG/HULL</b></div>`);
+    specials.push(`<div class="tp-abil-row"><span>NEXT LAUNCH</span><b>${state.mode === 'waves' ? `${Math.ceil(tower.droneCd || 0)}s` : `${Math.round(es.launchEvery || 6)}s CADENCE`}</b></div>`);
+  }
   if (entry.id === 'zeroday') specials.push(`<div class="tp-abil-row"><span>WAVE INCOME</span><b>$${es.income || 0}/WAVE</b></div>`);
   const abilities = [];
   if (entry.id === 'corpseblossom' && trackLevel(tower) >= 4) {
@@ -1788,6 +1851,14 @@ function updateTowers(dt) {
             }
           }
         }
+      }
+    }
+    if (tower.id === 'dronespawner') {
+      // Strike-drone fabrication clock: only launches while hostiles stand in the ring.
+      tower.droneCd = Math.max(0, (tower.droneCd || 0) - dt);
+      if (tower.droneCd <= 0 && launchStrikeDrone(tower)) {
+        tower.droneCd = effStats(tower).launchEvery || 6;
+        if (state.panelTower === tower) openTowerPanel(tower); // live launch countdown
       }
     }
     if (tower.id === 'zeroday') tower.nukeCd = Math.max(0, (tower.nukeCd || 0) - dt);
@@ -1917,6 +1988,17 @@ function fireTower(tower, target) {
       fxRing(tx, ty, 'fx-ring-red');
       break;
     }
+    case 'missilesilo': {
+      // Strategic strike: the warhead flies a visible arc (slow, dodgeable by
+      // nothing — it always lands) and detonates for full damage in the blast.
+      // MIRV tiers crack the shell into cluster bomblets on impact.
+      const es = effStats(tower);
+      const missile = svgNode('circle', { class: 'fx-shell fx-missile', r: 5, cx: tower.x, cy: tower.y });
+      state.layers.fx.appendChild(missile);
+      state.projectiles.push({ kind: 'missile', x: tower.x, y: tower.y, tx, ty, speed: 210, dmg, splash: es.splash || 55, cluster: es.cluster || 0, node: missile });
+      fxRing(tower.x, tower.y, 'fx-ring-amber');
+      break;
+    }
     case 'virus': {
       // Melee swarm: blades land instantly — no projectile phase at all.
       damageEnemy(target, dmg);
@@ -1954,7 +2036,7 @@ function fireTower(tower, target) {
 function updateProjectiles(dt) {
   if (!state.layers) return;
   for (const p of state.projectiles) {
-    if (p.kind === 'shell') {
+    if (p.kind === 'shell' || p.kind === 'missile') {
       const dx = p.tx - p.x;
       const dy = p.ty - p.y;
       const step = p.speed * dt;
@@ -1967,6 +2049,17 @@ function updateProjectiles(dt) {
           if (!enemy.alive) continue;
           const [px, py] = posOf(enemy);
           if (Math.hypot(px - p.tx, py - p.ty) <= (p.splash || 40)) damageEnemy(enemy, p.dmg);
+        }
+        // MIRV PROTOCOL: the shell cracks open — cluster bomblets pepper a wide
+        // secondary ring around the impact crater for partial damage.
+        if (p.cluster) {
+          fxRing(p.tx, p.ty, 'fx-ring-amber');
+          for (const enemy of state.enemies) {
+            if (!enemy.alive) continue;
+            const [px, py] = posOf(enemy);
+            const d = Math.hypot(px - p.tx, py - p.ty);
+            if (d > (p.splash || 40) && d <= 130) damageEnemy(enemy, Math.round(p.dmg * 0.4));
+          }
         }
       } else {
         p.x += (dx / Math.hypot(dx, dy)) * step;

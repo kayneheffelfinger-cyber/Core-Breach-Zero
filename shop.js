@@ -45,29 +45,53 @@ window.CBZShop = (() => {
       icon: ic('<path d="M8 34h16"/><path d="M12 34L28 18"/><rect x="27" y="6" width="9" height="9" transform="rotate(45 31.5 10.5)"/><path d="M6 14a26 26 0 0 1 11-10" stroke-dasharray="3 4"/>') },
     { id: 'shotgunner', name: 'SHOTGUNNER', cat: 'offense', unlock: 3, price: { nc: 800, bt: 10 }, cost: 150, currency: 'mixed',
       tagline: 'Close-work scattergun — wide pellet bursts shred tight packs.',
-      stats: { dmg: 30, rate: 0.8, rng: 100, splash: 15, tgt: 'SPLASH 15U · GROUND · AA VIA SATELLITE' },
+      stats: { dmg: 27, rate: 0.8, rng: 100, splash: 12, tgt: 'SPLASH 12U · GROUND · AA VIA SATELLITE' },
       special: '>> Pellet blasts hammer everything inside the burst ring. Tier-1 Satellite Comms unlocks anti-air without a hex pad.',
       art: 'assets/towers/shotgunner.png',
       track: [
         { label: 'SATELLITE COMMS', cost: 95, sets: { rng: 105, air: 'yes' }, info: 'RNG 100 → 105 · ANTI-AIR UNLOCKED — no pad needed' },
-        { label: 'LARGER SHELLS', cost: 190, sets: { splash: 25 }, info: 'SPLASH 15 → 25' },
-        { label: 'HELL SHELLS', cost: 290, sets: { splash: 30, dmg: 40 }, info: 'SPLASH 25 → 30 · DMG 30 → 40' },
-        { label: 'EXPERT TRAINING', cost: 350, sets: { rate: 1, rng: 120, dmg: 45 }, info: 'RATE 0.8 → 1 · RNG 105 → 120 · DMG 40 → 45' },
+        { label: 'LARGER SHELLS', cost: 190, sets: { splash: 20 }, info: 'SPLASH 12 → 20' },
+        { label: 'HELL SHELLS', cost: 290, sets: { splash: 24, dmg: 36 }, info: 'SPLASH 20 → 24 · DMG 27 → 36' },
+        { label: 'EXPERT TRAINING', cost: 350, sets: { rate: 1, rng: 120, dmg: 40 }, info: 'RATE 0.8 → 1 · RNG 105 → 120 · DMG 36 → 40' },
       ],
       icon: ic('<path d="M7 33l12-12"/><path d="M12 35L24 23"/><path d="M24 23l5-5"/><circle cx="31" cy="12" r="2.2"/><circle cx="35" cy="17" r="2.2"/><circle cx="27" cy="7" r="1.8"/>') },
     { id: 'sniper', name: 'SNIPER', cat: 'offense', unlock: 5, price: { nc: 1800, bt: 50 }, cost: 300, currency: 'mixed',
       tagline: 'Long-reach marksman — one trigger pull, one deletion.',
-      stats: { dmg: 160, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      stats: { dmg: 145, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
       special: '>> Pinpoint rounds erase the priority threat. Tier-1 Sniper Headset locks every shot onto the highest-HP hostile in reach.',
       art: 'assets/towers/sniper.png',
       track: [
         { label: 'SNIPER HEADSET', cost: 150, sets: { rng: 270, targeting: 'maxhp' }, info: 'RNG 250 → 270 · ONLY TARGETS THE HIGHEST-HP ENEMY IN RANGE' },
-        { label: 'HIGHER CAL', cost: 200, sets: { dmg: 180 }, info: 'DMG 160 → 180' },
+        { label: 'HIGHER CAL', cost: 200, sets: { dmg: 165 }, info: 'DMG 145 → 165' },
         { label: 'AUTO RE-LOADER 9000', cost: 300, sets: { rate: 0.5 }, info: 'RATE 0.3 → 0.5' },
-        { label: '50 CAL', cost: 300, sets: { dmg: 270 }, info: 'DMG 180 → 270' },
-        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 470, rate: 0.4, rng: 350 }, info: 'DMG 270 → 470 · RATE 0.5 → 0.4 · RNG 270 → 350' },
+        { label: '50 CAL', cost: 300, sets: { dmg: 240 }, info: 'DMG 165 → 240' },
+        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 420, rate: 0.4, rng: 350 }, info: 'DMG 240 → 420 · RATE 0.5 → 0.4 · RNG 270 → 350' },
       ],
       icon: ic('<circle cx="20" cy="20" r="9"/><path d="M20 4v7"/><path d="M20 29v7"/><path d="M4 20h7"/><path d="M29 20h7"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'dronespawner', name: 'DRONE SPAWNER', cat: 'special', unlock: 20, price: { nc: 5200, bt: 85 }, cost: 475, currency: 'mixed', limit: 1,
+      tagline: 'Automated carrier — fabricates one-way strike drones straight into traffic.',
+      stats: { dmg: 0, rate: 0, rng: 190, drone: 70, launchEvery: 6, tgt: 'SPAWNER // LAUNCHES STRIKE DRONES · ONE PER COMMANDER' },
+      special: '>> While hostiles stand inside its ring, the carrier rolls a strike drone off the line every few seconds. The drone rockets across the grid and detonates on the first hostile it intercepts — walkers and flyers alike — for its full payload. Only one carrier deploys per commander.',
+      art: 'assets/towers/dronespawner.png',
+      track: [
+        { label: 'HUNGER DRONES', cost: 240, sets: { launchEvery: 5 }, info: 'LAUNCH CADENCE 6s → 5s' },
+        { label: 'WARBIRD CHASSIS', cost: 420, sets: { drone: 110 }, info: 'DRONE DMG/HULL 70 → 110' },
+        { label: 'SWARM LOGIC', cost: 850, sets: { launchEvery: 4, drone: 160 }, info: 'LAUNCH 5s → 4s · DRONE 110 → 160' },
+        { label: 'APEX CARRIER', cost: 1900, sets: { rng: 230, launchEvery: 3, drone: 240 }, info: 'RNG 190 → 230 · LAUNCH 4s → 3s · DRONE 160 → 240' },
+      ],
+      icon: ic('<rect x="10" y="22" width="20" height="8" rx="1"/><path d="M14 22v-4M26 22v-4"/><path d="M14 14h4M22 14h4"/><circle cx="16" cy="12" r="2.4"/><circle cx="24" cy="12" r="2.4"/><path d="M20 30v4M12 34h16"/>') },
+    { id: 'missilesilo', name: 'MISSILE SILO', cat: 'offense', unlock: 30, price: { nc: 9000, bt: 120 }, cost: 650, currency: 'mixed',
+      tagline: 'Strategic strike chassis — silo-launched warheads level whole formations.',
+      stats: { dmg: 300, rate: 0.22, rng: 300, splash: 55, tgt: 'SPLASH 55U · AIR + GROUND · NO PAD NEEDED' },
+      special: '>> The endgame answer. Warheads arc out to anywhere in a huge ring and detonate for full damage inside the blast — air or ground, no hex pad required. MIRV PROTOCOL cracks every shell into cluster bomblets that pepper the whole crater.',
+      art: 'assets/towers/missilesilo.png',
+      track: [
+        { label: 'WARHEAD CACHE', cost: 520, sets: { dmg: 420 }, info: 'DMG 300 → 420' },
+        { label: 'CLUSTER PAYLOAD', cost: 780, sets: { splash: 75 }, info: 'SPLASH 55 → 75' },
+        { label: 'SILO AUTOLOADER', cost: 1200, sets: { rate: 0.3, dmg: 500 }, info: 'RATE 0.22 → 0.3 · DMG 420 → 500' },
+        { label: 'MIRV PROTOCOL', cost: 2800, sets: { dmg: 780, splash: 90, rng: 340, cluster: 1 }, info: 'DMG 500 → 780 · SPLASH 75 → 90 · RNG 300 → 340 · MIRV CLUSTER BOMBLETS' },
+      ],
+      icon: ic('<path d="M12 34h16"/><path d="M14 34V14l6-8 6 8v20"/><path d="M17 20h6"/><circle cx="20" cy="26" r="2.4"/><path d="M8 34h24" stroke-dasharray="3 3"/>') },
     { id: 'zeroday', name: 'ZERO DAY-EXPLOIT RIG', cat: 'support', unlock: 15, price: { nc: 3600, bt: 30 }, cost: 350, currency: 'mixed', limit: 1,
       tagline: 'Passive breach engine — no guns, just money printed every wave.',
       stats: { dmg: 0, rate: 0, rng: 0, income: 120, tgt: 'ECONOMY RIG // PAYS EVERY WAVE · ONE PER COMMANDER' },
@@ -242,8 +266,9 @@ window.CBZShop = (() => {
     const splash = entry.stats.splash ? `<div class="tc-meter"><span>SPLASH</span><div class="tm-track"><i style="width:${pct(entry.stats.splash, 80)}"></i></div><b>${entry.stats.splash}U</b></div>` : '';
     const income = entry.stats.income ? `<div class="tc-meter"><span>INCOME</span><div class="tm-track"><i style="width:${pct(entry.stats.income, 1000)}"></i></div><b>$${format(entry.stats.income)}/WAVE</b></div>` : '';
     const summon = entry.stats.summon ? `<div class="tc-meter"><span>SUMMON</span><div class="tm-track"><i style="width:${pct(entry.stats.summon, 100)}"></i></div><b>${entry.stats.summon}% HP</b></div>` : '';
+    const drone = entry.stats.drone ? `<div class="tc-meter"><span>DRONE</span><div class="tm-track"><i style="width:${pct(entry.stats.drone, 300)}"></i></div><b>${entry.stats.drone} DMG/HULL</b></div>` : '';
     const row = (label, value, cap, suffix = '') => (value ? `<div class="tc-meter"><span>${label}</span><div class="tm-track"><i style="width:${pct(value, cap)}"></i></div><b>${value >= 999 ? 'INF' : value}${suffix}</b></div>` : '');
-    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}`;
+    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}`;
   }
 
   function cardHtml(entry) {

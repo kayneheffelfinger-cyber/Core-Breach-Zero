@@ -14,8 +14,19 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.23';
+const BUILD = '2026.10.24';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.24', tag: 'IRON RAIN',
+    items: [
+      ['NEW', 'Two endgame chassis decrypt: the MISSILE SILO (Clearance 30) and the DRONE SPAWNER (Clearance 20) — heavy hardware forged for commanders fighting in the HARD era.'],
+      ['NEW', 'MISSILE SILO — strategic warheads (300 dmg / 55U blast) that track air and ground without a hex pad. MIRV PROTOCOL cracks every shell into cluster bomblets that pepper the whole crater.'],
+      ['NEW', 'DRONE SPAWNER — an automated carrier that fabricates one-way strike drones; each drone detonates on the first hostile it intercepts for its full payload. Apex tier: 240-damage drones every 3 seconds.'],
+      ['BAL', 'SHOTGUNNER + SNIPER tuned down — the burst ring and the rail round were overbudget. Scattergun splash and marksman damage trimmed across both upgrade ladders.'],
+      ['BAL', 'HARD escalates again: hull pressure compounds at 1.10x per wave (wave 30 ≈ 15.9x hull, was 12.2x), hostiles run 15% faster, HELLFIRE burns six waves and the final escort grows a third Firewall Warden.'],
+      ['CLASSIFIED', 'Field test window open: one unregistered deploy signature has been cleared to force-entry the sealed dawn signal ahead of the countdown. If you know, you know.'],
+    ],
+  },
   {
     version: '2026.10.23', tag: 'CRIMSON SIGNAL',
     items: [
@@ -98,10 +109,19 @@ const UPDATE_LOG = [
 const CRIMSON_DEADLINE = Date.parse('2026-10-30T18:00:00Z'); // ~192h after deploy
 const CRIMSON_END = Date.parse('2026-11-06T18:00:00Z');      // 7-day event window
 const CRIMSON_DEBUG = new URLSearchParams(location.search).get('crimson'); // QA override: live | passed
+// Early dawn entry — the site admin's deploy signature alone forces the sealed
+// signal open ahead of the countdown. Every other commander waits for T-0.
+// The mirror of the admin surface in shop.js/server.js (roster name + admin key flag).
+function crimsonEarlyAccess() {
+  const shop = window.CBZShop;
+  const profile = shop && shop.profile ? shop.profile() : null;
+  return Boolean(profile && profile.admin);
+}
 function crimsonPhase(now = Date.now()) {
   if (CRIMSON_DEBUG === 'live') return 'live';
   if (CRIMSON_DEBUG === 'passed') return 'passed';
   if (now >= CRIMSON_END) return 'passed';
+  if (crimsonEarlyAccess()) return 'live';
   if (now >= CRIMSON_DEADLINE) return 'live';
   return 'sealed';
 }
@@ -131,7 +151,7 @@ const menus = {
   },
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of pure hell — compounding hulls, 12% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core).',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of pure hell — compounding hulls, 15% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
@@ -334,6 +354,8 @@ const LOCAL = (() => {
     virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
     shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
     sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
+    dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
+    missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
     zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
     corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed', adminOnly: true },
   };
@@ -812,6 +834,7 @@ function renderCrimsonPanel(item) {
   }
   document.querySelector('#dialog-kicker').textContent = '// EVENT PROTOCOL';
   document.querySelector('#dialog-title').textContent = 'THE CRIMSON DAWN';
+  const earlyEntry = Date.now() < CRIMSON_DEADLINE;
   body.innerHTML = `
     <div class="crimson-panel">
       <div class="crimson-sigil">✦</div>
@@ -823,6 +846,7 @@ function renderCrimsonPanel(item) {
         >> REWARD: 1x <b>DAWNBRINGER</b> RELIC — solar lance, armor-immune beams, air + ground without pads, 1600 DMG SUNSLAUGHTER tier. <b>NEVER OBTAINABLE AGAIN.</b><br>
         >> WINDOW CLOSES: <b>${escapeHtml(crimsonWindowText())}</b>
       </div>
+      ${earlyEntry ? '<p class="crimson-faded" style="letter-spacing:0.18em;">// EARLY FIELD TEST — ONE UNREGISTERED DEPLOY SIGNATURE ACCEPTED</p>' : ''}
       <button class="crimson-deploy" id="crimson-deploy" type="button">DEPLOY INTO THE DAWN <span>→</span></button>
       <p class="dialog-copy" style="text-align:center; margin-top:10px;">Solo deployment // phase-grid sector // no protocol vote — the dawn chooses for you.</p>
     </div>`;

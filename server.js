@@ -39,6 +39,8 @@ const SHOP = {
   virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
   shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
   sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
+  dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
+  missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
   zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
   corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed', adminOnly: true },
 };
