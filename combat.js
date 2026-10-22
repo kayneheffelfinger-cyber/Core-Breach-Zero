@@ -34,6 +34,7 @@ const SURGE_MODS = {
   hardened: { hp: 1.4, speed: 1, label: 'HARDENED HULLS', note: 'HOSTILES +40% HP' },
   crush: { hp: 1.5, speed: 1.15, label: 'CRUSH PROTOCOL', note: 'HOSTILES +50% HP · 15% FASTER' },
   hellfire: { hp: 1.65, speed: 1.2, label: 'HELLFIRE SURGE', note: 'HOSTILES +65% HP · 20% FASTER' },
+  dawnfire: { hp: 1.8, speed: 1.25, label: 'DAWNFIRE SURGE', note: 'HOSTILES +80% HP · 25% FASTER' },
 };
 const EASY_WAVES = [
   { groups: [['glitched', 16]] },
@@ -136,19 +137,52 @@ const HARD_WAVES = [
   { groups: [['shielded', 34], ['nullcore', 20], ['warden', 2], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 36], ['juggernaut', 4], ['phantom', 10]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
+// --- Crimson Dawn: 20 waves of the impossible (LIMITED-TIME EVENT) ------------------
+// The event protocol makes HARD look like a tutorial. Elite classes only get
+// featured from wave 3, boss stacks land every other wave from wave 10, DAWNFIRE
+// surges (the strongest modifier in the game) burn four of the last seven waves
+// and the final hour buries the overseer under 2 Wardens, 3 Viruses and 3 Leaks
+// under DAWNFIRE. Hull pressure compounds at 1.13x per wave — wave 10 ≈ 3x,
+// wave 20 ≈ 10.2x roster hull. The prize: the DAWNBRINGER relic blueprint.
+const CRIMSON_WAVES = [
+  { groups: [['glitched', 34], ['runner', 26]] },
+  { groups: [['shielded', 30], ['glitched', 36], ['runner', 24]], mod: 'overclock' },
+  { groups: [['drone', 30], ['file', 44], ['hexbug', 12]], phase: 'NANITE DEBUT', mod: 'hardened' },
+  { groups: [['runner', 48], ['drone', 24], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS', mod: 'overclock' },
+  { groups: [['shielded', 36], ['drone', 32], ['phantom', 14]], phase: 'PHASE PRESSURE', mod: 'hardened' },
+  { groups: [['nullcore', 18], ['file', 52], ['hexbug', 14]], mod: 'overclock' },
+  { groups: [['shielded', 40], ['nullcore', 16], ['runner', 34]], phase: 'ARMOR COLUMN', mod: 'crush' },
+  { groups: [['nullcore', 18], ['leak', 2], ['file', 44], ['phantom', 12]], phase: 'MINI-BOSS // MEMORY LEAK', mod: 'hardened' },
+  { groups: [['file', 66], ['runner', 38], ['hexbug', 18]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 2], ['shielded', 34], ['juggernaut', 5]], phase: 'DOUBLE TROUBLE', mod: 'dawnfire' },
+  { groups: [['drone', 48], ['runner', 40], ['phantom', 14]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 44], ['nullcore', 22], ['glitched', 52], ['hexbug', 16]], phase: 'DAWNFIRE COLUMN', mod: 'dawnfire' },
+  { groups: [['virus', 3], ['leak', 3], ['file', 62], ['drone', 34], ['juggernaut', 4]], phase: 'VIRULENT SURGE', mod: 'hardened' },
+  { groups: [['leak', 3], ['nullcore', 22], ['drone', 38]], phase: 'LEAK STORM', mod: 'hellfire' },
+  { groups: [['runner', 58], ['drone', 36], ['file', 52], ['phantom', 16]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 24], ['shielded', 40], ['virus', 3], ['juggernaut', 6]], phase: 'ARMOR COLUMN', mod: 'dawnfire' },
+  { groups: [['drone', 52], ['runner', 44], ['glitched', 56]], mod: 'overclock' },
+  { groups: [['virus', 4], ['leak', 3], ['shielded', 38], ['warden', 2]], phase: 'FIREWALL RISING', mod: 'hardened' },
+  { groups: [['nullcore', 26], ['file', 68], ['drone', 40], ['phantom', 16], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hellfire' },
+  { groups: [['shielded', 40], ['nullcore', 24], ['warden', 2], ['overseer', 1], ['virus', 3], ['leak', 3], ['drone', 40], ['juggernaut', 5], ['phantom', 12]], phase: 'FINAL DAWN // THE CRIMSON HOUR', mod: 'dawnfire' },
+];
+
 // Per-protocol pressure: Medium compounds HP faster than Easy on top of denser waves.
 // HARD dials snap off twice — hull pressure now COMPOUNDS every wave
 // ((1.09)^index: wave 10 ≈ 2.2x, wave 20 ≈ 5.1x, wave 30 ≈ 12.2x roster hull —
 // the run escalates, it never plateaus) and every hostile moves 12% faster.
+// CRIMSON DAWN (event) compounds steeper still at 1.13x — wave 20 ≈ 21.7x hull —
+// and every hostile moves 18% faster. Nothing comes back from that.
 const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 }; // legacy linear curve (easy/medium)
-const MODE_HP_GROWTH = { hard: 0.09 }; // HARD ONLY: compounding hull curve — hell is exponential
-const MODE_SPEED = { hard: 1.12 };     // HARD ONLY: all hostiles run 12% faster — less reaction window
+const MODE_HP_GROWTH = { hard: 0.09, crimson: 0.13 }; // compounding hull curves — hell and the dawn are exponential
+const MODE_SPEED = { hard: 1.12, crimson: 1.18 };     // hostile protocol speed multipliers
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
 // Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
 // commander all but ends the run (virus 60, leak 80, warden 120, overseer 250).
-const MODE_BOSS_LEAK = { hard: 10 };
-const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES };
+// Crimson Dawn keeps the same rule: at 21x hull, one leak should end you.
+const MODE_BOSS_LEAK = { hard: 10, crimson: 10 };
+const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, crimson: CRIMSON_WAVES };
 function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
 
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
@@ -180,6 +214,7 @@ const TOWER_RULES = {
   virus: { air: 'yes' },
   zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
   corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
+  dawnbreaker: { air: 'yes' },  // CRIMSON RELIC — dawn-forged lance tracks air natively
 };
 
 // One-off rigs: only a single unit of these chassis may deploy per commander.
@@ -799,7 +834,7 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
-    const hardMult = state.protocol === 'hard' ? 0.85 : 1; // HELL PASS: hard pays WORSE per wave — salvage is blood in HARD
+    const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, and the dawn bleeds you for 70%
     const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
     state.earned += bonus;
@@ -811,7 +846,7 @@ function runWaves(dt) {
     if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
-    state.intermission = state.protocol === 'hard' ? 4.5 : 7; // HELL PASS: hard rebuild windows cut 7s → 4.5s — the swarm never waits
+    state.intermission = state.protocol === 'crimson' ? 3 : state.protocol === 'hard' ? 4.5 : 7; // HARD: 4.5s to rebuild — the swarm never waits. CRIMSON: 3s
     updateHud();
   }
   if (state.intermission > 0) {
@@ -1207,7 +1242,7 @@ function startMission(map, skipVote = false, forcedProtocol = null) {
 function launchCombat(mode) {
   closeVote();
   state.protocol = mode;
-  if (mode === 'hard') state.cash = Math.round(state.cash * 0.8); // HELL PASS: the grid strips 20% of opening salvage — you deploy wounded
+  if (mode === 'hard' || mode === 'crimson') state.cash = Math.round(state.cash * (mode === 'crimson' ? 0.7 : 0.8)); // HELL strips 20% of opening salvage; the DAWN strips 30% — you deploy wounded
   const proto = document.querySelector('#combat-protocol');
   if (proto) proto.textContent = String(mode).toUpperCase();
   state.mode = 'countdown';
@@ -1889,6 +1924,23 @@ function fireTower(tower, target) {
       state.layers.fx.appendChild(slash);
       setTimeout(() => slash.remove(), 160);
       fxRing(tx, ty, 'fx-ring-virus');
+      break;
+    }
+    case 'dawnbreaker': {
+      // CRIMSON RELIC: hitscan solar lance — the beam burns straight through
+      // armor plating AND shield lattices (phase damage), tracks air natively,
+      // and SUNSLAUGHTER tiers splash the burn onto everything near the target.
+      damageEnemy(target, dmg, { phase: true, src: 'dawn' });
+      fireLine(tower, target, 'fx-dawn', 2.4);
+      fxRing(tx, ty, 'fx-ring-amber');
+      const burn = effStats(tower).splash || 0;
+      if (burn > 0) {
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || enemy === target) continue;
+          const [px, py] = posOf(enemy);
+          if (Math.hypot(px - tx, py - ty) <= burn) damageEnemy(enemy, Math.round(dmg * 0.6), { phase: true, src: 'dawn' });
+        }
+      }
       break;
     }
     default: {

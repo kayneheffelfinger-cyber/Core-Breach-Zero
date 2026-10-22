@@ -82,6 +82,17 @@ window.CBZShop = (() => {
         { label: 'NUCLEAR FALL OUT', cost: 500, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
       ],
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: 0, cost: 900, currency: 'nc', event: true,
+      tagline: 'CRIMSON RELIC — a dawn-forged solar lance that treats armor as a rumor.',
+      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR' },
+      special: '>> Forged in the only Crimson Dawn the grid will ever see. Every beam burns straight through armor plating at full damage, tracks air and ground without a hex pad, and the ladder ends in SUNSLAUGHTER: 1600 damage rounds with a burning 45-unit splash. The strongest chassis to ever deploy. It will never be sold, crafted or given again — survive the dawn or never hold it.',
+      track: [
+        { label: 'FIRST LIGHT', cost: 800, sets: { dmg: 640, rate: 1 }, info: 'DMG 420 → 640 · RATE 0.9 → 1.0' },
+        { label: 'MERIDIAN', cost: 1400, sets: { rng: 360, dmg: 900 }, info: 'RNG 320 → 360 · DMG 640 → 900' },
+        { label: 'HIGH NOON', cost: 2200, sets: { dmg: 1200, rate: 1.1 }, info: 'DMG 900 → 1200 · RATE 1.0 → 1.1' },
+        { label: 'SUNSLAUGHTER', cost: 3600, sets: { dmg: 1600, splash: 45 }, info: 'DMG 1200 → 1600 · SOLAR BURN SPLASH 45U' },
+      ],
+      icon: ic('<circle cx="20" cy="20" r="6"/><path d="M20 4v6M20 30v6M4 20h6M30 20h6M8.6 8.6l4.3 4.3M27.1 27.1l4.3 4.3M31.4 8.6l-4.3 4.3M12.9 27.1l-4.3 4.3"/>') },
     { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, price: { nc: 7777, bt: 777 }, cost: 350, currency: 'mixed', limit: 1, adminOnly: true,
       tagline: 'Grave warden — anything that dies near it rises and walks the lane backwards.',
       stats: { dmg: 0, rate: 0, rng: 180, summon: 30, tgt: 'SPAWNER // NO ATTACK · ONE PER COMMANDER' },
@@ -160,10 +171,12 @@ window.CBZShop = (() => {
   }
 
   function visibility(entry) {
-    // CLASSIFIED blueprints exist only for flagged admin commanders — everyone
-    // else never sees the card, the counter, or the buy path.
+    // CLASSIFIED + CRIMSON RELIC: visibility() decides who even sees a card.
+    // adminOnly = flagged admins only. event = relic blueprints — never purchasable,
+    // they materialize in the armory only when the commander survives the event.
     if (entry.adminOnly && !isAdminProfile(profile) && !profile.owned.includes(entry.id)) return 'hidden';
     if (profile.owned.includes(entry.id)) return 'owned';
+    if (entry.event) return 'event-locked';
     if (entry.reward && !profile.firstClear) return 'reward-locked';
     if (profile.level >= entry.unlock) return 'buy';
     if (profile.level >= entry.unlock - HORIZON) return 'locked';
@@ -247,6 +260,20 @@ window.CBZShop = (() => {
           <p class="tc-special">${entry.special}</p>
           ${trackHtml(entry)}
           <div class="tc-lock"><span>SIGNAL ENCRYPTED</span><b>LV ${entry.unlock}</b></div>
+        </article>`;
+    }
+    if (vis === 'event-locked') {
+      return `
+        <article class="tower-card state-event state-locked cat-${entry.cat}" data-id="${entry.id}">
+          <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">CRIMSON RELIC</span></div>
+          <div class="tc-icon">${artHtml(entry) || entry.icon}</div>
+          <h4>${entry.name}</h4>
+          <p class="tc-tagline">${entry.tagline}</p>
+          <div class="tc-stats">${meters(entry)}</div>
+          <div class="tc-target">${entry.stats.tgt}</div>
+          <p class="tc-special">${entry.special}</p>
+          ${trackHtml(entry)}
+          <div class="tc-lock crimson-lock"><span>EVENT RELIC</span><b>SLAY THE CRIMSON DAWN</b></div>
         </article>`;
     }
     if (vis === 'reward-locked') {

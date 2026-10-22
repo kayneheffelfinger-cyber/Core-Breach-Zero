@@ -8,17 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261022a">
+  <link rel="stylesheet" href="styles.css?v=20261023a">
   <!-- PeerJS powers the peer-net room relay on static hosts (GitHub Pages): the
        room lead's browser becomes the authority over WebRTC data channels. The
        library is VENDORED locally so a blocked or flaky CDN can never kill
        cross-device multiplayer again; the bays degrade to same-browser tab
        linking only if this file itself fails to load. -->
-  <script src="assets/vendor/peerjs.min.js?v=20261022a" defer></script>
-  <script src="assets/vendor/mqtt.min.js?v=20261022a" defer></script>
-  <script src="app.js?v=20261022a" defer></script>
-  <script src="combat.js?v=20261022a" defer></script>
-  <script src="shop.js?v=20261022a" defer></script>
+  <script src="assets/vendor/peerjs.min.js?v=20261023a" defer></script>
+  <script src="assets/vendor/mqtt.min.js?v=20261023a" defer></script>
+  <script src="app.js?v=20261023a" defer></script>
+  <script src="combat.js?v=20261023a" defer></script>
+  <script src="shop.js?v=20261023a" defer></script>
 </head>
 <body>
   <div class="auth-overlay" id="auth-overlay">
@@ -65,6 +65,9 @@
         <h1 id="main-title">CORE BREACH<span class="title-accent">: ZERO</span></h1>
         <p class="intro">Tactical tower defense protocol // Awaiting commander input</p>
         <nav class="menu-list" aria-label="Main menu">
+          <button class="menu-item menu-crimson" type="button" data-menu="crimson" id="menu-crimson">
+            <span class="menu-icon crimson" aria-hidden="true">✦</span><span class="menu-copy"><strong id="crimson-title">???</strong><small class="crimson-sub" id="crimson-sub">The Crimson Dawn Approaches</small><small class="crimson-count" id="crimson-count">T-192:00:00</small></span><span class="menu-arrow">›</span>
+          </button>
           <button class="menu-item selected" type="button" data-menu="play">
             <span class="menu-icon cyan" aria-hidden="true">▶</span><span class="menu-copy"><strong>PLAY MENU</strong><small>Solo map recon &amp; 2-commander rooms</small></span><span class="menu-arrow">›</span>
           </button>
@@ -81,7 +84,7 @@
             <span class="menu-icon amber" aria-hidden="true">▤</span><span class="menu-copy"><strong>UPDATE LOG</strong><small>Every deployment to the grid, newest first</small></span><span class="menu-arrow">›</span>
           </button>
         </nav>
-        <div class="home-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE</span><span>BUILD 2026.10.21 // RELAY NET</span></div>
+        <div class="home-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE</span><span>BUILD 2026.10.23 // CRIMSON SIGNAL</span></div>
       </section>
 
       <aside class="intel-panel" aria-live="polite">
@@ -97,7 +100,7 @@
         <button class="launch-button" type="button" data-menu="play">OPEN DEPLOYMENT BAY <span>→</span></button>
       </aside>
     </main>
-    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>PEER NET + RELAY NET LIVE // EASY + MEDIUM + HARD MODES // NEXUS SHOP LIVE</span></footer>
+    <footer class="status-footer"><span><i class="live-dot"></i> CORE SERVER ONLINE // ROOM SERVICE READY</span><span>PEER NET + RELAY NET LIVE // EASY + MEDIUM + HARD MODES // CRIMSON SIGNAL DETECTED</span></footer>
   </div>
 
   <div class="battlefield" id="battlefield" hidden>

@@ -45,9 +45,9 @@ check('HELLFIRE SURGE defined (+65% HP / +20% speed)', SURGE_MODS && SURGE_MODS.
 check('legacy linear table intact for easy/medium', MODE_HP_SCALE && MODE_HP_SCALE.easy === 0.12 && MODE_HP_SCALE.medium === 0.14);
 check('beginWave uses compounding branch for hard', /growth\s*\?\s*Math\.pow\(1 \+ growth, index\)/.test(combat));
 check('spawnEnemy applies protocol speed multiplier', /speed: t\.speed \* \(state\.surgeSpeed \|\| 1\) \* \(MODE_SPEED\[state\.protocol\] \|\| 1\)/.test(combat));
-check('wave payout squeeze: hard pays 0.85x', /hardMult = state\.protocol === 'hard' \? 0\.85 : 1/.test(combat));
-check('rebuild window: hard intermission 4.5s', /state\.intermission = state\.protocol === 'hard' \? 4\.5 : 7/.test(combat));
-check('opening salvage stripped 20% on hard lock-in', /mode === 'hard'\) state\.cash = Math\.round\(state\.cash \* 0\.8\)/.test(combat));
+check('wave payout squeeze: hard 0.85x / crimson 0.7x', /hardMult = state\.protocol === 'hard' \? 0\.85 : state\.protocol === 'crimson' \? 0\.7 : 1/.test(combat));
+check('rebuild window: hard 4.5s / crimson 3s', /state\.intermission = state\.protocol === 'crimson' \? 3 : state\.protocol === 'hard' \? 4\.5 : 7/.test(combat));
+check('opening salvage stripped on hard lock-in (0.8x)', /mode === 'hard' \|\| mode === 'crimson'\) state\.cash = Math\.round\(state\.cash \* \(mode === 'crimson' \? 0\.7 : 0\.8\)\)/.test(combat));
 check('vote card copy warns about hell', combat.includes('COMPOUNDING HULLS · +12% SPEED · HELLFIRE SURGES'));
 
 console.log('--- HARD ladder integrity ---');
@@ -90,7 +90,7 @@ console.log('--- Deploy chain: update log, rewards, cache-bust ---');
 const appjs = read('app.js');
 const serverjs = read('server.js');
 const indexhtml = read('index.html');
-check('BUILD bumped to 2026.10.22', appjs.includes("const BUILD = '2026.10.22';"));
+check('BUILD bumped to 2026.10.23', appjs.includes("const BUILD = '2026.10.23';"));
 check('UPDATE LOG leads with HELL PROTOCOL entry', appjs.indexOf('HELL PROTOCOL') < appjs.indexOf('RELAY NET') && appjs.includes("version: '2026.10.22', tag: 'HELL PROTOCOL'"));
 const appRewards = extractLiteral(appjs, 'REWARDS');
 const serverRewards = extractLiteral(serverjs, 'REWARDS');
@@ -99,7 +99,7 @@ check('LOCAL hard boss + flawless bumped (18 NC / 65 XP / 100 NC flawless)', app
 check('server.js REWARDS.hard mirrors LOCAL exactly', JSON.stringify(appRewards.hard) === JSON.stringify(serverRewards.hard));
 check('easy/medium rewards untouched', appRewards.easy.winNC === 60 && appRewards.medium.winNC === 100);
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261022a', busts.length === 6 && busts.every((v) => v === '?v=20261022a'), busts.join(' '));
+check('all 6 index.html assets cache-busted to 20261023a', busts.length === 6 && busts.every((v) => v === '?v=20261023a'), busts.join(' '));
 check('play menu copy names the hell pass', appjs.includes('30 waves of pure hell'));
 
 console.log('--- Syntax gates ---');

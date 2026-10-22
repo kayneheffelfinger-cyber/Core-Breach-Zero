@@ -14,8 +14,18 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.22';
+const BUILD = '2026.10.23';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.23', tag: 'CRIMSON SIGNAL',
+    items: [
+      ['NEW', 'A new button sits at the top of the menu: ??? — an unregistered broadcast bleeding into the sector grid. Origin unknown. The Crimson Dawn Approaches.'],
+      ['NEW', 'The signal carries a 192-hour countdown. When it hits zero, the dawn goes live: a limited-time combat protocol that makes HARD look like a tutorial.'],
+      ['NEW', 'Event rules leak: 20 waves, hull pressure compounding at 1.13x every wave, hostiles 18% faster, DAWNFIRE surges (+80% HP / +25% speed) and boss breaches that hit for x10 core damage.'],
+      ['RELIC', 'Survive all 20 waves and the DAWNBRINGER relic is yours — a dawn-forged solar lance that ignores armor, hits air and ground without a pad, and tops out at 1600 damage with a burning splash. It will never be obtainable again.'],
+      ['NET', 'The event window runs 7 days from unlock, then the signal fades for good. The countdown is the same for every commander on the grid.'],
+    ],
+  },
   {
     version: '2026.10.22', tag: 'HELL PROTOCOL',
     items: [
@@ -80,7 +90,45 @@ const UPDATE_LOG = [
   },
 ];
 
+// --- CRIMSON DAWN event clock -------------------------------------------------------
+// An unregistered broadcast went live with build 2026.10.23: 192 hours of static,
+// then the dawn. The deadline is a FIXED UTC instant — the site is static-hosted,
+// so every commander on the grid counts down to the same second. The window runs
+// 7 days, then the signal fades and the relic is gone for good.
+const CRIMSON_DEADLINE = Date.parse('2026-10-30T18:00:00Z'); // ~192h after deploy
+const CRIMSON_END = Date.parse('2026-11-06T18:00:00Z');      // 7-day event window
+const CRIMSON_DEBUG = new URLSearchParams(location.search).get('crimson'); // QA override: live | passed
+function crimsonPhase(now = Date.now()) {
+  if (CRIMSON_DEBUG === 'live') return 'live';
+  if (CRIMSON_DEBUG === 'passed') return 'passed';
+  if (now >= CRIMSON_END) return 'passed';
+  if (now >= CRIMSON_DEADLINE) return 'live';
+  return 'sealed';
+}
+function crimsonCountdownText() {
+  const ms = Math.max(0, CRIMSON_DEADLINE - Date.now());
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor(ms / 60000) % 60;
+  const s = Math.floor(ms / 1000) % 60;
+  return `T-${String(h).padStart(3, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+function crimsonWindowText() {
+  return new Date(CRIMSON_END).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+}
+
 const menus = {
+  crimson: {
+    tag: 'SIGNAL INTERCEPT', title: '???',
+    description: 'An unregistered broadcast is bleeding into the sector grid. Origin unknown. Protocol unknown. The countdown will not stop.',
+    stats: () => {
+      const phase = crimsonPhase();
+      return [
+        ['SIGNAL', phase === 'sealed' ? 'ENCRYPTED' : phase === 'live' ? 'DECRYPTED' : 'FADED'],
+        ['DAWN IN', phase === 'sealed' ? crimsonCountdownText() : phase === 'live' ? 'NOW' : '—'],
+        ['ORIGIN', 'UNKNOWN'],
+      ];
+    },
+  },
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
     description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of pure hell — compounding hulls, 12% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core).',
@@ -293,6 +341,7 @@ const LOCAL = (() => {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
     medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
     hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
+    crimson: { waveNC: 15, waveXP: 25, bossNC: 25, bossBT: 2, bossXP: 80, winNC: 500, winXP: 600, flawlessNC: 200, flawlessBT: 10, flawlessXP: 300, firstClearBT: 10 },
   };
   let down = false;
 
@@ -486,6 +535,13 @@ const LOCAL = (() => {
         const winKey = `${String(body.map)}:${String(body.difficulty)}`;
         meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
       }
+      // Crimson Dawn relic — surviving the event grants the DAWNBRINGER blueprint,
+      // one per commander, never purchasable. It exists in no shop price table.
+      let relic = false;
+      if (win && String(body.difficulty) === 'crimson' && !meta.owned.includes('dawnbreaker')) {
+        meta.owned.push('dawnbreaker');
+        relic = true;
+      }
       const afterAch = achievementsFrom(meta.mapWins);
       // Perk multipliers — perk loadout is explicit: only EQUIPPED perks (max 2)
       // run. SALVAGE PROTOCOL = +10% NC; BOUNTY HUNTER = +25% commander bounty NC.
@@ -505,7 +561,7 @@ const LOCAL = (() => {
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, unlocked, profile: profilePayload(account) };
+      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before }, unlocked, profile: profilePayload(account) };
     }
     if (path === '/api/redeem') {
       // Salvage-code redemption — mirrors server.js exactly (same codes, same grants).
@@ -706,6 +762,7 @@ function openMenu(key) {
   document.querySelector('#dialog-kicker').textContent = `// ${item.tag}`;
   document.querySelector('#dialog-title').textContent = item.title;
   if (key === 'play') openPlayMenu();
+  else if (key === 'crimson') renderCrimsonPanel(item);
   else if (key === 'shop') renderNexusShop();
   else if (key === 'perks') renderPerksMenu(item);
   else if (key === 'settings') renderSettingsPanel(item);
@@ -713,6 +770,84 @@ function openMenu(key) {
   else renderDetails(item);
   dialog.showModal();
 }
+
+// --- Crimson Dawn panel: sealed signal -> live event -> faded -----------------------
+function crimsonLoreHtml() {
+  return `
+    <div class="crimson-lore">
+      >> SIGNAL INTERCEPT 09-DELTA // ORIGIN: <b>UNKNOWN</b><br>
+      >> DECRYPTION: <b>FAILED</b> — 192 HOURS TO FORCED ENTRY<br>
+      >> CONTENT FRAGMENT: "...the dawn does not ask permission. it does not bargain. it arrives, and the grid <b>burns in colors you have never survived</b>."<br>
+      >> ATTACHMENT DETECTED: 1 RELIC BLUEPRINT — <b>DAWNBRINGER</b> // ENCRYPTED<br>
+      >> THE GRID REMEMBERS: NOTHING STAYS BURIED.
+    </div>`;
+}
+function renderCrimsonPanel(item) {
+  const phase = crimsonPhase();
+  if (phase === 'sealed') {
+    body.innerHTML = `
+      <div class="crimson-panel">
+        <div class="crimson-sigil">✦</div>
+        <div class="crimson-big" id="crimson-big">${crimsonCountdownText()}<small>UNTIL THE DAWN</small></div>
+        ${crimsonLoreHtml()}
+        <p class="dialog-copy" style="text-align:center; margin-top:14px;">The broadcast repeats the same fragment every hour. Command has no record of this transmission. The countdown is not ours. The dawn approaches.</p>
+      </div>`;
+    return;
+  }
+  if (phase === 'passed') {
+    const shop = window.CBZShop;
+    const profile = shop && shop.profile ? shop.profile() : null;
+    const relic = Boolean(profile && profile.owned && profile.owned.includes('dawnbreaker'));
+    document.querySelector('#dialog-kicker').textContent = '// SIGNAL LOST';
+    document.querySelector('#dialog-title').textContent = 'THE DAWN HAS PASSED';
+    body.innerHTML = `
+      <div class="crimson-panel">
+        <div class="crimson-sigil" style="opacity:0.35; animation:none;">✦</div>
+        <p class="crimson-faded">THE BROADCAST WENT SILENT — THE WINDOW IS CLOSED</p>
+        <p class="dialog-copy" style="text-align:center; margin-top:12px;">${relic
+          ? 'The grid records your name. The DAWNBRINGER relic is held in your armory — a survivor\u2019s mark from the only Crimson Dawn there will ever be.'
+          : 'The dawn came and went. Whatever burned in those seven days burned without you — the DAWNBRINGER relic is gone with it. Nothing stays buried, but nothing returns either.'}</p>
+      </div>`;
+    return;
+  }
+  document.querySelector('#dialog-kicker').textContent = '// EVENT PROTOCOL';
+  document.querySelector('#dialog-title').textContent = 'THE CRIMSON DAWN';
+  body.innerHTML = `
+    <div class="crimson-panel">
+      <div class="crimson-sigil">✦</div>
+      <div class="crimson-lore">
+        >> FORCED ENTRY COMPLETE. THE BROADCAST IS <b>THE EVENT</b>.<br>
+        >> 20 WAVES. HULL PRESSURE <b>COMPOUNDS 1.13x EVERY WAVE</b> — wave 10 ≈ 3x hull, wave 20 ≈ 10.2x.<br>
+        >> HOSTILES RUN <b>18% FASTER</b>. DAWNFIRE SURGES STACK <b>+80% HP / +25% SPEED</b> onto the worst waves.<br>
+        >> COMMANDER BREACHES HIT THE CORE FOR <b>x10 DAMAGE</b>. REBUILD WINDOWS: 3 SECONDS. SALVAGE PAYS 70%.<br>
+        >> REWARD: 1x <b>DAWNBRINGER</b> RELIC — solar lance, armor-immune beams, air + ground without pads, 1600 DMG SUNSLAUGHTER tier. <b>NEVER OBTAINABLE AGAIN.</b><br>
+        >> WINDOW CLOSES: <b>${escapeHtml(crimsonWindowText())}</b>
+      </div>
+      <button class="crimson-deploy" id="crimson-deploy" type="button">DEPLOY INTO THE DAWN <span>→</span></button>
+      <p class="dialog-copy" style="text-align:center; margin-top:10px;">Solo deployment // phase-grid sector // no protocol vote — the dawn chooses for you.</p>
+    </div>`;
+  body.querySelector('#crimson-deploy').addEventListener('click', () => {
+    playSound();
+    dialog.close();
+    openBattlefield('cbz');
+    if (window.CBZCombat) CBZCombat.startMission(BATTLE_MAPS.cbz, true, 'crimson');
+  });
+}
+setInterval(() => {
+  const phase = crimsonPhase();
+  const button = document.querySelector('#menu-crimson');
+  if (button) {
+    button.classList.toggle('crimson-live', phase === 'live');
+    const count = document.querySelector('#crimson-count');
+    const title = document.querySelector('#crimson-title');
+    const sub = document.querySelector('#crimson-sub');
+    if (count) count.textContent = phase === 'sealed' ? crimsonCountdownText() : phase === 'live' ? 'THE DAWN IS HERE' : 'SIGNAL LOST';
+    if (title) title.textContent = phase === 'live' ? 'CRIMSON DAWN' : '???';
+    if (sub) sub.textContent = phase === 'live' ? 'The Dawn has arrived — the window is open' : phase === 'passed' ? 'The signal went silent' : 'The Crimson Dawn Approaches';
+  }
+  const big = document.querySelector('#crimson-big');
+  if (big && phase === 'sealed') big.innerHTML = `${crimsonCountdownText()}<small>UNTIL THE DAWN</small>`;
+}, 1000);
 
 // --- Skill matrix: PERKS + ACHIEVEMENTS tabs --------------------------------------
 function renderPerksMenu(item) {

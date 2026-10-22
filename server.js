@@ -54,6 +54,7 @@ const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
   medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
   hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
+  crimson: { waveNC: 15, waveXP: 25, bossNC: 25, bossBT: 2, bossXP: 80, winNC: 500, winXP: 600, flawlessNC: 200, flawlessBT: 10, flawlessXP: 300, firstClearBT: 10 },
 };
 const PROTOCOLS = Object.keys(REWARDS);
 
@@ -291,6 +292,13 @@ async function handleApi(request, response, pathname) {
       const winKey = `${String(body.map)}:${String(body.difficulty)}`;
       meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
     }
+    // Crimson Dawn relic — surviving the event grants the DAWNBRINGER blueprint,
+    // one per commander, never purchasable (it exists in no shop price table).
+    let relic = false;
+    if (win && String(body.difficulty) === 'crimson' && !meta.owned.includes('dawnbreaker')) {
+      meta.owned.push('dawnbreaker');
+      relic = true;
+    }
     const afterAch = achievementsFrom(meta.mapWins);
     // Perk multipliers — perk loadout is explicit: only EQUIPPED perks (max 2)
     // run. SALVAGE PROTOCOL = +10% NC; BOUNTY HUNTER = +25% commander bounty NC.
@@ -308,7 +316,7 @@ async function handleApi(request, response, pathname) {
     }
     if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     saveAccounts();
-    return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, levelsGained: meta.level - before }, unlocked, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before }, unlocked, profile: profilePayload(accounts[name]) });
   }
 
   // Salvage codes — playtesting funds. One redemption per commander account per
