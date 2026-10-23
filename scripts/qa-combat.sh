@@ -27,7 +27,7 @@ echo "logged in as: $($B eval "document.querySelector('#cmdr-chip').textContent"
 sleep 0.5
 
 echo "--- flow 1: recon + vote + wave 1"
-$B find first ".menu-item" click
+$B find first "[data-menu=\"play\"]" click
 sleep 0.5
 $B find text "SOLO MAP RECON" click
 sleep 0.5
@@ -49,7 +49,7 @@ echo "--- flow 2: frozen enemies + hover tooltip (wave 8 tanks)"
 $B open "http://127.0.0.1:3111/?cbzwave=8&freeze=1&cash=1240" > /dev/null
 $B wait --load networkidle
 sleep 1.6
-$B find first ".menu-item" click
+$B find first "[data-menu=\"play\"]" click
 sleep 0.4
 $B find text "SOLO MAP RECON" click
 sleep 0.4
@@ -70,7 +70,7 @@ echo "--- flow 3: wave 5 mini-boss"
 $B open "http://127.0.0.1:3111/?cbzwave=5" > /dev/null
 $B wait --load networkidle
 sleep 1.6
-$B find first ".menu-item" click
+$B find first "[data-menu=\"play\"]" click
 sleep 0.4
 $B find text "SOLO MAP RECON" click
 sleep 0.4
@@ -88,7 +88,7 @@ echo "--- flow 4: CBZ phase gates + dual direction lanes"
 $B open "http://127.0.0.1:3111/?cbzwave=1" > /dev/null
 $B wait --load networkidle
 sleep 1.6
-$B find first ".menu-item" click
+$B find first "[data-menu=\"play\"]" click
 sleep 0.4
 $B find text "SOLO MAP RECON" click
 sleep 0.4

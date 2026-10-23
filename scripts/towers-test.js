@@ -118,16 +118,17 @@ check('early-access gate sits inside the phase machine before the T-0 check', ph
 check('live panel marks the early field test (and nothing more)', appjs.includes('// EARLY FIELD TEST — ONE UNREGISTERED DEPLOY SIGNATURE ACCEPTED'));
 check('QA override still wins over early access (?crimson=passed)', appjs.indexOf("CRIMSON_DEBUG === 'passed'") < earlyIdx);
 check('non-admin seal untouched: default shop profile has no admin flag', shopjs.includes('equippedPerks: [], admin: false }'));
+check('phantom bay fix: setProfile purges catalog-dead blueprint ids', shopjs.includes('towerById(id) && profile.owned.includes(id)'));
 
 console.log('--- Deploy chain: update log, build, cache-bust ---');
 const indexhtml = read('index.html');
 const styles = read('styles.css');
-check('BUILD bumped to 2026.10.24', appjs.includes("const BUILD = '2026.10.24';"));
-check('UPDATE LOG leads with IRON RAIN entry', appjs.indexOf('IRON RAIN') < appjs.indexOf('CRIMSON SIGNAL') && appjs.includes("version: '2026.10.24', tag: 'IRON RAIN'"));
+check('BUILD bumped to 2026.10.25', appjs.includes("const BUILD = '2026.10.25';"));
+check('UPDATE LOG leads with CRIMSON VEINS entry', appjs.indexOf('CRIMSON VEINS') < appjs.indexOf('IRON RAIN') && appjs.includes("version: '2026.10.25', tag: 'CRIMSON VEINS'"));
 check('update log covers both towers + nerf + hard buff + classified field test', ['MISSILE SILO', 'DRONE SPAWNER', 'SHOTGUNNER + SNIPER tuned down', 'HARD escalates again', 'If you know, you know'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261023b', busts.length === 6 && busts.every((v) => v === '?v=20261023b'), busts.join(' '));
-check('shell footer brands IRON RAIN', indexhtml.includes('BUILD 2026.10.24 // IRON RAIN') && indexhtml.includes('IRON RAIN DEPLOYED'));
+check('all 6 index.html assets cache-busted to 20261023c', busts.length === 6 && busts.every((v) => v === '?v=20261023c'), busts.join(' '));
+check('shell footer brands CRIMSON VEINS', indexhtml.includes('BUILD 2026.10.25 // CRIMSON VEINS') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 

@@ -14,8 +14,17 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.24';
+const BUILD = '2026.10.25';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.25', tag: 'CRIMSON VEINS',
+    items: [
+      ['FIX', 'Phantom bay exorcised — loadouts now refuse blueprints that no longer exist in the catalog. A retired roster (RIP ARCLANCE) could leave a ghost id occupying a loadout bay: the strip showed four filled bays while the cap swore all five were armed, and the fifth tower could never be equipped. Equipping a tower now heals the stored layout for good.'],
+      ['NEW', 'The Crimson Dawn deploys onto its own battleground: THE CRIMSON WELL — twin winding veins that graft into a single artery before the Well, two phase tears that hurl hostiles clear across the sector, and eighteen build hexes. CORE: ZERO is retired from event duty.'],
+      ['NEW', 'The Well bleeds: a full crimson board theme — blood-red lanes, counter-rotating ritual seals around the core, pulsing breach sigils where the veins enter, and a dark red horizon vignette.'],
+      ['NEW', 'Every hostile of the dawn arrives marked: crimson aura rings, ember glow and red hull readouts — and hostiles caught in a DAWNFIRE surge burn brighter still.'],
+    ],
+  },
   {
     version: '2026.10.24', tag: 'IRON RAIN',
     items: [
@@ -853,8 +862,8 @@ function renderCrimsonPanel(item) {
   body.querySelector('#crimson-deploy').addEventListener('click', () => {
     playSound();
     dialog.close();
-    openBattlefield('cbz');
-    if (window.CBZCombat) CBZCombat.startMission(BATTLE_MAPS.cbz, true, 'crimson');
+    openBattlefield(CRIMSON_MAP);
+    if (window.CBZCombat) CBZCombat.startMission(CRIMSON_MAP, true, 'crimson');
   });
 }
 setInterval(() => {
@@ -2614,6 +2623,25 @@ const BATTLE_MAPS = {
   },
 };
 
+// Event-exclusive battleground — deliberately NOT in BATTLE_MAPS, so it never leaks
+// into co-op bay pickers or solo map recon. The Crimson Dawn deploys here alone.
+const CRIMSON_MAP = {
+  id: 'crimson', difficulty: 'CRIMSON', name: 'THE CRIMSON WELL', sector: 'SECTOR \u221E // BELOW THE SIGNAL',
+  mechanic: 'TWIN VEINS + PHASE TEARS', hint: 'Two burning veins graft into one artery before the Well.',
+  theme: 'crimson',
+  paths: [
+    'M -60 120 H 150 Q 220 120 220 190 V 240 Q 220 300 290 300 H 380 Q 450 300 450 360 V 410 Q 450 470 520 470 H 640 Q 700 470 700 410 V 370 Q 700 300 630 300 H 505',
+    'M 1060 480 H 860 Q 790 480 790 410 V 360 Q 790 300 720 300 H 690 Q 630 300 630 240 V 190 Q 630 130 570 130 H 370 Q 310 130 310 190 V 230 Q 310 300 380 300 H 505',
+  ],
+  core: { x: 505, y: 300 }, spawns: [[0, 120], [1060, 480]],
+  pads: [[60, 60], [300, 60], [505, 60], [700, 60], [940, 60], [140, 210], [60, 300], [505, 180], [700, 200], [860, 180], [940, 300], [900, 400], [140, 420], [300, 420], [505, 420], [400, 540], [820, 540], [200, 540]],
+  zones: [],
+  gates: [
+    { x: 430, y: 300, toX: 130, toY: 120 },
+    { x: 450, y: 130, toX: 560, toY: 470 },
+  ],
+};
+
 function hexPoints(x, y, r) {
   return Array.from({ length: 6 }, (_, i) => {
     const angle = Math.PI / 3 * i - Math.PI / 6;
@@ -2631,11 +2659,29 @@ function svgNode(name, attributes, text) {
 function buildBoard(map) {
   const board = document.querySelector('#board');
   board.innerHTML = '';
+  if (map.theme) board.dataset.theme = map.theme;
+  else board.removeAttribute('data-theme');
   const layer = (name) => {
     const group = svgNode('g', { class: `layer-${name}` });
     board.appendChild(group);
     return group;
   };
+  // Crimson decor renders beneath every gameplay layer — the Well bleeds first.
+  if (map.theme === 'crimson') {
+    const decor = layer('decor');
+    const defs = svgNode('defs', {});
+    const grad = svgNode('radialGradient', { id: 'crim-vign', cx: '50%', cy: '50%', r: '72%' });
+    grad.appendChild(svgNode('stop', { offset: '55%', 'stop-color': '#2a0a12', 'stop-opacity': '0' }));
+    grad.appendChild(svgNode('stop', { offset: '100%', 'stop-color': '#2a0a12', 'stop-opacity': '.6' }));
+    defs.appendChild(grad);
+    decor.appendChild(defs);
+    decor.appendChild(svgNode('rect', { class: 'crimson-vignette', x: 0, y: 0, width: 1000, height: 600, fill: 'url(#crim-vign)' }));
+    // Ritual rings — slow counter-rotating seals around the Well.
+    decor.appendChild(svgNode('circle', { class: 'crimson-ritual', cx: map.core.x, cy: map.core.y, r: 52 }));
+    decor.appendChild(svgNode('circle', { class: 'crimson-ritual r2', cx: map.core.x, cy: map.core.y, r: 66 }));
+    // Breach sigils — the veins' entry points pulse where the dawn pours in.
+    for (const [sx, sy] of map.spawns) decor.appendChild(svgNode('polygon', { class: 'crimson-runesigil', points: hexPoints(sx, sy, 27) }));
+  }
   const zones = layer('zones');
   const tracks = layer('tracks');
   const gates = layer('gates');
@@ -2680,7 +2726,8 @@ function mapCard(map) {
 }
 
 function openBattlefield(mapId) {
-  const map = BATTLE_MAPS[mapId];
+  // Accepts a BATTLE_MAPS id OR a map object (the event-exclusive CRIMSON_MAP).
+  const map = typeof mapId === 'object' && mapId ? mapId : BATTLE_MAPS[mapId];
   if (!map) return;
   playSound();
   dialog.close();

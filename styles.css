@@ -910,3 +910,40 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
   color: #ff5468; background: rgba(24, 3, 6, 0.7);
   text-shadow: 0 0 8px rgba(255, 30, 50, 0.5);
 }
+
+/* --- CRIMSON DAWN: THE CRIMSON WELL — the board bleeds ----------------------------- */
+#board[data-theme="crimson"] .track-glow { stroke: rgba(255, 43, 74, 0.15); }
+#board[data-theme="crimson"] .track-road { stroke: #150a0f; }
+#board[data-theme="crimson"] .track-line { stroke: rgba(255, 43, 74, 0.6); }
+#board[data-theme="crimson"] .pad { fill: rgba(24, 11, 16, 0.88); stroke: #54202b; }
+#board[data-theme="crimson"] .pad:hover { stroke: #ff2b4a; fill: rgba(255, 43, 74, 0.1); }
+#board[data-theme="crimson"] .spawn-node { fill: rgba(255, 43, 74, 0.14); stroke: #ff2b4a; }
+#board[data-theme="crimson"] .spawn-label { fill: rgba(255, 130, 150, 0.75); }
+#board[data-theme="crimson"] .gate-node { fill: rgba(255, 43, 74, 0.3); stroke: #ff2b4a; }
+#board[data-theme="crimson"] .gate-exit { fill: rgba(255, 43, 74, 0.08); stroke: rgba(255, 130, 150, 0.6); }
+#board[data-theme="crimson"] .core-ring { stroke: rgba(255, 43, 74, 0.55); }
+#board[data-theme="crimson"] .core-node { fill: rgba(255, 43, 74, 0.22); stroke: #ff2b4a; }
+#board[data-theme="crimson"] .core-label { fill: rgba(255, 130, 150, 0.85); }
+#board[data-theme="crimson"] .zone-circle { stroke: rgba(255, 43, 74, 0.4); }
+#board[data-theme="crimson"] .zone-label { fill: rgba(255, 130, 150, 0.8); }
+.crimson-vignette { pointer-events: none; }
+.crimson-ritual {
+  fill: none; stroke: rgba(255, 43, 74, 0.4); stroke-width: 1.2; stroke-dasharray: 3 13;
+  transform-box: fill-box; transform-origin: center;
+  animation: crimson-spin 26s linear infinite;
+}
+.crimson-ritual.r2 { stroke: rgba(255, 130, 150, 0.28); stroke-dasharray: 2 9; animation-duration: 40s; animation-direction: reverse; }
+@keyframes crimson-spin { to { transform: rotate(360deg); } }
+.crimson-runesigil { fill: none; stroke: rgba(255, 43, 74, 0.5); stroke-width: 1.4; animation: spawn-pulse 2.6s ease-in-out infinite; }
+/* crimson hostiles: aura ring + ember glow + red hull readout */
+.e-crimson .e-chassis { filter: drop-shadow(0 0 4px rgba(255, 45, 80, 0.85)) drop-shadow(0 0 11px rgba(255, 0, 50, 0.4)); }
+.e-crimson.e-surge .e-chassis { filter: drop-shadow(0 0 6px rgba(255, 45, 80, 1)) drop-shadow(0 0 16px rgba(255, 0, 50, 0.65)); }
+.e-crimson .hp-fill { fill: #ff5e7a; }
+.e-crimson .e-aura {
+  fill: none; stroke: rgba(255, 43, 74, 0.55); stroke-width: 1.6; stroke-dasharray: 4 5;
+  transform-box: fill-box; transform-origin: center;
+  animation: crimson-aura 1.5s ease-in-out infinite, crimson-spin 9s linear infinite;
+}
+.e-crimson.e-boss .e-aura { stroke-width: 2.4; }
+@keyframes crimson-aura { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.95; } }
+.fx-ring-crimson { stroke: #ff2b4a; }

@@ -1,5 +1,6 @@
 #!/bin/bash
-# Loadout + free placement QA: shop strip -> equip -> mission bar -> place -> blocked -> sell -> towers kill
+# Loadout + phantom-bay QA: strip -> PHANTOM EXORCISM (retired roster id must not occupy a bay)
+# -> buy + equip a full 5-bay loadout -> mission bar -> place -> blocked -> sell -> towers kill
 cd /home/z/my-project/Core-Breach-Zero
 SS=/home/z/my-project/download/screenshots
 mkdir -p "$SS"
@@ -25,29 +26,73 @@ $B wait --fn "document.querySelector('#auth-overlay').hidden === true" --timeout
 echo "logged in: $($B eval "document.querySelector('#cmdr-chip').textContent")"
 
 echo "--- flow 1: shop loadout strip (1 filled + 4 empty bays)"
-$B find text "NEXUS SHOP" click
-sleep 0.7
+$B find first "[data-menu=\"shop\"]" click
+sleep 1.0
 echo "strip present: $($B eval "!!document.querySelector('#loadout-strip')")"
 echo "filled bays: $($B eval "document.querySelectorAll('.ls-bay.filled').length")"
 echo "empty bays: $($B eval "document.querySelectorAll('.ls-bay.ls-empty').length")"
 
-echo "--- flow 2: buy arclance + equip to bay 2"
-$B eval "document.querySelector('[data-buy=\"arclance\"]').scrollIntoView({block:'center'})" > /dev/null
-$B find first "[data-buy='arclance']" click
-sleep 0.4
-$B find first "[data-buy='arclance']" click
-$B wait --fn "window.CBZShop.profile().owned.includes('arclance')" --timeout 6000
-$B eval "document.querySelector('[data-equip=\"arclance\"]').scrollIntoView({block:'center'})" > /dev/null
-$B find first "[data-equip='arclance']" click
-sleep 0.6
-echo "equip button armed: $($B eval "document.querySelector('[data-equip=\"arclance\"]').textContent")"
-echo "filled bays now: $($B eval "document.querySelectorAll('.ls-bay.filled').length")"
+echo "--- flow 2: PHANTOM BAY regression (arclance = blueprint retired in the 3-chassis rebuild)"
+pkill -f "node server.js" 2>/dev/null; sleep 0.4
+node -e "
+const fs = require('fs');
+const db = JSON.parse(fs.readFileSync('accounts.json', 'utf8'));
+const acct = db.QALOADOUT;
+acct.meta.level = 20; acct.meta.nc = 50000; acct.meta.bt = 2000;
+acct.meta.owned.push('arclance');             // ghost blueprint from the old roster
+acct.meta.loadout = ['sentinel', 'arclance']; // ghost occupies bay 2 while rendering EMPTY
+fs.writeFileSync('accounts.json', JSON.stringify(db, null, 2));
+console.log('phantom injected: loadout=' + acct.meta.loadout.join(','));
+"
+(PORT=3111 node server.js > /tmp/cbz-qa.log 2>&1 &)
+sleep 1.4
+$B open http://127.0.0.1:3111/ > /dev/null
+$B wait --load networkidle
+sleep 0.8
+# Server restart wiped in-memory sessions — log back in if the overlay reappeared.
+if [ "$($B eval "document.querySelector('#auth-overlay').hidden" | tr -d '"')" != "true" ]; then
+  $B find first "#tab-login" click
+  sleep 0.3
+  $B find first "#auth-identity" fill "QALOADOUT"
+  $B find first "#auth-passcode" fill "corebreach"
+  $B find first "#auth-submit" click
+  $B wait --fn "document.querySelector('#auth-overlay').hidden === true" --timeout 8000
+fi
+TOKEN=$($B eval "localStorage.getItem('cbz-token')" | tr -d '"')
+$B find first "[data-menu=\"shop\"]" click
+sleep 1.0
+PHANTOM=$($B eval "window.CBZShop.profile().loadout.includes('arclance')" | tr -d '"')
+echo "phantom in live loadout (expect false): $PHANTOM"
+FILLED=$($B eval "document.querySelectorAll('.ls-bay.filled').length")
+EMPTY=$($B eval "document.querySelectorAll('.ls-bay.ls-empty').length")
+echo "filled bays after exorcism (expect 1): $FILLED"
+echo "empty bays after exorcism (expect 4): $EMPTY"
+echo "header: $($B eval "document.querySelector('.ls-head small').textContent.slice(0, 42)")"
+if [ "$PHANTOM" = "false" ] && [ "$FILLED" = "1" ] && [ "$EMPTY" = "4" ]; then echo "PASS phantom bay exorcised"; else echo "FAIL phantom still occupies a bay"; fi
 $B screenshot "$SS/44-shop-loadout-strip.png"
 
-echo "--- flow 3: mission loadout bar appears on deploy"
+echo "--- flow 2b: buy + equip four real towers -> a full 5-bay loadout"
+for T in virus shotgunner sniper zeroday; do
+  $B eval "document.querySelector('[data-buy=\"$T\"]').scrollIntoView({block:'center'})" > /dev/null
+  $B find first "[data-buy='$T']" click
+  sleep 0.3
+  $B find first "[data-buy='$T']" click
+  $B wait --fn "window.CBZShop.profile().owned.includes('$T')" --timeout 6000
+  $B eval "document.querySelector('[data-equip=\"$T\"]').scrollIntoView({block:'center'})" > /dev/null
+  $B find first "[data-equip='$T']" click
+  sleep 0.5
+done
+echo "filled bays final (expect 5): $($B eval "document.querySelectorAll('.ls-bay.filled').length")"
+echo "empty bays final (expect 0): $($B eval "document.querySelectorAll('.ls-bay.ls-empty').length")"
+echo "loadout final: $($B eval "window.CBZShop.loadout().map((t) => t.id).join(',')")"
+HEAL=$(curl -s -X POST http://127.0.0.1:3111/api/profile -H 'content-type: application/json' -d "{\"token\":\"$TOKEN\"}" | python3 -c "import sys,json; lo=json.load(sys.stdin)['profile']['loadout']; print(len(lo), 'arclance' in lo)")
+echo "stored layout healed server-side (expect: 5 False): $HEAL"
+$B screenshot "$SS/44b-shop-5-bays.png"
+
+echo "--- flow 3: mission loadout bar appears on deploy (5 armed slots)"
 $B find first "#dialog-close" click
 sleep 0.5
-$B find first ".menu-item" click
+$B find first "[data-menu=\"play\"]" click
 sleep 0.5
 $B find text "SOLO MAP RECON" click
 sleep 0.5
@@ -97,12 +142,12 @@ sleep 0.4
 echo "after sell towers: $($B eval "document.querySelectorAll('.layer-towers .tower').length")"
 echo "cash after 70% refund: $($B eval "document.querySelector('#combat-cash').textContent")"
 
-echo "--- flow 6: towers actually kill (wave 1, 2 sentinels on the lane)"
+echo "--- flow 6: towers actually kill (wave 1, sentinel + sniper on the lane)"
 $B eval "document.querySelector(\".lo-slot[data-tower='sentinel']\").click()" > /dev/null
 sleep 0.2
 $B eval "__fire(150, 220)" > /dev/null
 $B eval "document.querySelector('.tp-sell') && 0" > /dev/null
-$B eval "document.querySelector(\".lo-slot[data-tower='arclance']\").click()" > /dev/null
+$B eval "document.querySelector(\".lo-slot[data-tower='sniper']\").click()" > /dev/null
 sleep 0.2
 $B eval "__fire(450, 235)" > /dev/null
 sleep 0.3

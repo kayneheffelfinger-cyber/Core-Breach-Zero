@@ -180,9 +180,13 @@ window.CBZShop = (() => {
     const before = profile.level;
     profile = { ...profile, ...next };
     profile.xpNext = xpToNext(profile.level);
-    // A loadout may only ever reference blueprints the commander owns.
+    // A loadout may only ever reference blueprints the commander owns — AND blueprints
+    // that still exist. Retired rosters (RIP ARCLANCE) left ghost ids in stored loadouts:
+    // the bay rendered EMPTY but the 5-bay cap still counted it, so a fifth tower could
+    // never be equipped. Purging catalog-dead ids here heals the strip, the cap check,
+    // the header count and the in-mission bar in one stroke.
     profile.loadout = (Array.isArray(profile.loadout) ? profile.loadout : [])
-      .map(String).filter((id, index, list) => list.indexOf(id) === index && profile.owned.includes(id)).slice(0, MAX_BAYS);
+      .map(String).filter((id, index, list) => list.indexOf(id) === index && towerById(id) && profile.owned.includes(id)).slice(0, MAX_BAYS);
     if (!profile.loadout.length && profile.owned.length) profile.loadout = [profile.owned[0]];
     if (profile.level > before) {
       showToast(`CLEARANCE LEVEL UP — LV ${profile.level} UNLOCKED`);

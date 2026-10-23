@@ -397,13 +397,15 @@ function shapeFor(key, t) {
 // --- Spawning / damage / death -------------------------------------------------------
 function spawnEnemy(key, pathIdx) {
   const t = ENEMY_TYPES[key];
-  const g = svgNode('g', { class: `enemy e-${key}${t.boss ? ' e-boss' : ''}` });
+  const g = svgNode('g', { class: `enemy e-${key}${t.boss ? ' e-boss' : ''}${state.protocol === 'crimson' ? ` e-crimson${state.surgeMod ? ' e-surge' : ''}` : ''}` });
   // Shapes live in an inner chassis so CSS spawn/death/hover animations can scale or
   // bob them freely — a CSS transform on this outer group would override the
   // per-frame position attribute and teleport the unit toward the board corner.
   const chassis = svgNode('g', { class: 'e-chassis' });
   for (const node of shapeFor(key, t)) chassis.appendChild(node);
   g.appendChild(chassis);
+  // The dawn marks its own: a pulsing crimson aura ring orbits every hostile.
+  if (state.protocol === 'crimson') g.insertBefore(svgNode('circle', { class: 'e-aura', r: t.size + 7 }), chassis);
   const barY = -(t.size + 13);
   const barW = t.boss ? 34 : 22;
   g.appendChild(svgNode('rect', { class: 'hp-bg', x: -barW / 2, y: barY, width: barW, height: 3.4 }));
@@ -437,6 +439,7 @@ function spawnEnemy(key, pathIdx) {
   enemy.fy = y;
   g.setAttribute('transform', `translate(${x} ${y})`);
   g.classList.add('spawn-in');
+  if (state.protocol === 'crimson') fxRing(x, y, 'fx-ring-crimson'); // the vein spits them out burning
   setTimeout(() => g.classList.remove('spawn-in'), 420);
   if (t.boss) { banner(t.name, '// HOSTILE COMMANDER DETECTED', 'banner-red'); updateBossBar(); }
   return enemy;
@@ -926,6 +929,7 @@ function beginWave(index) {
   state.bossHpMult = state.protocol === 'easy' ? EASY_BOSS_RELIEF : 1;
   const surge = wave.mod ? SURGE_MODS[wave.mod] : null;
   state.surgeSpeed = surge ? surge.speed : 1;
+  state.surgeMod = wave.mod || null; // crimson visuals: surge waves burn brighter
   if (surge && surge.hp !== 1) state.hpScale *= surge.hp;
   const queue = [];
   const bosses = [];

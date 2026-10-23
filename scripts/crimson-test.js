@@ -28,7 +28,7 @@ function extractLiteral(src, name) {
 
 console.log('--- Crimson clock (app.js) ---');
 const appjs = read('app.js');
-check('BUILD bumped to 2026.10.24', appjs.includes("const BUILD = '2026.10.24';"));
+check('BUILD bumped to 2026.10.25', appjs.includes("const BUILD = '2026.10.25';"));
 check('deadline is a fixed UTC instant (static-host safe)', appjs.includes("Date.parse('2026-10-30T18:00:00Z')"));
 check('192h gate: window is 7 days after unlock', appjs.includes("Date.parse('2026-11-06T18:00:00Z')"));
 check('phase machine: sealed -> live -> passed', /now >= CRIMSON_END\).*passed[\s\S]*?now >= CRIMSON_DEADLINE\).*live[\s\S]*?return 'sealed'/.test(appjs));
@@ -37,7 +37,11 @@ check('countdown format T-HHH:MM:SS', /T-\$\{String\(h\).padStart\(3, '0'\)/.tes
 check('menu ticker repaints every second', appjs.includes("setInterval(() => {"));
 check('ticker drives button title/sub/count + crimson-live class', appjs.includes("crimson-live") && appjs.includes("THE DAWN IS HERE") && appjs.includes("SIGNAL LOST"));
 check('crimson menu entry registered', appjs.includes("crimson: {\n    tag: 'SIGNAL INTERCEPT', title: '???',"));
-check('event panel deploys via CBZCombat.startMission(cbz, true, crimson)', appjs.includes("CBZCombat.startMission(BATTLE_MAPS.cbz, true, 'crimson')"));
+check('event panel deploys onto THE CRIMSON WELL', appjs.includes("CBZCombat.startMission(CRIMSON_MAP, true, 'crimson')"));
+check('CRIMSON_MAP is a dedicated event battleground (not in BATTLE_MAPS)', appjs.includes("name: 'THE CRIMSON WELL'") && appjs.includes("id: 'crimson', difficulty: 'CRIMSON'") && /const BATTLE_MAPS = \{[\s\S]*?\n\};[\s\S]*?const CRIMSON_MAP = \{/.test(appjs));
+check('CRIMSON_MAP carries the crimson board theme + phase tears', appjs.includes("theme: 'crimson'") && appjs.includes("mechanic: 'TWIN VEINS + PHASE TEARS'"));
+check('buildBoard paints the crimson decor + theme hook', appjs.includes("board.dataset.theme = map.theme") && appjs.includes("class: 'crimson-ritual'") && appjs.includes("class: 'crimson-runesigil'"));
+check('openBattlefield accepts a map object for the event map', appjs.includes("typeof mapId === 'object' && mapId ? mapId : BATTLE_MAPS[mapId]"));
 
 console.log('--- Crimson protocol (combat.js) ---');
 const combat = read('combat.js');
@@ -97,11 +101,18 @@ const indexhtml = read('index.html');
 const styles = read('styles.css');
 check('menu button ??? with crimson subtext', indexhtml.includes('data-menu="crimson"') && indexhtml.includes('???</strong>') && indexhtml.includes('The Crimson Dawn Approaches'));
 check('countdown line lives on the button', indexhtml.includes('id="crimson-count"'));
-check('all 6 assets cache-busted to 20261023b', (indexhtml.match(/\?v=20261023b/g) || []).length === 6);
+check('all 6 assets cache-busted to 20261023c', (indexhtml.match(/\?v=20261023c/g) || []).length === 6);
 check('eerie glow styles: menu pulse + big countdown + deploy button', styles.includes('.menu-item.menu-crimson') && styles.includes('.crimson-big') && styles.includes('.crimson-deploy'));
 check('dawn beam style for the relic', styles.includes('.fx-dawn'));
-check('footer brands the signal', indexhtml.includes('CRIMSON SIGNAL DETECTED'));
-check('UPDATE LOG leads with IRON RAIN, then CRIMSON SIGNAL', appjs.indexOf('IRON RAIN') < appjs.indexOf('CRIMSON SIGNAL') && appjs.indexOf('CRIMSON SIGNAL') < appjs.indexOf('HELL PROTOCOL'));
+check('footer brands the Well', indexhtml.includes('THE CRIMSON WELL IS OPEN'));
+check('UPDATE LOG leads with CRIMSON VEINS, then IRON RAIN, then CRIMSON SIGNAL', appjs.indexOf('CRIMSON VEINS') < appjs.indexOf('IRON RAIN') && appjs.indexOf('IRON RAIN') < appjs.indexOf('CRIMSON SIGNAL') && appjs.indexOf('CRIMSON SIGNAL') < appjs.indexOf('HELL PROTOCOL'));
+
+console.log('--- Crimson hostiles + Well theme (combat.js + styles.css) ---');
+check('hostiles of the dawn carry the e-crimson mark', combat.includes('` e-crimson${') && combat.includes("class: 'e-aura'"));
+check('crimson spawn burns an ember ring', combat.includes("fxRing(x, y, 'fx-ring-crimson')"));
+check('surge waves burn brighter (state.surgeMod tracked)', combat.includes('state.surgeMod = wave.mod || null;') && combat.includes(" e-surge"));
+check('Well styles: bleeding lanes + ritual seals + sigils + vignette', styles.includes('#board[data-theme="crimson"] .track-line') && styles.includes('.crimson-ritual') && styles.includes('.crimson-runesigil') && styles.includes('.crimson-vignette'));
+check('hostile styles: aura pulse + ember glow + red hull readout', styles.includes('.e-crimson .e-aura') && styles.includes('.e-crimson .e-chassis') && styles.includes('.e-crimson .hp-fill'));
 check('private early-access gate exists and never leaks to non-admins', appjs.includes('function crimsonEarlyAccess()') && appjs.includes("if (crimsonEarlyAccess()) return 'live';"));
 
 console.log('--- Syntax gates ---');
