@@ -958,6 +958,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .shop-tab-ult:hover { color: #ffe38a; border-color: rgba(255,210,63,.85); }
 .shop-tab-ult.on { border-color: var(--amber); background: #241a05; color: #ffd23f; box-shadow: inset 0 -2px 0 var(--amber); }
 #shop-ultimatum { display: block; }
+#shop-ultimatum[hidden] { display: none; }
 .ult-hero { display: flex; flex-direction: column; gap: 13px; padding: 18px 16px; margin-bottom: 14px; border: 1px solid rgba(255,210,63,.38); background: linear-gradient(180deg, rgba(38,27,5,.5), rgba(10,14,18,.92)); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); }
 .ult-total { font: 700 32px var(--display); color: #ffd23f; text-shadow: 0 0 26px rgba(255,210,63,.35); }
 .ult-total span { margin-right: 8px; color: rgba(255,210,63,.7); }
