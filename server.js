@@ -117,6 +117,10 @@ function sanitizeMeta(name) {
   }
   if (!Number.isFinite(meta.ultCores)) meta.ultCores = 0;
   if (!Number.isFinite(meta.ultClaims)) meta.ultClaims = 0;
+  // DAWN CLEARANCE — full clearance decrypts every blueprint the grid can mint,
+  // the Crimson relic included: the site admin holds the DAWNBRINGER without
+  // waiting for the event window (mirrors app.js LOCAL sanitizeMeta — keep in sync).
+  if (isAdmin(name) && !meta.owned.includes('dawnbreaker')) meta.owned.push('dawnbreaker');
 }
 
 // Grant legacy accounts the Nexus wallet without touching their credentials.

@@ -14,8 +14,15 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.30';
+const BUILD = '2026.10.31';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.31', tag: 'DAWN CLEARANCE',
+    items: [
+      ['RELIC', 'DAWN CLEARANCE — the site admin decrypts the DAWNBRINGER. Full clearance means FULL clearance: every blueprint the grid can mint, the Crimson relic included. The dawn-forged solar lance sits in the armory from first login — no seven-day vigil, no sealed signal, no 20-wave gauntlet between the admin and 1600-damage SUNSLAUGHTER rounds that ignore armor and track air without a pad. Every other commander still earns it the old way: survive the dawn or never hold it.'],
+      ['FIX', 'LOCAL armory heal — the LOCAL loadout link now runs the same access-rules pass the Nexus runs before it checks bay contents, so clearance-granted blueprints arm cleanly on offline rigs instead of bouncing off a stale armory snapshot.'],
+    ],
+  },
   {
     version: '2026.10.30', tag: 'INSANE ERA',
     items: [
@@ -467,6 +474,10 @@ const LOCAL = (() => {
     }
     if (!Number.isFinite(meta.ultCores)) meta.ultCores = 0;
     if (!Number.isFinite(meta.ultClaims)) meta.ultClaims = 0;
+    // DAWN CLEARANCE — full clearance decrypts every blueprint the grid can mint,
+    // the Crimson relic included: the site admin holds the DAWNBRINGER without
+    // waiting for the event window (mirrors server.js sanitizeMeta — keep in sync).
+    if ((meta.admin || isAdminName(account.name)) && !meta.owned.includes('dawnbreaker')) meta.owned.push('dawnbreaker');
   }
 
   function randomHex(bytes) {
@@ -585,6 +596,7 @@ const LOCAL = (() => {
     }
     if (path === '/api/loadout') {
       const account = requireAccount(body);
+      sanitizeMeta(account); // DAWN CLEARANCE — the relic decrypt lands before the armory check
       const meta = account.meta;
       const list = Array.isArray(body.loadout) ? body.loadout.map((id) => String(id || '')) : null;
       if (!list) throw new Error('Loadout payload must be a list of blueprint ids.');

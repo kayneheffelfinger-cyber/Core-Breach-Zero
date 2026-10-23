@@ -252,6 +252,16 @@ async function api(path, payload) {
     check('civilian blossom purchase blocked 404', civBlossom.status === 404, JSON.stringify(civBlossom.data));
     const civPerks = await api('/api/perks', { token: civToken, perks: ['salvage'] });
     check('civilian perk equip without HARDLINE rejected 403', civPerks.status === 403, JSON.stringify(civPerks.data));
+    // DAWN CLEARANCE — the admin decrypts the DAWNBRINGER relic (no event win needed);
+    // the civilian stays empty-handed until it survives the actual Crimson Dawn.
+    const adminRelic = await api('/api/profile', { token });
+    check('DAWN CLEARANCE: relic in admin armory', adminRelic.data.ok && adminRelic.data.profile.owned.includes('dawnbreaker'), JSON.stringify(adminRelic.data.profile.owned));
+    const civRelic = await api('/api/profile', { token: civToken });
+    check('civilian holds no relic before the dawn', civRelic.data.ok && !civRelic.data.profile.owned.includes('dawnbreaker'), JSON.stringify(civRelic.data.profile.owned));
+    const relicArm = await api('/api/loadout', { token, loadout: ['sentinel', 'dawnbreaker'] });
+    check('relic arms into the loadout 200', relicArm.status === 200 && relicArm.data.ok && relicArm.data.profile.loadout.includes('dawnbreaker'), JSON.stringify(relicArm.data));
+    const civArm = await api('/api/loadout', { token: civToken, loadout: ['sentinel', 'dawnbreaker'] });
+    check('civilian relic arm rejected 400', civArm.status === 400, JSON.stringify(civArm.data));
     // FULL CLEARANCE — the admin account (flagged above via ADMINLOG101011) equips
     // perks it never earned; the civilian stays locked out of the same vault.
     const adminPerks = await api('/api/perks', { token, perks: ['deeppockets', 'overclock'] });
