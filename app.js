@@ -14,8 +14,15 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.31';
+const BUILD = '2026.10.32';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.32', tag: 'OPEN ROSTER',
+    items: [
+      ['BAL', 'EXECUTIONER leaves the ULTIMATUM vault and joins the standard blueprint grid — Clearance 50, priced like the top shelf it is: 12,000 NC + 150 BT, the priciest chassis in the rotation. Same headsman rail: max-hull tracking, chaff soaks a token 15% of the shot, and commanders below the execute threshold lose their heads. One rail per commander, and it co-arms freely with the vault cards — only one ULTIMATUM card at a time still applies to blossom and warden. Commanders who claimed the free climb keep it; the armory never claws back.'],
+      ['NEW', 'DAWNBRINGER ships with its own decal — the dawn-forged solar lance finally shows its face in the armory: a sun-disc emitter, gold-sigiled hex base and an amber solar core, sticker-cut like every other chassis in the roster.'],
+    ],
+  },
   {
     version: '2026.10.31', tag: 'DAWN CLEARANCE',
     items: [
@@ -420,6 +427,7 @@ const LOCAL = (() => {
     dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
     missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
     zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
+    executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -457,9 +465,8 @@ const LOCAL = (() => {
   const ULT_CARDS = {
     corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
     gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
-    executioner: { name: 'EXECUTIONER', cores: 0, unlock: 50 },
   };
-  const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'executioner']);
+  const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden']);
   // Enforce access rules on a LOCAL meta: perk-slot default + economy migrations.
   // ULTIMATUM era: legacy metas get their lifetime XP ledger backfilled from the
   // level history — nobody loses owned towers, levels only ever climb now.

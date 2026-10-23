@@ -119,7 +119,7 @@ window.CBZShop = (() => {
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
     { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: 0, cost: 900, currency: 'nc', event: true,
       tagline: 'CRIMSON RELIC — a dawn-forged solar lance that treats armor as a rumor.',
-      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR' },
+      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR' }, art: 'assets/towers/dawnbreaker.png',
       special: '>> Forged in the only Crimson Dawn the grid will ever see. Every beam burns straight through armor plating at full damage, tracks air and ground without a hex pad, and the ladder ends in SUNSLAUGHTER: 1600 damage rounds with a burning 45-unit splash. The strongest chassis to ever deploy. It will never be sold, crafted or given again — survive the dawn or never hold it.',
       track: [
         { label: 'FIRST LIGHT', cost: 800, sets: { dmg: 640, rate: 1 }, info: 'DMG 420 → 640 · RATE 0.9 → 1.0' },
@@ -154,10 +154,10 @@ window.CBZShop = (() => {
         { label: 'LAST TOLL', cost: 3200, sets: { bell: 260, bellEvery: 4.5, yardSlow: 0.45, tollStun: 1.2, rng: 230 }, info: 'BELL 140 → 260 DMG · CADENCE 4.5s · YARD -45% SPEED · STUN 1.2s' },
       ],
       icon: ic('<circle cx="20" cy="21" r="8"/><path d="M20 13v-4M16 9h8"/><circle cx="20" cy="21" r="2.2" fill="currentColor" stroke="none"/><path d="M8 21c2-2 4-2 6 0M26 21c2-2 4-2 6 0"/>') },
-    { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, cost: 450, limit: 1, ultimatum: true,
-      tagline: 'ULTIMATUM CARD — the headsman\u2019s rail. Free for commanders who climbed past Clearance 50. It only has one job.',
+    { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, price: { nc: 12000, bt: 150 }, cost: 450, currency: 'mixed', limit: 1,
+      tagline: 'The headsman\u2019s rail. Decrypts at Clearance 50 — it only has one job.',
       stats: { dmg: 90, rate: 0.5, rng: 240, tgt: 'MAX-HULL // AIR + GROUND · ONE PER COMMANDER', targeting: 'maxhp' },
-      special: '>> The rail never wastes a round on the small stuff — chaff soaks a token 15% of the shot, while commanders (mini-bosses and bosses) pay full price. Its true work is the sentence: mark a commander below the execute threshold and the next round takes its head clean off. Only the final boss is beyond the blade. Claimed at Clearance 50 — no cores, no NC, just the climb. One card armed at a time.',
+      special: '>> The rail never wastes a round on the small stuff — chaff soaks a token 15% of the shot, while commanders (mini-bosses and bosses) pay full price. Its true work is the sentence: mark a commander below the execute threshold and the next round takes its head clean off. Only the final boss is beyond the blade. The priciest chassis in the standard rotation — and the only one that hunts commanders. One rail per commander.',
       art: 'assets/towers/executioner.png',
       track: [
         { label: 'WIDENED SLOTS', cost: 250, sets: { rng: 260 }, info: 'RNG 240 → 260' },
@@ -190,8 +190,6 @@ window.CBZShop = (() => {
       blurb: 'The CLASSIFIED vault is open. One core — one hundred thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
     { id: 'gravewarden', name: 'GRAVE WARDEN', cores: 2, unlock: 20,
       blurb: 'The second apex rig: a walled yard where the dead pay toll. Two cores bank the Warden — the bell never rests, and nothing hostile walks his yard at full speed.' },
-    { id: 'executioner', name: 'EXECUTIONER', cores: 0, unlock: 50,
-      blurb: 'The headsman\u2019s rail costs no cores — it costs the climb. Clearance 50 and beyond claims it free: a bosses-only executioner that takes a commander\u2019s head below the threshold. Only the final boss is beyond the blade.' },
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0, admin: false };
@@ -495,12 +493,10 @@ window.CBZShop = (() => {
         ? `<button class="ult-buy${armedHere ? ' on' : ''}" type="button" data-equip="${card.id}">${armedHere ? 'UNEQUIP CARD' : 'ARM CARD'}</button>`
         : locked
           ? `<button class="ult-buy cant" type="button" disabled>CLEARANCE ${card.unlock} REQUIRED</button>`
-          : card.cores === 0
-            ? `<button class="ult-buy${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'TAKE THE OATH?' : 'CLAIM // FREE AT CLEARANCE ' + card.unlock}</button>`
-            : `<button class="ult-buy${(profile.ultCores || 0) >= card.cores ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'SPEND THE CORE?' : `<i class="tok tok-ult">UC</i>${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</button>`;
+          : `<button class="ult-buy${(profile.ultCores || 0) >= card.cores ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'SPEND THE CORE?' : `<i class="tok tok-ult">UC</i>${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</button>`;
       return `
         <article class="ult-card${owned ? ' owned' : ''}" data-ult-card="${card.id}">
-          <div class="ult-card-top"><span>// ULTIMATUM CARD</span><b>${owned ? 'IN THE ARMORY' : card.cores === 0 ? `CLEARANCE ${card.unlock}` : `${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</b></div>
+          <div class="ult-card-top"><span>// ULTIMATUM CARD</span><b>${owned ? 'IN THE ARMORY' : `${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</b></div>
           ${tower ? artHtml(tower) : ''}
           <h4>${card.name}</h4>
           <p>${card.blurb}</p>

@@ -43,6 +43,7 @@ const SHOP = {
   dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
   missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
   zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
+  executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' },
 };
 
 // ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (100,000 XP per core);
@@ -51,10 +52,9 @@ const ULT_XP_PER_CORE = 100000;
 const ULT_CARDS = {
   corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
   gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
-  executioner: { name: 'EXECUTIONER', cores: 0, unlock: 50 },
 };
 // ULTIMATUM-class towers: at most ONE may be armed in the loadout at a time.
-const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'executioner']);
+const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden']);
 
 // Admin surface: accounts flagged by redeeming the admin key code (ADMINLOG101011)
 // or listed here by exact name. Admins see/purchase CLASSIFIED blueprints.

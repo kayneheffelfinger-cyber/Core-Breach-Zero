@@ -184,13 +184,13 @@ check('blueprint grid excludes ULTIMATUM cards', shopjs.includes('!entry.ultimat
 check('ultimatum vault styled (gold hero + card + exchange)', styles.includes('.ult-hero') && styles.includes('.ult-card') && styles.includes('.ult-exchange.ready') && styles.includes('.tok-ult'));
 
 console.log('--- Deploy chain: update log, build, cache-bust ---');
-check('BUILD bumped to 2026.10.31', appjs.includes("const BUILD = '2026.10.31';"));
+check('BUILD bumped to 2026.10.32', appjs.includes("const BUILD = '2026.10.32';"));
 check('UPDATE LOG leads with ULTIMATUM entry', appjs.indexOf("version: '2026.10.28', tag: 'ULTIMATUM'") < appjs.indexOf("version: '2026.10.27'") && appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL'));
 check('update log covers cap removal + vault + blossom card + migration', ['clearance cap is GONE', 'ULTIMATUM system goes live', 'first ULTIMATUM card', 'backfilled from their clearance history'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024e', busts.length === 6 && busts.every((v) => v === '?v=20261024e'), busts.join(' '));
-check('shell footer brands DAWN CLEARANCE', indexhtml.includes('BUILD 2026.10.31 // DAWN CLEARANCE') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
+check('all 6 index.html assets cache-busted to 20261024f', busts.length === 6 && busts.every((v) => v === '?v=20261024f'), busts.join(' '));
+check('shell footer brands OPEN ROSTER', indexhtml.includes('BUILD 2026.10.32 // OPEN ROSTER') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));
@@ -211,13 +211,14 @@ check('insane economy: opening -25% / wave pay 80% / rebuild 3.5s', combat.inclu
 check('insane pays 350 NC / 400 XP per win, mirrored exactly', INSANE_REWARDS_LOCAL && INSANE_REWARDS_SERVER && INSANE_REWARDS_LOCAL.insane.winNC === 350 && INSANE_REWARDS_LOCAL.insane.winXP === 400 && JSON.stringify(INSANE_REWARDS_LOCAL.insane) === JSON.stringify(INSANE_REWARDS_SERVER.insane));
 check('room protocols carry insane (LOCAL + server sync)', appjs.includes("const ROOM_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];") && serverjs.includes("const PROTOCOL_CHOICES = ['easy', 'medium', 'hard', 'insane'];"));
 check('play menu copy names the spiral', appjs.includes('INSANE (30 waves on the spiral'));
-check('GRAVE WARDEN + EXECUTIONER in the catalog with ULT flags + 5-tier tracks', TOWERS && TOWERS.some((t) => t.id === 'gravewarden' && t.ultimatum === true && t.limit === 1 && t.cost === 400 && t.track.length === 5) && TOWERS.some((t) => t.id === 'executioner' && t.ultimatum === true && t.limit === 1 && t.unlock === 50 && t.track.length === 5));
-check('apex decals shipped', fs.existsSync(path.join(ROOT, 'assets/towers/gravewarden.png')) && fs.existsSync(path.join(ROOT, 'assets/towers/executioner.png')));
-check('shop ULT_CARDS: 3 cards — warden 2 cores / executioner free at L50', /const ULT_CARDS = \[[\s\S]*?gravewarden[\s\S]*?cores: 2[\s\S]*?executioner[\s\S]*?cores: 0, unlock: 50[\s\S]*?\];/.test(shopjs));
-check('free-claim rendering for 0-core cards', shopjs.includes('CLAIM // FREE AT CLEARANCE') && shopjs.includes('card.cores === 0'));
-check('ULT one-card set extends to both apex rigs (server + LOCAL)', serverjs.includes("new Set(['corpseblossom', 'gravewarden', 'executioner'])") && appjs.includes("new Set(['corpseblossom', 'gravewarden', 'executioner'])"));
-check('server ULT_CARDS mirror: warden 2 cores, executioner unlock 50', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(serverjs) && /executioner: \{ name: 'EXECUTIONER', cores: 0, unlock: 50 \}/.test(serverjs));
-check('LOCAL ULT_CARDS mirror matches server', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(appjs) && /executioner: \{ name: 'EXECUTIONER', cores: 0, unlock: 50 \}/.test(appjs));
+check('OPEN ROSTER: EXECUTIONER sold in the grid (no ULT flag), warden stays apex', TOWERS && TOWERS.some((t) => t.id === 'gravewarden' && t.ultimatum === true && t.limit === 1 && t.cost === 400 && t.track.length === 5) && TOWERS.some((t) => t.id === 'executioner' && !t.ultimatum && t.limit === 1 && t.unlock === 50 && t.price && t.price.nc === 12000 && t.price.bt === 150 && t.track.length === 5));
+check('apex decals shipped + dawnbreaker decal', fs.existsSync(path.join(ROOT, 'assets/towers/gravewarden.png')) && fs.existsSync(path.join(ROOT, 'assets/towers/executioner.png')) && fs.existsSync(path.join(ROOT, 'assets/towers/dawnbreaker.png')) && shopjs.includes("art: 'assets/towers/dawnbreaker.png'"));
+check('shop ULT_CARDS: 2 cards — blossom 1 core / warden 2 cores, headsman gone', /const ULT_CARDS = \[[\s\S]*?corpseblossom[\s\S]*?cores: 1[\s\S]*?gravewarden[\s\S]*?cores: 2[\s\S]*?\];/.test(shopjs) && !shopjs.includes("id: 'executioner', name: 'EXECUTIONER', cores"));
+check('free-claim rendering retired with the headsman', !shopjs.includes('CLAIM // FREE AT CLEARANCE') && !shopjs.includes('card.cores === 0'));
+check('ULT one-card set trimmed to the vault duo (server + LOCAL)', serverjs.includes("new Set(['corpseblossom', 'gravewarden'])") && appjs.includes("new Set(['corpseblossom', 'gravewarden'])"));
+check('server ULT_CARDS mirror: vault duo only', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(serverjs) && !serverjs.includes("executioner: { name: 'EXECUTIONER', cores"));
+check('LOCAL ULT_CARDS mirror matches server', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(appjs) && !appjs.includes("executioner: { name: 'EXECUTIONER', cores"));
+check('EXECUTIONER priced in both SHOP mirrors at Clearance 50', serverjs.includes("executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' }") && appjs.includes("executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' }"));
 check('combat: warden + executioner registered as unique rigs with the right AA rules', combat.includes("gravewarden: { air: 'no' }") && combat.includes("executioner: { air: 'yes' }") && combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden', 'executioner'])"));
 check('executioner rail: max-hull targeting + boss-only full damage + execute cut', combat.includes("case 'executioner':") && /target\.t\.boss \? dmg : Math\.max\(1, Math\.round\(dmg \* \(es\.chaffPct \|\| 0\.15\)\)\)/.test(combat) && /target\.key !== 'overseer' && target\.hp <= target\.maxHp \* \(es\.execute \|\| 0\.15\)/.test(combat));
 check('grave warden: DEATH TOLL bell + yard slow + kill-charge feed', combat.includes('function graveWardenFeed') && combat.includes('function wardenYardMult') && /es\.bell && tower\.bellCd <= 0/.test(combat) && /enemy\.stun = Math\.max\(enemy\.stun \|\| 0, es\.tollStun \|\| 0\.8\)/.test(combat));

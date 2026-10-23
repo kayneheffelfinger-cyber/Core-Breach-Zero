@@ -61,6 +61,9 @@ async function api(path, payload) {
     check('unknown blueprint 404', unknown.status === 404);
     const bad = await api('/api/profile', { token: 'garbage' });
     check('bad token 401', bad.status === 401);
+    // OPEN ROSTER — the headsman sells in the grid now, but only past Clearance 50.
+    const exeLocked = await api('/api/shop/purchase', { token, itemId: 'executioner' });
+    check('EXECUTIONER grid card locked 403 below Clearance 50', exeLocked.status === 403, JSON.stringify(exeLocked.data));
 
     const loss = await api('/api/mission/complete', { token, result: 'loss', wavesCleared: 5, bossesKilled: 1, difficulty: 'easy' });
     check('loss nc = 5*8 + 1*10 = 50', loss.data.rewards.nc === 50, JSON.stringify(loss.data.rewards));
@@ -243,6 +246,8 @@ async function api(path, payload) {
     check('second blossom rejected 409 (one per commander)', ultRebuy.status === 409, JSON.stringify(ultRebuy.data));
     const ultUnknown = await api('/api/ultimatum', { token, action: 'buy', card: 'notacard' });
     check('unknown Ultimatum card 404', ultUnknown.status === 404, JSON.stringify(ultUnknown.data));
+    const exeVault = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
+    check('EXECUTIONER left the vault: ultimatum buy 404', exeVault.status === 404, JSON.stringify(exeVault.data));
     // Non-admin who never touched the admin key: registered clean, still blocked.
     const civreg = await api('/api/register', { name: 'SHOPCIVILIAN', email: 'civ@test.io', passcode: 'test1234' });
     const civToken = civreg.data.token;
@@ -302,14 +307,18 @@ async function api(path, payload) {
     check('grave warden costs exactly 2 cores 200', wardenBuy.status === 200 && wardenBuy.data.profile.owned.includes('gravewarden') && wardenBuy.data.profile.ultCores === 0, JSON.stringify(wardenBuy.data));
     const wardenRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
     check('grave warden rebuy 409', wardenRebuy.status === 409, JSON.stringify(wardenRebuy.data));
-    const headsman = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
-    check('executioner claims FREE at clearance 50+ 200 (cores untouched)', headsman.status === 200 && headsman.data.profile.owned.includes('executioner') && headsman.data.profile.ultCores === 0, JSON.stringify(headsman.data));
-    const headsmanRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
-    check('executioner rebuy 409', headsmanRebuy.status === 409, JSON.stringify(headsmanRebuy.data));
+    // --- OPEN ROSTER: the headsman sells in the grid now, vault refuses him ---
+    const wallet = await api('/api/profile', { token });
+    const headsman = await api('/api/shop/purchase', { token, itemId: 'executioner' });
+    check('EXECUTIONER purchased off the grid 200 (12,000 NC + 150 BT)', headsman.status === 200 && headsman.data.ok && headsman.data.profile.owned.includes('executioner') && headsman.data.profile.nc === wallet.data.profile.nc - 12000 && headsman.data.profile.bt === wallet.data.profile.bt - 150, JSON.stringify(headsman.data));
+    const headsmanRebuy = await api('/api/shop/purchase', { token, itemId: 'executioner' });
+    check('EXECUTIONER rebuy 409', headsmanRebuy.status === 409, JSON.stringify(headsmanRebuy.data));
+    const vaultLeft = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
+    check('vault no longer sells the headsman 404', vaultLeft.status === 404, JSON.stringify(vaultLeft.data));
     const bothApex = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'gravewarden', 'executioner'] });
-    check('one-card rule: warden + executioner cannot co-arm 400', bothApex.status === 400, JSON.stringify(bothApex.data));
-    const headsmanArm = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'executioner'] });
-    check('executioner arms as the solo apex card 200', headsmanArm.status === 200 && headsmanArm.data.profile.loadout.includes('executioner'), JSON.stringify(headsmanArm.data));
+    check('warden + headsman co-arm legal 200 (executioner left ULT_TOWERS)', bothApex.status === 200 && bothApex.data.ok && bothApex.data.profile.loadout.includes('executioner'), JSON.stringify(bothApex.data));
+    const duoApex = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'corpseblossom', 'gravewarden'] });
+    check('one-card rule lives: blossom + warden co-arm 400', duoApex.status === 400, JSON.stringify(duoApex.data));
     await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
