@@ -31,7 +31,7 @@ function loadAccounts() {
 const accounts = loadAccounts();
 
 // --- Nexus economy (mirrored in shop.js — keep in sync) -----------------------
-const MAX_LEVEL = 30;
+// Clearance is UNCAPPED since the ULTIMATUM era — levels climb forever.
 const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
 const SHOP = {
   sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
@@ -43,8 +43,14 @@ const SHOP = {
   dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
   missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
   zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
-  corpseblossom: { name: 'CORPSE BLOSSOM', unlock: 20, price: { nc: 7777, bt: 777 }, currency: 'mixed', adminOnly: true },
 };
+
+// ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (100,000 XP per core);
+// cores buy ULTIMATUM cards. Mirrored in app.js LOCAL — keep in sync.
+const ULT_XP_PER_CORE = 100000;
+const ULT_CARDS = { corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 } };
+// ULTIMATUM-class towers: at most ONE may be armed in the loadout at a time.
+const ULT_TOWERS = new Set(['corpseblossom']);
 
 // Admin surface: accounts flagged by redeeming the admin key code (ADMINLOG101011)
 // or listed here by exact name. Admins see/purchase CLASSIFIED blueprints.
@@ -77,7 +83,7 @@ function achievementsFrom(mapWins) {
 }
 
 function defaultMeta() {
-  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [] };
+  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0 };
 }
 
 // Perk loadout: id -> achievement that decrypts it. Mirrored in app.js LOCAL.
@@ -90,22 +96,33 @@ const PERK_ACH = {
   overclock: 'apexpredator',
 };
 
-// Enforce access rules on a meta: perk-slot default + CLASSIFIED ownership strip.
-// Non-admins never hold the Corpse Blossom — it was yanked from general issue.
+// Enforce access rules on a meta: perk-slot default + economy migrations.
+// ULTIMATUM era: legacy metas get their lifetime XP ledger backfilled from the
+// level history, so veteran commanders bank Ultimatum cores on the same curve
+// as fresh ones. Nobody loses owned towers — levels only ever climb now.
 function sanitizeMeta(name) {
   const account = accounts[name];
   if (!account) return;
   const meta = account.meta;
   if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
-  if (!isAdmin(name)) {
-    if (Array.isArray(meta.owned) && meta.owned.includes('corpseblossom')) meta.owned = meta.owned.filter((id) => id !== 'corpseblossom');
-    if (Array.isArray(meta.loadout) && meta.loadout.includes('corpseblossom')) meta.loadout = meta.loadout.filter((id) => id !== 'corpseblossom');
+  if (!Number.isFinite(meta.totalXp)) {
+    let back = Number(meta.xp) || 0;
+    for (let l = 1; l < (meta.level || 1); l += 1) back += xpToNext(l);
+    meta.totalXp = back;
   }
+  if (!Number.isFinite(meta.ultCores)) meta.ultCores = 0;
+  if (!Number.isFinite(meta.ultClaims)) meta.ultClaims = 0;
 }
 
 // Grant legacy accounts the Nexus wallet without touching their credentials.
 for (const name of Object.keys(accounts)) {
-  accounts[name].meta = { ...defaultMeta(), ...(accounts[name].meta && typeof accounts[name].meta === 'object' ? accounts[name].meta : {}) };
+  const legacy = accounts[name].meta && typeof accounts[name].meta === 'object' ? accounts[name].meta : {};
+  if (!Number.isFinite(legacy.totalXp)) {
+    let back = Number(legacy.xp) || 0;
+    for (let l = 1; l < (legacy.level || 1); l += 1) back += xpToNext(l);
+    legacy.totalXp = back; // backfill BEFORE the defaults spread can zero it
+  }
+  accounts[name].meta = { ...defaultMeta(), ...legacy };
   sanitizeMeta(name);
 }
 saveAccounts();
@@ -122,7 +139,7 @@ const REDEEM_CODES = {
 function profilePayload(account) {
   const meta = account.meta;
   sanitizeMeta(account.name);
-  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), maxLevel: MAX_LEVEL, nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins), equippedPerks: meta.equippedPerks || [], admin: isAdmin(account.name) };
+  return { name: account.name, level: meta.level, xp: meta.xp, xpNext: xpToNext(meta.level), nc: meta.nc, bt: meta.bt, firstClear: meta.firstClear, owned: meta.owned, loadout: meta.loadout || [], redeemed: meta.redeemed || [], mapWins: meta.mapWins || {}, achievements: achievementsFrom(meta.mapWins), equippedPerks: meta.equippedPerks || [], totalXp: meta.totalXp || 0, ultCores: meta.ultCores || 0, ultClaims: meta.ultClaims || 0, admin: isAdmin(account.name) };
 }
 
 function saveAccounts() {
@@ -234,7 +251,6 @@ async function handleApi(request, response, pathname) {
     const itemId = String(body.itemId || '');
     const item = SHOP[itemId];
     if (!item) return sendJson(response, 404, { ok: false, error: 'Unknown blueprint.' });
-    if (item.adminOnly && !isAdmin(name)) return sendJson(response, 404, { ok: false, error: 'Unknown blueprint.' }); // CLASSIFIED — admins only
     const meta = accounts[name].meta;
     if (meta.owned.includes(itemId)) return sendJson(response, 409, { ok: false, error: 'Blueprint already in your armory.' });
     if (meta.level < item.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
@@ -265,6 +281,9 @@ async function handleApi(request, response, pathname) {
         : 'Loadouts hold max 5 bays and only blueprints you own.';
       return sendJson(response, 400, { ok: false, error: why });
     }
+    // ULTIMATUM rule — at most ONE Ultimatum card armed at a time.
+    const ultArmed = clean.filter((id) => ULT_TOWERS.has(id)).length;
+    if (ultArmed > 1) return sendJson(response, 400, { ok: false, error: 'Only one ULTIMATUM card can be armed at a time — unequip one first.' });
     meta.loadout = clean;
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
@@ -313,11 +332,11 @@ async function handleApi(request, response, pathname) {
     meta.nc += nc;
     meta.bt += bt;
     meta.xp += xp;
-    while (meta.level < MAX_LEVEL && meta.xp >= xpToNext(meta.level)) {
+    meta.totalXp += xp; // lifetime ledger — banks Ultimatum cores, never decreases
+    while (meta.xp >= xpToNext(meta.level)) { // clearance is UNCAPPED
       meta.xp -= xpToNext(meta.level);
       meta.level += 1;
     }
-    if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     saveAccounts();
     return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before }, unlocked, profile: profilePayload(accounts[name]) });
   }
@@ -344,11 +363,11 @@ async function handleApi(request, response, pathname) {
     const before = meta.level;
     if (grant.xp) {
       meta.xp += grant.xp;
-      while (meta.level < MAX_LEVEL && meta.xp >= xpToNext(meta.level)) {
+      meta.totalXp += grant.xp; // lifetime ledger — banks Ultimatum cores
+      while (meta.xp >= xpToNext(meta.level)) { // clearance is UNCAPPED
         meta.xp -= xpToNext(meta.level);
         meta.level += 1;
       }
-      if (meta.level >= MAX_LEVEL) meta.xp = Math.min(meta.xp, xpToNext(MAX_LEVEL));
     }
     saveAccounts();
     return sendJson(response, 200, { ok: true, granted: { nc: grant.nc, bt: grant.bt, xp: grant.xp || 0, levelsGained: meta.level - before, admin: Boolean(grant.admin), firstClear: Boolean(grant.firstClear) }, profile: profilePayload(accounts[name]) });
@@ -374,6 +393,39 @@ async function handleApi(request, response, pathname) {
     meta.equippedPerks = clean;
     saveAccounts();
     return sendJson(response, 200, { ok: true, profile: profilePayload(accounts[name]) });
+  }
+
+  // ULTIMATUM vault — lifetime XP banks Ultimatum cores; cores buy ULTIMATUM cards.
+  // Mirrored in app.js LOCAL — keep the contract in sync.
+  if (pathname === '/api/ultimatum' && request.method === 'POST') {
+    const body = await readBody(request);
+    const name = sessionName(body ? String(body.token || '') : '');
+    if (!name || !accounts[name]) return sendJson(response, 401, { ok: false, error: 'Session expired. Log in again.' });
+    const meta = accounts[name].meta;
+    const action = String((body || {}).action || '');
+    if (action === 'exchange') {
+      // Milestone claim: every ULT_XP_PER_CORE of LIFETIME XP banks one core.
+      // The ledger never decreases — levels, wallets and owned towers are untouched.
+      const banked = Math.floor((meta.totalXp || 0) / ULT_XP_PER_CORE);
+      if (banked <= (meta.ultClaims || 0)) return sendJson(response, 400, { ok: false, error: `Not enough lifetime XP — an Ultimatum core costs ${ULT_XP_PER_CORE.toLocaleString('en-US')} TOTAL XP.` });
+      meta.ultCores = (meta.ultCores || 0) + 1;
+      meta.ultClaims = (meta.ultClaims || 0) + 1;
+      saveAccounts();
+      return sendJson(response, 200, { ok: true, granted: { cores: meta.ultCores, claims: meta.ultClaims }, profile: profilePayload(accounts[name]) });
+    }
+    if (action === 'buy') {
+      const cardId = String((body || {}).card || '');
+      const card = ULT_CARDS[cardId];
+      if (!card) return sendJson(response, 404, { ok: false, error: 'Unknown Ultimatum card.' });
+      if (meta.owned.includes(cardId)) return sendJson(response, 409, { ok: false, error: 'Ultimatum card already in your armory.' });
+      if (meta.level < card.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${card.unlock} required.` });
+      if ((meta.ultCores || 0) < card.cores) return sendJson(response, 402, { ok: false, error: `Not enough Ultimatum cores — ${card.name} costs ${card.cores}.` });
+      meta.ultCores -= card.cores;
+      meta.owned.push(cardId);
+      saveAccounts();
+      return sendJson(response, 200, { ok: true, acquired: cardId, profile: profilePayload(accounts[name]) });
+    }
+    return sendJson(response, 400, { ok: false, error: 'Unknown Ultimatum action.' });
   }
 
   return sendJson(response, 404, { ok: false, error: 'Unknown API endpoint.' });

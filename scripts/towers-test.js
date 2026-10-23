@@ -1,5 +1,5 @@
-// SCRAP PROTOCOL validation: Sentinel buff, Sniper nerf #3, Virus CONTAGION rework,
-// the SHREDDER early-wave specialist, mirror sync + deploy chain checks.
+// ULTIMATUM validation: uncapped clearance, lifetime XP ledger, core exchange,
+// CORPSE BLOSSOM as the first Ultimatum card, one-card equip rule, mirrors + deploy chain.
 // Usage: node scripts/towers-test.js  (pure file/logic checks — no server needed)
 const fs = require('fs');
 const path = require('path');
@@ -141,7 +141,7 @@ const earlyIdx = appjs.indexOf('if (crimsonEarlyAccess()) return \'live\';');
 check('early-access gate sits inside the phase machine before the T-0 check', phaseIdx >= 0 && earlyIdx > phaseIdx && earlyIdx < appjs.indexOf("now >= CRIMSON_DEADLINE) return 'live';", phaseIdx));
 check('live panel marks the early field test (and nothing more)', appjs.includes('// EARLY FIELD TEST — ONE UNREGISTERED DEPLOY SIGNATURE ACCEPTED'));
 check('QA override still wins over early access (?crimson=passed)', appjs.indexOf("CRIMSON_DEBUG === 'passed'") < earlyIdx);
-check('non-admin seal untouched: default shop profile has no admin flag', shopjs.includes('equippedPerks: [], admin: false }'));
+check('non-admin seal untouched: default shop profile has no admin flag', shopjs.includes('ultClaims: 0, admin: false }'));
 check('phantom bay fix: setProfile purges catalog-dead blueprint ids', shopjs.includes('towerById(id) && profile.owned.includes(id)'));
 
 console.log('--- FULL CLEARANCE: all-perks admin + event debrief (app.js/combat.js/server.js) ---');
@@ -157,16 +157,40 @@ check('event debrief omits the retry button entirely', combat.includes("const ev
 check('non-event debrief keeps RE-DEPLOY / RETRY', combat.includes("${win ? 'RE-DEPLOY' : 'RETRY'}"));
 check('event debrief keeps RETURN TO BAY as the exit', combat.includes("<button class=\"inline-button\" id=\"end-bay\" type=\"button\">RETURN TO BAY</button>"));
 
-console.log('--- Deploy chain: update log, build, cache-bust ---');
+console.log('--- ULTIMATUM: uncapped clearance + core vault (shop.js/app.js/server.js) ---');
 const indexhtml = read('index.html');
 const styles = read('styles.css');
-check('BUILD bumped to 2026.10.27', appjs.includes("const BUILD = '2026.10.27';"));
-check('UPDATE LOG leads with FULL CLEARANCE entry', appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL') && appjs.includes("version: '2026.10.27', tag: 'FULL CLEARANCE'"));
-check('update log covers perk clearance + event debrief fix', ['EVERY perk in the arsenal decrypted', 'ADMIN CLEARANCE', 'RETURN TO BAY'].every((s) => appjs.includes(s)));
+check('level cap is gone everywhere (app/server/shop)', !appjs.includes('MAX_LEVEL') && !serverjs.includes('MAX_LEVEL') && !shopjs.includes('MAX_LEVEL'));
+check('MAX CLEARANCE display retired from the shop', !shopjs.includes('MAX CLEARANCE'));
+check('lifetime XP ledger increments on missions (server + LOCAL)', serverjs.includes('meta.totalXp += xp;') && appjs.includes('meta.totalXp += xp;'));
+check('lifetime XP ledger increments on salvage codes (server + LOCAL)', serverjs.includes('meta.totalXp += grant.xp;') && appjs.includes('meta.totalXp += grant.xp;'));
+check('veteran backfill from clearance history (server + LOCAL)', serverjs.includes('back += xpToNext(l);') && appjs.includes('back += xpToNext(l);'));
+const appUltCards = extractLiteral(appjs, 'ULT_CARDS');
+const serverUltCards = extractLiteral(serverjs, 'ULT_CARDS');
+check('ULT card catalog mirrors (corpseblossom: 1 core, L20)', JSON.stringify(appUltCards) === JSON.stringify(serverUltCards) && Boolean(appUltCards && appUltCards.corpseblossom) && appUltCards.corpseblossom.cores === 1 && appUltCards.corpseblossom.unlock === 20);
+check('ULT_XP_PER_CORE mirrors at 100000', /const ULT_XP_PER_CORE = 100000;/.test(appjs) && /const ULT_XP_PER_CORE = 100000;/.test(serverjs));
+check('/api/ultimatum lives on server + LOCAL', serverjs.includes("pathname === '/api/ultimatum'") && appjs.includes("path === '/api/ultimatum'"));
+check('exchange is a milestone claim (banked vs claims, both sides)', serverjs.includes('banked <= (meta.ultClaims || 0)') && appjs.includes('banked <= (meta.ultClaims || 0)'));
+check('purchase guards: 409 dupe + 403 clearance + 402 cores (server)', serverjs.includes("'Ultimatum card already in your armory.'") && serverjs.includes('Clearance level ${card.unlock} required.') && serverjs.includes('Not enough Ultimatum cores'));
+check('one-card rule enforced in both loadout validators', serverjs.includes('Only one ULTIMATUM card can be armed at a time') && appjs.includes('Only one ULTIMATUM card can be armed at a time'));
+check('blossom left the NC/BT shop mirrors (Ultimatum-only)', !localShop.corpseblossom && !serverShop.corpseblossom);
+check('shop catalog flags the blossom ULTIMATUM (adminOnly retired)', shopjs.includes('ultimatum: true') && !shopjs.includes('adminOnly: true'));
+check('vault tab + panel + exchange wired in the shop', shopjs.includes('shop-tab-ult') && shopjs.includes('data-cat="__ult"') && shopjs.includes('id="shop-ultimatum"') && shopjs.includes('onUltClick'));
+check('exchange button labels the 100k milestone', shopjs.includes('EXCHANGE 100,000 XP // BANK ') && shopjs.includes('REACH 100,000 TOTAL XP TO BANK A CORE'));
+check('TOTAL XP counter lives in the shop wallet', shopjs.includes('TOTAL XP // LIFETIME') && shopjs.includes('id="shop-totalxp"'));
+check('vault card renders blossom art + arm/buy actions', shopjs.includes('data-ult-buy="${card.id}"') && shopjs.includes("ULTIMATUM CARD ACQUIRED"));
+check('client one-card guard + setProfile heal in shop.js', shopjs.includes('ONLY ONE ULTIMATUM CARD CAN BE ARMED') && shopjs.includes('let ultSeen = false;'));
+check('blueprint grid excludes ULTIMATUM cards', shopjs.includes('!entry.ultimatum && (filter'));
+check('ultimatum vault styled (gold hero + card + exchange)', styles.includes('.ult-hero') && styles.includes('.ult-card') && styles.includes('.ult-exchange.ready') && styles.includes('.tok-ult'));
+
+console.log('--- Deploy chain: update log, build, cache-bust ---');
+check('BUILD bumped to 2026.10.28', appjs.includes("const BUILD = '2026.10.28';"));
+check('UPDATE LOG leads with ULTIMATUM entry', appjs.indexOf("version: '2026.10.28', tag: 'ULTIMATUM'") < appjs.indexOf("version: '2026.10.27'") && appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL'));
+check('update log covers cap removal + vault + blossom card + migration', ['clearance cap is GONE', 'ULTIMATUM system goes live', 'first ULTIMATUM card', 'backfilled from their clearance history'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024a', busts.length === 6 && busts.every((v) => v === '?v=20261024a'), busts.join(' '));
-check('shell footer brands FULL CLEARANCE', indexhtml.includes('BUILD 2026.10.27 // FULL CLEARANCE') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
+check('all 6 index.html assets cache-busted to 20261024b', busts.length === 6 && busts.every((v) => v === '?v=20261024b'), busts.join(' '));
+check('shell footer brands ULTIMATUM', indexhtml.includes('BUILD 2026.10.28 // ULTIMATUM') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));

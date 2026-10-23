@@ -172,8 +172,7 @@ async function api(path, payload) {
     const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
     const applyXp = (level, xp, gain) => {
       xp += gain;
-      while (level < 30 && xp >= xpToNext(level)) { xp -= xpToNext(level); level += 1; }
-      if (level >= 30) xp = Math.min(xp, xpToNext(30));
+      while (xp >= xpToNext(level)) { xp -= xpToNext(level); level += 1; } // clearance is UNCAPPED
       return [level, xp];
     };
     const [expLevel1, expXp1] = applyXp(sealed.data.profile.level, sealed.data.profile.xp, 5000);
@@ -223,8 +222,27 @@ async function api(path, payload) {
     const rigBt = rigWallet.data.profile.bt;
     const rig = await api('/api/shop/purchase', { token, itemId: 'zeroday' });
     check('zeroday purchase deducts 3600 NC + 30 BT (L15 gate open)', rig.data.ok && rig.data.profile.owned.includes('zeroday') && rig.data.profile.nc === rigNc - 3600 && rig.data.profile.bt === rigBt - 30, JSON.stringify(rig.data));
-    const blossom = await api('/api/shop/purchase', { token, itemId: 'corpseblossom' });
-    check('blossom purchase (admin key flag) deducts 7777 NC + 777 BT', blossom.data.ok && blossom.data.profile.owned.includes('corpseblossom') && blossom.data.profile.nc === rigNc - 3600 - 7777 && blossom.data.profile.bt === rigBt - 30 - 777, JSON.stringify(blossom.data));
+    // ULTIMATUM era — the Blossom left the NC/BT vault: it is an Ultimatum card now.
+    const blossomNC = await api('/api/shop/purchase', { token, itemId: 'corpseblossom' });
+    check('blossom no longer sold for NC/BT (Ultimatum-only) 404', blossomNC.status === 404, JSON.stringify(blossomNC.data));
+    const ultShallow = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('ultimatum exchange with shallow XP bank 400', ultShallow.status === 400, JSON.stringify(ultShallow.data));
+    for (let i = 0; i < 24; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // repeatable +5000 XP — farms past one 100k core
+    const farmed = await api('/api/profile', { token });
+    check('level cap removed: clearance sails past LV 30', farmed.data.profile.level > 30, `level=${farmed.data.profile.level}`);
+    check('lifetime totalXp ledger banks past 100k', farmed.data.profile.totalXp >= 100000, `totalXp=${farmed.data.profile.totalXp}`);
+    check('no cores banked before the exchange', farmed.data.profile.ultCores === 0 && farmed.data.profile.ultClaims === 0, JSON.stringify(farmed.data.profile));
+    const ultEx = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('100k lifetime XP exchanges for 1 Ultimatum core', ultEx.data.ok && ultEx.data.profile.ultCores === 1 && ultEx.data.profile.ultClaims === 1, JSON.stringify(ultEx.data));
+    check('exchange never touched the level or owned towers', ultEx.data.profile.level === farmed.data.profile.level && ultEx.data.profile.owned.length === farmed.data.profile.owned.length, 'level/armory intact');
+    const ultDupe = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('double exchange before the next 100k rejected 400', ultDupe.status === 400, JSON.stringify(ultDupe.data));
+    const ultBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('Ultimatum card: CORPSE BLOSSOM acquired for 1 core', ultBuy.data.ok && ultBuy.data.profile.owned.includes('corpseblossom') && ultBuy.data.profile.ultCores === 0, JSON.stringify(ultBuy.data));
+    const ultRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('second blossom rejected 409 (one per commander)', ultRebuy.status === 409, JSON.stringify(ultRebuy.data));
+    const ultUnknown = await api('/api/ultimatum', { token, action: 'buy', card: 'notacard' });
+    check('unknown Ultimatum card 404', ultUnknown.status === 404, JSON.stringify(ultUnknown.data));
     // Non-admin who never touched the admin key: registered clean, still blocked.
     const civreg = await api('/api/register', { name: 'SHOPCIVILIAN', email: 'civ@test.io', passcode: 'test1234' });
     const civToken = civreg.data.token;
@@ -259,6 +277,8 @@ async function api(path, payload) {
     check('persisted redeemed ledger (4 codes, repeatable skips ledger)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     check('persisted achievement overdrive + hardline', p.achievements && p.achievements.overdrive === true && p.achievements.hardline === true, JSON.stringify(p.achievements));
     check('persisted mapWins spire + hard ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2 && p.mapWins['easy:hard'] === 1, JSON.stringify(p.mapWins));
+    check('persisted lifetime XP + Ultimatum ledger', typeof p.totalXp === 'number' && p.totalXp >= 100000 && p.ultCores === 0 && p.ultClaims === 1, JSON.stringify({ totalXp: p.totalXp, ultCores: p.ultCores, ultClaims: p.ultClaims }));
+    check('persisted uncapped clearance past LV 30', p.level > 30, `level=${p.level}`);
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

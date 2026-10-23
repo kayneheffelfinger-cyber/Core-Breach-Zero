@@ -2,8 +2,8 @@
 // Loaded after app.js: uses its globals (apiRequest, playSound, showToast).
 // Economy tables mirror server.js — keep xpToNext + reward math in sync there.
 window.CBZShop = (() => {
-  const MAX_LEVEL = 30;
   const HORIZON = 10; // locked blueprints stay visible within 10 levels; beyond that they are hidden
+  // Clearance is UNCAPPED since the ULTIMATUM era — levels climb forever.
   const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
 
   const CATEGORIES = {
@@ -128,10 +128,10 @@ window.CBZShop = (() => {
         { label: 'SUNSLAUGHTER', cost: 3600, sets: { dmg: 1600, splash: 45 }, info: 'DMG 1200 → 1600 · SOLAR BURN SPLASH 45U' },
       ],
       icon: ic('<circle cx="20" cy="20" r="6"/><path d="M20 4v6M20 30v6M4 20h6M30 20h6M8.6 8.6l4.3 4.3M27.1 27.1l4.3 4.3M31.4 8.6l-4.3 4.3M12.9 27.1l-4.3 4.3"/>') },
-    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, price: { nc: 7777, bt: 777 }, cost: 350, currency: 'mixed', limit: 1, adminOnly: true,
-      tagline: 'Grave warden — anything that dies near it rises and walks the lane backwards.',
+    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, cost: 350, limit: 1, ultimatum: true,
+      tagline: 'ULTIMATUM CARD — the grave warden. Anything that dies near it rises and walks the lane backwards.',
       stats: { dmg: 0, rate: 0, rng: 180, summon: 30, tgt: 'SPAWNER // NO ATTACK · ONE PER COMMANDER' },
-      special: '>> When anything dies inside its ring, a weakened copy rises and marches back down the track, detonating on the first hostile it touches for damage equal to its hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain.',
+      special: '>> The apex tier of the Nexus. When anything dies inside its ring, a weakened copy rises and marches back down the track, detonating on the first hostile it touches for damage equal to its hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain. Obtained only in the ULTIMATUM vault: one card armed at a time.',
       art: 'assets/towers/corpseblossom.png',
       track: [
         { label: 'LARGER BRANCHES', cost: 140, sets: { rng: 200 }, info: 'RNG 180 → 200' },
@@ -156,7 +156,15 @@ window.CBZShop = (() => {
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
 
-  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), maxLevel: MAX_LEVEL, nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], admin: false };
+  // --- ULTIMATUM vault: lifetime XP banks cores, cores buy cards -----------------
+  // Mirrors server.js ULT_* — keep in sync.
+  const ULT_XP_PER_CORE = 100000;
+  const ULT_CARDS = [
+    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cores: 1, unlock: 20,
+      blurb: 'The CLASSIFIED vault is open. One core — one hundred thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
+  ];
+
+  let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0, admin: false };
   // Belt-and-braces: a profile snapshot may predate the admin flag (login race,
   // old cache), so the shop ALSO honors the admin roster by commander name —
   // mirrors server.js ADMIN_NAMES. Server still enforces purchases.
@@ -185,6 +193,7 @@ window.CBZShop = (() => {
   let filter = 'all';
   let armed = null;
   let armedTimer = 0;
+  let armedCard = null;
 
   const towerById = (id) => TOWERS.find((entry) => entry.id === id);
   const format = (value) => Number(value || 0).toLocaleString('en-US');
@@ -200,6 +209,9 @@ window.CBZShop = (() => {
     // the header count and the in-mission bar in one stroke.
     profile.loadout = (Array.isArray(profile.loadout) ? profile.loadout : [])
       .map(String).filter((id, index, list) => list.indexOf(id) === index && towerById(id) && profile.owned.includes(id)).slice(0, MAX_BAYS);
+    // ULTIMATUM rule — at most ONE Ultimatum card armed at a time.
+    let ultSeen = false;
+    profile.loadout = profile.loadout.filter((id) => { const e = towerById(id); if (e && e.ultimatum) { if (ultSeen) return false; ultSeen = true; } return true; });
     if (!profile.loadout.length && profile.owned.length) profile.loadout = [profile.owned[0]];
     if (profile.level > before) {
       showToast(`CLEARANCE LEVEL UP — LV ${profile.level} UNLOCKED`);
@@ -212,10 +224,10 @@ window.CBZShop = (() => {
   }
 
   function visibility(entry) {
-    // CLASSIFIED + CRIMSON RELIC: visibility() decides who even sees a card.
-    // adminOnly = flagged admins only. event = relic blueprints — never purchasable,
-    // they materialize in the armory only when the commander survives the event.
-    if (entry.adminOnly && !isAdminProfile(profile) && !profile.owned.includes(entry.id)) return 'hidden';
+    // ULTIMATUM cards never render in the blueprint grid — they live in the vault tab.
+    if (entry.ultimatum) return profile.owned.includes(entry.id) ? 'owned' : 'ultimatum';
+    // CRIMSON RELIC: event = relic blueprints — never purchasable, they materialize
+    // in the armory only when the commander survives the event.
     if (profile.owned.includes(entry.id)) return 'owned';
     if (entry.event) return 'event-locked';
     if (entry.reward && !profile.firstClear) return 'reward-locked';
@@ -225,7 +237,7 @@ window.CBZShop = (() => {
   }
 
   function hiddenCount() {
-    return TOWERS.filter((entry) => visibility(entry) === 'hidden' && !(entry.adminOnly && !isAdminProfile(profile))).length;
+    return TOWERS.filter((entry) => !entry.ultimatum && visibility(entry) === 'hidden').length;
   }
 
   // --- Deployment loadout: the blueprints carried into a mission -----------------
@@ -250,6 +262,13 @@ window.CBZShop = (() => {
     if (spot >= 0) {
       profile.loadout.splice(spot, 1);
     } else {
+      // ULTIMATUM rule — one card armed at a time. Mirrors the Nexus validators.
+      const armedCard = profile.loadout.some((bid) => { const other = towerById(bid); return bid !== id && other && other.ultimatum; });
+      if (entry.ultimatum && armedCard) {
+        playSound('alarm');
+        showToast('ONLY ONE ULTIMATUM CARD CAN BE ARMED — unequip the current card first.');
+        return;
+      }
       if (profile.loadout.length >= MAX_BAYS) {
         playSound('alarm');
         showToast('Loadout full — all 5 bays are occupied. Unequip a blueprint first.');
@@ -354,6 +373,7 @@ window.CBZShop = (() => {
     container = target;
     filter = 'all';
     armed = null;
+    armedCard = null;
     container.innerHTML = `
       <header class="shop-head">
         <div><span class="shop-kicker">// NEXUS MARKETPLACE</span><h3>BLUEPRINT EXCHANGE</h3></div>
@@ -362,9 +382,10 @@ window.CBZShop = (() => {
       <div class="shop-wallet">
         <div class="shop-level">
           <div class="shop-level-badge" id="shop-level-badge"><b id="shop-level">${profile.level}</b><span>CLEARANCE</span></div>
-          <div class="shop-xp"><div class="shop-xp-head"><span>CLEARANCE PROGRESS</span><span id="shop-xp-num"></span></div><div class="shop-xp-track"><i id="shop-xp-fill"></i></div></div>
+          <div class="shop-xp"><div class="shop-xp-head"><span>CLEARANCE PROGRESS — UNCAPPED</span><span id="shop-xp-num"></span></div><div class="shop-xp-track"><i id="shop-xp-fill"></i></div></div>
         </div>
         <div class="shop-currencies">
+          <div class="cur-chip cur-xp"><i class="tok tok-xp">XP</i><div><b id="shop-totalxp">0</b><span>TOTAL XP // LIFETIME</span></div></div>
           <div class="cur-chip cur-nc"><i class="tok tok-nc">NC</i><div><b id="shop-nc">0</b><span>NEXUS COINS</span></div></div>
           <div class="cur-chip cur-bt"><i class="tok tok-bt">BT</i><div><b id="shop-bt">0</b><span>BREACH TOKENS</span></div></div>
         </div>
@@ -376,8 +397,10 @@ window.CBZShop = (() => {
       <p class="shop-note">Nexus Coins flow from every wave, boss and cleared sector. <b>Breach Tokens</b> drop only from boss kills, flawless defenses and first clearances. New blueprints decrypt 10 clearance levels before they unlock — beyond that range, their signals stay hidden. Equipped blueprints deploy from the loadout bar in battle; towers you place claim a clearance box on the grid that blocks overlapping builds.</p>
       <div class="shop-tabs" id="shop-tabs"></div>
       <div class="shop-grid" id="shop-grid"></div>
+      <div id="shop-ultimatum" hidden></div>
       <div class="shop-encrypted" id="shop-encrypted" hidden></div>`;
-    container.querySelector('#shop-tabs').innerHTML = Object.entries(CATEGORIES).map(([id, cat]) => `<button class="shop-tab${id === 'all' ? ' on' : ''}" type="button" data-cat="${id}">${cat.label}</button>`).join('');
+    container.querySelector('#shop-tabs').innerHTML = Object.entries(CATEGORIES).map(([id, cat]) => `<button class="shop-tab${id === 'all' ? ' on' : ''}" type="button" data-cat="${id}">${cat.label}</button>`).join('')
+      + '<button class="shop-tab shop-tab-ult" type="button" data-cat="__ult">★ ULTIMATUM</button>';
     container.querySelector('#shop-tabs').addEventListener('click', (event) => {
       const tab = event.target.closest('[data-cat]');
       if (!tab) return;
@@ -387,6 +410,7 @@ window.CBZShop = (() => {
       repaint();
     });
     container.querySelector('#shop-grid').addEventListener('click', onGridClick);
+    container.querySelector('#shop-ultimatum').addEventListener('click', onUltClick);
     repaint();
   }
 
@@ -395,25 +419,110 @@ window.CBZShop = (() => {
     const grid = container.querySelector('#shop-grid');
     if (!grid) return;
     paintBays();
-    const list = TOWERS.filter((entry) => (filter === 'all' || entry.cat === filter) && visibility(entry) !== 'hidden');
-    grid.innerHTML = list.map(cardHtml).join('');
+    const ultView = filter === '__ult';
+    const list = TOWERS.filter((entry) => !entry.ultimatum && (filter === 'all' || entry.cat === filter) && visibility(entry) !== 'hidden');
+    grid.innerHTML = ultView ? '' : list.map(cardHtml).join('');
+    grid.hidden = ultView;
+    const ultPanel = container.querySelector('#shop-ultimatum');
+    if (ultPanel) {
+      ultPanel.hidden = !ultView;
+      if (ultView) ultPanel.innerHTML = ultPanelHtml();
+    }
     const level = container.querySelector('#shop-level');
     if (level) level.textContent = profile.level;
+    const totalXp = container.querySelector('#shop-totalxp');
+    if (totalXp) totalXp.textContent = format(profile.totalXp || 0);
     const nc = container.querySelector('#shop-nc');
     if (nc) nc.textContent = format(profile.nc);
     const bt = container.querySelector('#shop-bt');
     if (bt) bt.textContent = format(profile.bt);
-    const capped = profile.level >= MAX_LEVEL;
     const xpNum = container.querySelector('#shop-xp-num');
     const xpFill = container.querySelector('#shop-xp-fill');
-    if (xpNum) xpNum.textContent = capped ? 'MAX CLEARANCE' : `${format(profile.xp)} / ${format(profile.xpNext)} XP`;
-    if (xpFill) xpFill.style.width = capped ? '100%' : `${Math.min(100, Math.round((profile.xp / profile.xpNext) * 100))}%`;
+    if (xpNum) xpNum.textContent = `${format(profile.xp)} / ${format(profile.xpNext)} XP`;
+    if (xpFill) xpFill.style.width = `${Math.min(100, Math.round((profile.xp / profile.xpNext) * 100))}%`;
     const encrypted = container.querySelector('#shop-encrypted');
     if (encrypted) {
-      const count = hiddenCount();
+      const count = ultView ? 0 : hiddenCount();
       encrypted.hidden = count === 0;
       encrypted.innerHTML = `<span>▲</span> ${count} ENCRYPTED BLUEPRINT${count === 1 ? '' : 'S'} BEYOND DECRYPT HORIZON <span>▲</span>`;
     }
+  }
+
+  // --- ULTIMATUM vault panel -----------------------------------------------------
+  function ultPanelHtml() {
+    const total = profile.totalXp || 0;
+    const banked = Math.floor(total / ULT_XP_PER_CORE);
+    const ready = Math.max(0, banked - (profile.ultClaims || 0));
+    const intoCore = total % ULT_XP_PER_CORE;
+    const pct = Math.min(100, Math.round((intoCore / ULT_XP_PER_CORE) * 100));
+    const cards = ULT_CARDS.map((card) => {
+      const tower = towerById(card.id);
+      const owned = profile.owned.includes(card.id);
+      const locked = profile.level < card.unlock;
+      const armedHere = owned && profile.loadout.includes(card.id);
+      const arming = !owned && (profile.ultCores || 0) >= card.cores && armedCard === card.id;
+      const action = owned
+        ? `<button class="ult-buy${armedHere ? ' on' : ''}" type="button" data-equip="${card.id}">${armedHere ? 'UNEQUIP CARD' : 'ARM CARD'}</button>`
+        : locked
+          ? `<button class="ult-buy cant" type="button" disabled>CLEARANCE ${card.unlock} REQUIRED</button>`
+          : `<button class="ult-buy${(profile.ultCores || 0) >= card.cores ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'SPEND THE CORE?' : `<i class="tok tok-ult">UC</i>${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</button>`;
+      return `
+        <article class="ult-card${owned ? ' owned' : ''}" data-ult-card="${card.id}">
+          <div class="ult-card-top"><span>// ULTIMATUM CARD</span><b>${owned ? 'IN THE ARMORY' : `${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</b></div>
+          ${tower ? artHtml(tower) : ''}
+          <h4>${card.name}</h4>
+          <p>${card.blurb}</p>
+          ${tower ? `<div class="ult-stats"><span>${tower.stats.tgt}</span></div>` : ''}
+          ${tower ? trackHtml(tower) : ''}
+          ${action}
+        </article>`;
+    }).join('');
+    return `
+      <div class="ult-hero">
+        <div class="ult-total"><span>★</span> ${format(total)}<small>TOTAL XP // EVERY MISSION, BOSS AND SALVAGE CODE — FOREVER</small></div>
+        <div class="ult-core">
+          <div class="ult-core-head"><span>NEXT ULTIMATUM CORE</span><b>${format(intoCore)} / ${format(ULT_XP_PER_CORE)} XP</b></div>
+          <div class="ult-core-track"><i style="width:${pct}%"></i></div>
+          <div class="ult-core-foot"><span>BANKED: ${banked} · CLAIMED: ${profile.ultClaims || 0} · UNSPENT CORES: ${profile.ultCores || 0}</span><span>${ULT_XP_PER_CORE.toLocaleString('en-US')} XP PER CORE</span></div>
+        </div>
+        <button class="ult-exchange${ready > 0 ? ' ready' : ''}" type="button" data-ult-exchange="1" ${ready > 0 ? '' : 'disabled'}>${ready > 0 ? `EXCHANGE 100,000 XP // BANK ${ready} ULTIMATUM CORE${ready === 1 ? '' : 'S'}` : 'REACH 100,000 TOTAL XP TO BANK A CORE'}</button>
+        <p class="ult-note">The exchange NEVER touches your clearance, wallet or armory — levels and owned towers are safe forever. Cores only ever grow.</p>
+      </div>
+      <div class="ult-grid">${cards}</div>`;
+  }
+
+  async function ultimatumAction(payload, button) {
+    if (button) { button.disabled = true; }
+    try {
+      const data = await apiRequest('/api/ultimatum', { token: localStorage.getItem('cbz-token') || '', ...payload });
+      setProfile(data.profile);
+      playSound();
+      if (payload.action === 'exchange') showToast(`ULTIMATUM CORE BANKED — ${(profile.ultCores || 0)} UNSPENT.`);
+      if (payload.action === 'buy') showToast(`ULTIMATUM CARD ACQUIRED: ${ULT_CARDS.find((c) => c.id === payload.card)?.name || 'CARD'} — welcome to the apex tier.`);
+      repaint();
+    } catch (error) {
+      playSound('alarm');
+      showToast(error.message);
+      armedCard = null;
+      repaint();
+    }
+  }
+
+  function onUltClick(event) {
+    const equip = event.target.closest('[data-equip]');
+    if (equip) { toggleEquip(equip.dataset.equip); return; }
+    const exchange = event.target.closest('[data-ult-exchange]');
+    if (exchange && !exchange.disabled) { ultimatumAction({ action: 'exchange' }, exchange); return; }
+    const buy = event.target.closest('[data-ult-buy]');
+    if (!buy) return;
+    const cardId = buy.dataset.ultBuy;
+    if (armedCard !== cardId) {
+      armedCard = cardId;
+      repaint();
+      return;
+    }
+    armedCard = null;
+    ultimatumAction({ action: 'buy', card: cardId }, buy);
   }
 
   function onGridClick(event) {
@@ -487,5 +596,5 @@ window.CBZShop = (() => {
     return data.granted || null;
   }
 
-  return { render, setProfile, submitMission, redeemCode, setPerks, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_LEVEL, MAX_BAYS };
+  return { render, setProfile, submitMission, redeemCode, setPerks, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_BAYS, ULT_CARDS, ULT_XP_PER_CORE };
 })();
