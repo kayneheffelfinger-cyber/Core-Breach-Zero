@@ -14,8 +14,16 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.28';
+const BUILD = '2026.10.29';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.29', tag: 'FLIGHT CORRIDOR',
+    items: [
+      ['BAL', 'Crimson Dawn drone nerf: OVERCLOCKED DRONES now burn the Well for 1 core damage per leak, down from 2 — event battleground only. The Well\u2019s AA hexes sit far off the flight corridors, so a leaked armada no longer cores you through the middle. Drones keep their full 2-damage bite on every other protocol.'],
+      ['NEW', 'Two AA pads laid directly under the drone approach lines on THE CRIMSON WELL — one on the west corridor, one on the east — so ground-only units can finally take the AA link where the flyers actually fly. All 18 original pads untouched.'],
+      ['FIX', 'Hostile intel panel now reports protocol-adjusted CORE DMG — scanning a drone on the Well reads 1, everywhere else reads 2. No more lying readouts.'],
+    ],
+  },
   {
     version: '2026.10.28', tag: 'ULTIMATUM',
     items: [
@@ -2707,7 +2715,7 @@ const CRIMSON_MAP = {
     'M 1060 480 H 860 Q 790 480 790 410 V 360 Q 790 300 720 300 H 690 Q 630 300 630 240 V 190 Q 630 130 570 130 H 370 Q 310 130 310 190 V 230 Q 310 300 380 300 H 505',
   ],
   core: { x: 505, y: 300 }, spawns: [[0, 120], [1060, 480]],
-  pads: [[60, 60], [300, 60], [505, 60], [700, 60], [940, 60], [140, 210], [60, 300], [505, 180], [700, 200], [860, 180], [940, 300], [900, 400], [140, 420], [300, 420], [505, 420], [400, 540], [820, 540], [200, 540]],
+  pads: [[60, 60], [300, 60], [505, 60], [700, 60], [940, 60], [140, 210], [60, 300], [505, 180], [700, 200], [860, 180], [940, 300], [900, 400], [140, 420], [300, 420], [505, 420], [400, 540], [820, 540], [200, 540], [300, 225], [700, 365]],
   zones: [],
   gates: [
     { x: 430, y: 300, toX: 130, toY: 120 },

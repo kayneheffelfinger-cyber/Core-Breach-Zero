@@ -182,6 +182,16 @@ const EASY_BOSS_RELIEF = 0.9;
 // commander all but ends the run (virus 60, leak 80, warden 120, overseer 250).
 // Crimson Dawn keeps the same rule: at 21x hull, one leak should end you.
 const MODE_BOSS_LEAK = { hard: 10, crimson: 10 };
+// Flight Corridor pass: OVERCLOCKED DRONES burn the Well's core for 1 per leak,
+// down from 2 — the event map's AA hexes sit far off the flight corridors, so a
+// leaked armada shouldn't core you through the middle. Absolute per-hostile
+// overrides for non-boss leaks (future event protocols: add rows).
+const MODE_LEAK = { crimson: { drone: 1 } };
+function leakDamage(enemy) {
+  const overrides = MODE_LEAK[state.protocol] || {};
+  if (!enemy.t.boss && overrides[enemy.key] != null) return overrides[enemy.key];
+  return Math.round(enemy.t.dmg * (enemy.t.boss ? (MODE_BOSS_LEAK[state.protocol] || 1) : 1));
+}
 const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, crimson: CRIMSON_WAVES };
 function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
 
@@ -689,7 +699,7 @@ function leakEnemy(enemy) {
   enemy.alive = false;
   hideTip(enemy);
   enemy.node.remove();
-  const leakDmg = Math.round(enemy.t.dmg * (enemy.t.boss ? (MODE_BOSS_LEAK[state.protocol] || 1) : 1));
+  const leakDmg = leakDamage(enemy);
   state.baseHp = Math.max(0, state.baseHp - leakDmg);
   board.classList.remove('core-hit');
   void board.offsetWidth;
@@ -1182,7 +1192,7 @@ function showTip(enemy, event) {
     <div class="tip-rows">
       <div><span>SPEED</span><b>${t.speed >= 120 ? 'VERY FAST' : t.speed >= 90 ? 'FAST' : t.speed >= 60 ? 'AVERAGE' : t.speed >= 40 ? 'SLOW' : 'VERY SLOW'}</b></div>
       <div><span>ARMOR</span><b>${armor}</b></div>
-      <div><span>CORE DMG</span><b>${t.dmg}</b></div>
+      <div><span>CORE DMG</span><b>${leakDamage(enemy)}</b></div>
       <div><span>BOUNTY</span><b>$${t.bounty}</b></div>
     </div>
     <p class="tip-ability">${t.ability}</p>`;

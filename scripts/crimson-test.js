@@ -28,7 +28,7 @@ function extractLiteral(src, name) {
 
 console.log('--- Crimson clock (app.js) ---');
 const appjs = read('app.js');
-check('BUILD bumped to 2026.10.28', appjs.includes("const BUILD = '2026.10.28';"));
+check('BUILD bumped to 2026.10.29', appjs.includes("const BUILD = '2026.10.29';"));
 check('deadline is a fixed UTC instant (static-host safe)', appjs.includes("Date.parse('2026-10-30T18:00:00Z')"));
 check('192h gate: window is 7 days after unlock', appjs.includes("Date.parse('2026-11-06T18:00:00Z')"));
 check('phase machine: sealed -> live -> passed', /now >= CRIMSON_END\).*passed[\s\S]*?now >= CRIMSON_DEADLINE\).*live[\s\S]*?return 'sealed'/.test(appjs));
@@ -101,7 +101,7 @@ const indexhtml = read('index.html');
 const styles = read('styles.css');
 check('menu button ??? with crimson subtext', indexhtml.includes('data-menu="crimson"') && indexhtml.includes('???</strong>') && indexhtml.includes('The Crimson Dawn Approaches'));
 check('countdown line lives on the button', indexhtml.includes('id="crimson-count"'));
-check('all 6 assets cache-busted to 20261024b', (indexhtml.match(/\?v=20261024b/g) || []).length === 6);
+check('all 6 assets cache-busted to 20261024c', (indexhtml.match(/\?v=20261024c/g) || []).length === 6);
 check('eerie glow styles: menu pulse + big countdown + deploy button', styles.includes('.menu-item.menu-crimson') && styles.includes('.crimson-big') && styles.includes('.crimson-deploy'));
 check('dawn beam style for the relic', styles.includes('.fx-dawn'));
 check('footer brands the Well', indexhtml.includes('THE CRIMSON WELL IS OPEN'));
@@ -114,6 +114,33 @@ check('surge waves burn brighter (state.surgeMod tracked)', combat.includes('sta
 check('Well styles: bleeding lanes + ritual seals + sigils + vignette', styles.includes('#board[data-theme="crimson"] .track-line') && styles.includes('.crimson-ritual') && styles.includes('.crimson-runesigil') && styles.includes('.crimson-vignette'));
 check('hostile styles: aura pulse + ember glow + red hull readout', styles.includes('.e-crimson .e-aura') && styles.includes('.e-crimson .e-chassis') && styles.includes('.e-crimson .hp-fill'));
 check('private early-access gate exists and never leaks to non-admins', appjs.includes('function crimsonEarlyAccess()') && appjs.includes("if (crimsonEarlyAccess()) return 'live';"));
+
+console.log('--- Flight Corridor: drone nerf + corridor pads ---');
+const CRIMSON_MAP = extractLiteral(appjs, 'CRIMSON_MAP');
+check('MODE_LEAK table: crimson drones leak 1 core dmg', combat.includes('MODE_LEAK = { crimson: { drone: 1 } }'));
+check('base drone core dmg untouched outside crimson (2)', ENEMY_TYPES && ENEMY_TYPES.drone && ENEMY_TYPES.drone.dmg === 2);
+check('leakEnemy routes through the leakDamage helper', /function leakEnemy[\s\S]{0,200}?const leakDmg = leakDamage\(enemy\);/.test(combat));
+check('leakDamage honors per-protocol overrides before boss multiplier', /function leakDamage[\s\S]*?overrides\[enemy\.key\] != null[\s\S]*?MODE_BOSS_LEAK/.test(combat));
+check('hostile intel tip reports protocol-adjusted CORE DMG', combat.includes('<div><span>CORE DMG</span><b>${leakDamage(enemy)}</b></div>'));
+check('boss 10x leak rule untouched', combat.includes('MODE_BOSS_LEAK = { hard: 10, crimson: 10 }'));
+const pads = (CRIMSON_MAP && Array.isArray(CRIMSON_MAP.pads)) ? CRIMSON_MAP.pads : [];
+check('CRIMSON_MAP lays 20 AA pads', pads.length === 20, String(pads.length));
+const hasPad = (x, y) => pads.some(([px, py]) => px === x && py === y);
+check('west corridor pad at (300, 225)', hasPad(300, 225));
+check('east corridor pad at (700, 365)', hasPad(700, 365));
+check('all 18 original pads preserved', [[60,60],[300,60],[505,60],[700,60],[940,60],[140,210],[60,300],[505,180],[700,200],[860,180],[940,300],[900,400],[140,420],[300,420],[505,420],[400,540],[820,540],[200,540]].every(([x, y]) => hasPad(x, y)));
+const lineDist = (spawn, core, pad) => Math.abs((core[1] - spawn[1]) * (pad[0] - spawn[0]) - (core[0] - spawn[0]) * (pad[1] - spawn[1])) / Math.hypot(core[0] - spawn[0], core[1] - spawn[1]);
+const segDist = (p, a, b) => {
+  const [px, py] = p, [ax, ay] = a, [bx, by] = b;
+  const dx = bx - ax, dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+};
+check('west pad sits on the (0,120)->core flight line (<10u)', lineDist([0, 120], [505, 300], [300, 225]) < 10);
+check('east pad sits on the (1060,480)->core flight line (<10u)', lineDist([1060, 480], [505, 300], [700, 365]) < 10);
+check('corridor pads clear of the veins (>=36u, deploy-legal)', segDist([300, 225], [290, 300], [380, 300]) >= 36 && segDist([300, 225], [220, 190], [220, 240]) >= 36 && segDist([700, 365], [690, 300], [790, 300]) >= 36 && segDist([700, 365], [790, 360], [790, 410]) >= 36);
+check('UPDATE LOG leads with FLIGHT CORRIDOR entry', appjs.indexOf("version: '2026.10.29', tag: 'FLIGHT CORRIDOR'") >= 0 && appjs.indexOf("version: '2026.10.29'") < appjs.indexOf("version: '2026.10.28'"));
+check('update log covers drone nerf + corridor pads + intel readout', ['1 core damage per leak', 'Two AA pads laid directly under the drone approach lines', 'protocol-adjusted CORE DMG'].every((s) => appjs.includes(s)));
 
 console.log('--- Syntax gates ---');
 for (const f of ['app.js', 'combat.js', 'server.js', 'shop.js']) {

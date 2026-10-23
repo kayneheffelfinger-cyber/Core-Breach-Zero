@@ -184,13 +184,13 @@ check('blueprint grid excludes ULTIMATUM cards', shopjs.includes('!entry.ultimat
 check('ultimatum vault styled (gold hero + card + exchange)', styles.includes('.ult-hero') && styles.includes('.ult-card') && styles.includes('.ult-exchange.ready') && styles.includes('.tok-ult'));
 
 console.log('--- Deploy chain: update log, build, cache-bust ---');
-check('BUILD bumped to 2026.10.28', appjs.includes("const BUILD = '2026.10.28';"));
+check('BUILD bumped to 2026.10.29', appjs.includes("const BUILD = '2026.10.29';"));
 check('UPDATE LOG leads with ULTIMATUM entry', appjs.indexOf("version: '2026.10.28', tag: 'ULTIMATUM'") < appjs.indexOf("version: '2026.10.27'") && appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL'));
 check('update log covers cap removal + vault + blossom card + migration', ['clearance cap is GONE', 'ULTIMATUM system goes live', 'first ULTIMATUM card', 'backfilled from their clearance history'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024b', busts.length === 6 && busts.every((v) => v === '?v=20261024b'), busts.join(' '));
-check('shell footer brands ULTIMATUM', indexhtml.includes('BUILD 2026.10.28 // ULTIMATUM') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
+check('all 6 index.html assets cache-busted to 20261024c', busts.length === 6 && busts.every((v) => v === '?v=20261024c'), busts.join(' '));
+check('shell footer brands FLIGHT CORRIDOR', indexhtml.includes('BUILD 2026.10.29 // FLIGHT CORRIDOR') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));
