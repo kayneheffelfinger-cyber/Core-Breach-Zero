@@ -368,7 +368,8 @@ async function handleApi(request, response, pathname) {
     for (const id of clean) {
       const achId = PERK_ACH[id];
       if (!achId) return sendJson(response, 404, { ok: false, error: 'Unknown perk protocol.' });
-      if (!ach[achId]) return sendJson(response, 403, { ok: false, error: 'That perk is still encrypted — earn its achievement first.' });
+      // FULL CLEARANCE — admins equip any perk without the achievement record (mirrors app.js LOCAL).
+      if (!ach[achId] && !isAdmin(name)) return sendJson(response, 403, { ok: false, error: 'That perk is still encrypted — earn its achievement first.' });
     }
     meta.equippedPerks = clean;
     saveAccounts();

@@ -144,15 +144,29 @@ check('QA override still wins over early access (?crimson=passed)', appjs.indexO
 check('non-admin seal untouched: default shop profile has no admin flag', shopjs.includes('equippedPerks: [], admin: false }'));
 check('phantom bay fix: setProfile purges catalog-dead blueprint ids', shopjs.includes('towerById(id) && profile.owned.includes(id)'));
 
+console.log('--- FULL CLEARANCE: all-perks admin + event debrief (app.js/combat.js/server.js) ---');
+check('CBZPerks.has grants flag-admins every perk without achievements', appjs.includes('if (!profile.admin && (!profile.achievements || !profile.achievements[perk.ach])) return false;'));
+check('perks panel renders admin-decrypted cards with the clearance line', appjs.includes('const earned = admin || cleared;') && appjs.includes('>> ADMIN CLEARANCE — DECRYPTED WITHOUT THE RECORD.'));
+check('earned-achievement cards still show the standard standby line', appjs.includes("const standby = cleared ? '>> ON STANDBY — EQUIP INTO ONE OF TWO SLOTS.'"));
+check('LOCAL /api/perks lets admins equip unearned perks', appjs.includes("if (!ach[achId] && !admin) throw new Error('That perk is still encrypted — earn its achievement first.');"));
+check('LOCAL admin check covers roster names AND flag-admins', appjs.includes('const admin = Boolean(meta.admin) || isAdminName(account.name); // FULL CLEARANCE — admins skip the vault'));
+check('server /api/perks mirror grants admins the same clearance', serverjs.includes('if (!ach[achId] && !isAdmin(name)) return sendJson(response, 403'));
+const crimsonMap = extractLiteral(appjs, 'CRIMSON_MAP');
+check('CRIMSON_MAP flagged as an event gamemode', Boolean(crimsonMap) && crimsonMap.event === true && crimsonMap.theme === 'crimson');
+check('event debrief omits the retry button entirely', combat.includes("const eventMode = Boolean((state.map && state.map.event) || state.protocol === 'crimson');") && combat.includes("eventMode ? '' : `<button class=\"inline-button\" id=\"end-redeploy\"") && combat.includes("if (!eventMode) panel.querySelector('#end-redeploy')"));
+check('non-event debrief keeps RE-DEPLOY / RETRY', combat.includes("${win ? 'RE-DEPLOY' : 'RETRY'}"));
+check('event debrief keeps RETURN TO BAY as the exit', combat.includes("<button class=\"inline-button\" id=\"end-bay\" type=\"button\">RETURN TO BAY</button>"));
+
 console.log('--- Deploy chain: update log, build, cache-bust ---');
 const indexhtml = read('index.html');
 const styles = read('styles.css');
-check('BUILD bumped to 2026.10.26', appjs.includes("const BUILD = '2026.10.26';"));
-check('UPDATE LOG leads with SCRAP PROTOCOL entry', appjs.indexOf('SCRAP PROTOCOL') < appjs.indexOf('CRIMSON VEINS') && appjs.includes("version: '2026.10.26', tag: 'SCRAP PROTOCOL'"));
+check('BUILD bumped to 2026.10.27', appjs.includes("const BUILD = '2026.10.27';"));
+check('UPDATE LOG leads with FULL CLEARANCE entry', appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL') && appjs.includes("version: '2026.10.27', tag: 'FULL CLEARANCE'"));
+check('update log covers perk clearance + event debrief fix', ['EVERY perk in the arsenal decrypted', 'ADMIN CLEARANCE', 'RETURN TO BAY'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261023d', busts.length === 6 && busts.every((v) => v === '?v=20261023d'), busts.join(' '));
-check('shell footer brands SCRAP PROTOCOL', indexhtml.includes('BUILD 2026.10.26 // SCRAP PROTOCOL') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
+check('all 6 index.html assets cache-busted to 20261024a', busts.length === 6 && busts.every((v) => v === '?v=20261024a'), busts.join(' '));
+check('shell footer brands FULL CLEARANCE', indexhtml.includes('BUILD 2026.10.27 // FULL CLEARANCE') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));

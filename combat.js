@@ -1379,6 +1379,10 @@ function endMission(win, fromSync = false) {
   hideTip();
   const panel = document.createElement('div');
   panel.className = `mission-end ${win ? 'win' : 'lose'}`;
+  // Event gamemodes (the Crimson Dawn + every future event map) never offer a
+  // retry — the redeploy path relaunches the standard protocol vote, which can
+  // never re-arm an event run. The debrief offers one clean exit: RETURN TO BAY.
+  const eventMode = Boolean((state.map && state.map.event) || state.protocol === 'crimson');
   panel.innerHTML = `
     <div class="end-card">
       <div class="eyebrow">${win ? '// PROTOCOL COMPLETE' : '// CORE LOST'}</div>
@@ -1392,7 +1396,7 @@ function endMission(win, fromSync = false) {
       </div>
       <div class="end-rewards" id="end-rewards"></div>
       <div class="end-actions">
-        <button class="inline-button" id="end-redeploy" type="button">${win ? 'RE-DEPLOY' : 'RETRY'}</button>
+        ${eventMode ? '' : `<button class="inline-button" id="end-redeploy" type="button">${win ? 'RE-DEPLOY' : 'RETRY'}</button>`}
         <button class="inline-button" id="end-bay" type="button">RETURN TO BAY</button>
       </div>
     </div>`;
@@ -1409,7 +1413,7 @@ function endMission(win, fromSync = false) {
       map: state.map ? state.map.id : '',
     }).then((data) => paintPayout(panel, data));
   }
-  panel.querySelector('#end-redeploy').addEventListener('click', () => { panel.remove(); state.endPanel = null; resetBoard(); startMission(state.map); });
+  if (!eventMode) panel.querySelector('#end-redeploy').addEventListener('click', () => { panel.remove(); state.endPanel = null; resetBoard(); startMission(state.map); });
   panel.querySelector('#end-bay').addEventListener('click', () => { resetBoard(); restoreRecon(); openMenu('play'); });
   notifyRoomEnded();
   banner(win ? 'SECTOR CLEARED' : 'CORE BREACHED', win ? '// VICTORY TOKEN EARNED' : '// EVACUATE', win ? 'banner-green' : 'banner-red');

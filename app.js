@@ -14,8 +14,15 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.26';
+const BUILD = '2026.10.27';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.27', tag: 'FULL CLEARANCE',
+    items: [
+      ['CLASSIFIED', 'Commander clearance expanded — the site admin now walks the grid with EVERY perk in the arsenal decrypted. All six tactical rigs (OVERDRIVE, SALVAGE PROTOCOL, DEEP POCKETS, FIELD REPAIRS, BOUNTY HUNTER, OVERCLOCK MATRIX) go live from first login — no achievement records required, the perk panel marks them ADMIN CLEARANCE. The two-slot loadout rule still applies, so pick wisely. Everyone else: the HARD protocol still gates the vault.'],
+      ['FIX', 'Event debrief rebuilt — the RETRY button is gone from the CORE BREACHED screen on the Crimson Dawn. It never re-armed the dawn anyway: the button silently dropped you into the standard protocol vote instead of relaunching the event. The debrief now offers one clean exit — RETURN TO BAY — and that policy is wired into the event system itself, so every future event gamemode ships without a retry. The dawn only rises once per deployment.'],
+    ],
+  },
   {
     version: '2026.10.26', tag: 'SCRAP PROTOCOL',
     items: [
@@ -351,7 +358,10 @@ window.CBZPerks = {
     if (!perk) return false;
     const shop = window.CBZShop;
     const profile = shop && shop.profile ? shop.profile() : null;
-    if (!profile || !profile.achievements || !profile.achievements[perk.ach]) return false;
+    if (!profile) return false;
+    // FULL CLEARANCE: flag-admins walk the grid with every perk decrypted —
+    // no achievement record required. Non-admins still earn each one.
+    if (!profile.admin && (!profile.achievements || !profile.achievements[perk.ach])) return false;
     // Perk loadout is explicit: only EQUIPPED perks (max 2) run in missions.
     const equipped = profile.equippedPerks;
     return Array.isArray(equipped) ? equipped.includes(id) : false;
@@ -644,10 +654,11 @@ const LOCAL = (() => {
       const clean = [...new Set(list)].filter(Boolean);
       if (clean.length > 2) throw new Error('Only two perk slots are wired into the mission HUD — unequip one first.');
       const ach = achievementsFrom(meta.mapWins);
+      const admin = Boolean(meta.admin) || isAdminName(account.name); // FULL CLEARANCE — admins skip the vault
       for (const id of clean) {
         const achId = PERK_ACH[id];
         if (!achId) throw new Error('Unknown perk protocol.');
-        if (!ach[achId]) throw new Error('That perk is still encrypted — earn its achievement first.');
+        if (!ach[achId] && !admin) throw new Error('That perk is still encrypted — earn its achievement first.');
       }
       meta.equippedPerks = clean;
       const accounts = readAccounts();
@@ -926,18 +937,21 @@ function perksPanelHtml(achievements) {
   const shop = window.CBZShop;
   const profile = shop && shop.profile ? shop.profile() : null;
   const equipped = (profile && Array.isArray(profile.equippedPerks)) ? profile.equippedPerks : [];
+  const admin = Boolean(profile && profile.admin); // FULL CLEARANCE — every perk decrypts for the admin
   const cards = PERKS.map((perk) => {
-    const earned = Boolean(achievements[perk.ach]);
+    const cleared = Boolean(achievements[perk.ach]);
+    const earned = admin || cleared;
     const on = earned && equipped.includes(perk.id);
     const state = on ? 'EQUIPPED' : earned ? 'STANDBY' : 'LOCKED';
     const action = !earned ? '' : `
       <button class="perk-slot-btn${on ? ' on' : ''}" type="button" data-perk="${escapeHtml(perk.id)}">${on ? 'UNEQUIP SLOT' : 'EQUIP SLOT'}</button>`;
+    const standby = cleared ? '>> ON STANDBY — EQUIP INTO ONE OF TWO SLOTS.' : '>> ADMIN CLEARANCE — DECRYPTED WITHOUT THE RECORD.';
     return `
       <article class="perk-card${earned ? ' earned' : ''}${on ? ' on' : ''}" data-perk-card="${escapeHtml(perk.id)}">
         <div class="perk-head"><b>${escapeHtml(perk.name)}</b><span class="perk-state">${state}</span></div>
         <p>${escapeHtml(perk.desc)}</p>
         ${action}
-        <div class="perk-req">${on ? '>> WIRED INTO THE MISSION HUD.' : earned ? '>> ON STANDBY — EQUIP INTO ONE OF TWO SLOTS.' : `>> REQUIREMENT: ${escapeHtml(perk.req)}`}</div>
+        <div class="perk-req">${on ? '>> WIRED INTO THE MISSION HUD.' : earned ? standby : `>> REQUIREMENT: ${escapeHtml(perk.req)}`}</div>
       </article>`;
   }).join('');
   return `
@@ -2639,7 +2653,7 @@ const BATTLE_MAPS = {
 const CRIMSON_MAP = {
   id: 'crimson', difficulty: 'CRIMSON', name: 'THE CRIMSON WELL', sector: 'SECTOR \u221E // BELOW THE SIGNAL',
   mechanic: 'TWIN VEINS + PHASE TEARS', hint: 'Two burning veins graft into one artery before the Well.',
-  theme: 'crimson',
+  theme: 'crimson', event: true, // event gamemode — the mission debrief never offers a retry
   paths: [
     'M -60 120 H 150 Q 220 120 220 190 V 240 Q 220 300 290 300 H 380 Q 450 300 450 360 V 410 Q 450 470 520 470 H 640 Q 700 470 700 410 V 370 Q 700 300 630 300 H 505',
     'M 1060 480 H 860 Q 790 480 790 410 V 360 Q 790 300 720 300 H 690 Q 630 300 630 240 V 190 Q 630 130 570 130 H 370 Q 310 130 310 190 V 230 Q 310 300 380 300 H 505',

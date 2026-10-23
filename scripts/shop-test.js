@@ -234,6 +234,14 @@ async function api(path, payload) {
     check('civilian blossom purchase blocked 404', civBlossom.status === 404, JSON.stringify(civBlossom.data));
     const civPerks = await api('/api/perks', { token: civToken, perks: ['salvage'] });
     check('civilian perk equip without HARDLINE rejected 403', civPerks.status === 403, JSON.stringify(civPerks.data));
+    // FULL CLEARANCE — the admin account (flagged above via ADMINLOG101011) equips
+    // perks it never earned; the civilian stays locked out of the same vault.
+    const adminPerks = await api('/api/perks', { token, perks: ['deeppockets', 'overclock'] });
+    check('FULL CLEARANCE: admin equips unearned perks 200 (deeppockets + overclock)', adminPerks.status === 200 && adminPerks.data.ok && adminPerks.data.profile.equippedPerks.length === 2, JSON.stringify(adminPerks.data));
+    const civPerkLocked = await api('/api/perks', { token: civToken, perks: ['deeppockets'] });
+    check('civilian still blocked from unearned perk 403', civPerkLocked.status === 403, JSON.stringify(civPerkLocked.data));
+    const adminPerkClear = await api('/api/perks', { token, perks: [] });
+    check('admin perk slots clear back to empty', adminPerkClear.data.ok && adminPerkClear.data.profile.equippedPerks.length === 0, JSON.stringify(adminPerkClear.data));
     const quint = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     check('5-bay unique loadout accepted', quint.data.ok && quint.data.profile.loadout.length === 5, JSON.stringify(quint.data));
     const sept = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper', 'zeroday', 'corpseblossom'] });
