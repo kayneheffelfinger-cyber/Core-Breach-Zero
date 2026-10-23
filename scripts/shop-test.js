@@ -35,6 +35,8 @@ async function api(path, payload) {
   check('shotgunner decal asset served', sgdecal.ok);
   const sdecal = await fetch(`${BASE}/assets/towers/sniper.png`);
   check('sniper decal asset served', sdecal.ok);
+  const shdecal = await fetch(`${BASE}/assets/towers/shredder.png`);
+  check('shredder decal asset served', shdecal.ok);
 
   const identity = { identity: 'SHOPCMDR1', passcode: 'test1234' };
   const reg = await api('/api/register', { name: 'SHOPCMDR1', email: 'shop1@test.io', passcode: 'test1234' });
@@ -80,16 +82,16 @@ async function api(path, payload) {
     const dup = await api('/api/shop/purchase', { token, itemId: 'lazermortar' });
     check('duplicate rejected 409', dup.status === 409);
 
-    // Virus costs 1000 NC + 30 BT — partial funds are rejected, then a grind pass funds it.
+    // Virus costs 2400 NC + 55 BT — partial funds are rejected, then a grind pass funds it.
     const poor = await api('/api/shop/purchase', { token, itemId: 'virus' });
     check('dual-currency shortfall 402', poor.status === 402, `status=${poor.status}`);
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       await api('/api/mission/complete', { token, result: 'win', wavesCleared: 20, bossesKilled: 6, difficulty: 'easy' });
     }
     const funded = await api('/api/profile', { token });
-    check('grind banked >= 1000 NC and >= 30 BT', funded.data.profile.nc >= 1000 && funded.data.profile.bt >= 30, JSON.stringify(funded.data.profile));
+    check('grind banked >= 2400 NC and >= 55 BT', funded.data.profile.nc >= 2400 && funded.data.profile.bt >= 55, JSON.stringify(funded.data.profile));
     const virus = await api('/api/shop/purchase', { token, itemId: 'virus' });
-    check('dual-currency purchase deducts both', virus.data.ok && virus.data.profile.owned.includes('virus') && virus.data.profile.nc === funded.data.profile.nc - 1000 && virus.data.profile.bt === funded.data.profile.bt - 30, JSON.stringify(virus.data));
+    check('dual-currency purchase deducts both', virus.data.ok && virus.data.profile.owned.includes('virus') && virus.data.profile.nc === funded.data.profile.nc - 2400 && virus.data.profile.bt === funded.data.profile.bt - 55, JSON.stringify(virus.data));
 
     // Loadout bays on the server side (max 5, unique, owned only).
     const trio = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus'] });
@@ -203,6 +205,8 @@ async function api(path, payload) {
     // IRON RAIN endgame chassis: clearance gates hold for fresh accounts.
     const freshBuyDrone = await api('/api/shop/purchase', { token: freshToken, itemId: 'dronespawner' });
     check('level-20 clearance gate blocks fresh account 403 (DRONE SPAWNER)', freshBuyDrone.status === 403, JSON.stringify(freshBuyDrone.data));
+    const freshBuyShred = await api('/api/shop/purchase', { token: freshToken, itemId: 'shredder' });
+    check('level-20 clearance gate blocks fresh account 403 (SHREDDER)', freshBuyShred.status === 403, JSON.stringify(freshBuyShred.data));
     const freshBuySilo = await api('/api/shop/purchase', { token: freshToken, itemId: 'missilesilo' });
     check('level-30 clearance gate blocks fresh account 403 (MISSILE SILO)', freshBuySilo.status === 403, JSON.stringify(freshBuySilo.data));
     const freshAdmin = await api('/api/redeem', { token: freshToken, code: 'ADMINLOG101011' });

@@ -1,5 +1,5 @@
-// IRON RAIN validation: Missile Silo + Drone Spawner integrity, Shotgunner/Sniper
-// nerfs, HARD escalation, private Crimson early-access gate + deploy chain checks.
+// SCRAP PROTOCOL validation: Sentinel buff, Sniper nerf #3, Virus CONTAGION rework,
+// the SHREDDER early-wave specialist, mirror sync + deploy chain checks.
 // Usage: node scripts/towers-test.js  (pure file/logic checks — no server needed)
 const fs = require('fs');
 const path = require('path');
@@ -52,19 +52,43 @@ check('DRONE SPAWNER base: 70 dmg/hull drone every 6s in a 190 ring', drone && d
 check('DRONE SPAWNER apex tier: 240-damage drones every 3s at 230 rng', drone && drone.track[3].label === 'APEX CARRIER' && drone.track[3].sets.drone === 240 && drone.track[3].sets.launchEvery === 3 && drone.track[3].sets.rng === 230);
 check('DRONE SPAWNER has decal art', drone && drone.art === 'assets/towers/dronespawner.png' && fs.existsSync(path.join(ROOT, 'assets/towers/dronespawner.png')));
 check('shop card renders a DRONE meter for the carrier', shopjs.includes("entry.stats.drone ? `<div class=\"tc-meter\"><span>DRONE</span>"));
+check('shop card renders a CONTAGION meter for the virus', shopjs.includes("entry.stats.corrupt ? `<div class=\"tc-meter\"><span>CONTAGION</span>"));
 
-console.log('--- Nerfs: Shotgunner + Sniper (shop.js) ---');
+console.log('--- SCRAP PROTOCOL balance pass (shop.js) ---');
+const se = TOWERS.find((t) => t.id === 'sentinel');
+const vi = TOWERS.find((t) => t.id === 'virus');
+const sh = TOWERS.find((t) => t.id === 'shredder');
 const sg = TOWERS.find((t) => t.id === 'shotgunner');
 const sn = TOWERS.find((t) => t.id === 'sniper');
+check('SENTINEL buffed: 7 dmg / 1.6 rate / 135 rng', se.stats.dmg === 7 && se.stats.rate === 1.6 && se.stats.rng === 135);
+check('SENTINEL ladder rolled up (12 / 2.0+150 / 20+185)', se.track[0].sets.dmg === 12 && se.track[1].sets.rate === 2 && se.track[1].sets.rng === 150 && se.track[2].sets.dmg === 20 && se.track[2].sets.rng === 185);
+check('VIRUS is premium now: 2400 NC + 55 BT / 500 salvage', vi.price.nc === 2400 && vi.price.bt === 55 && vi.cost === 500);
+check('VIRUS base blades up: 12 dmg at 3/s', vi.stats.dmg === 12 && vi.stats.rate === 3);
+check('VIRUS ladder is 5 tiers ending ZERO PATIENT 80 dmg / 4.2 rate', vi.track.length === 5 && vi.track[4].label === 'ZERO PATIENT' && vi.track[4].sets.dmg === 80 && vi.track[4].sets.rate === 4.2);
+check('CONTAGION tier infects (corrupt 40) and ZERO PATIENT burns 70/s', vi.track[3].sets.corrupt === 40 && vi.track[4].sets.corrupt === 70);
+check('VIRUS blade tiers got pricier (650/900/1600/2400/3600)', vi.track.map((t) => t.cost).join(',') === '650,900,1600,2400,3600');
+check('SNIPER trimmed again: 130 dmg base', sn.stats.dmg === 130);
+check('SNIPER rail trimmed (150 / 215 / 375)', sn.track[1].sets.dmg === 150 && sn.track[3].sets.dmg === 215 && sn.track[4].sets.dmg === 375);
+check('SHREDDER decrypts at Clearance 20 (2200 NC + 35 BT / 90 salvage)', sh && sh.unlock === 20 && sh.price.nc === 2200 && sh.price.bt === 35 && sh.cost === 90);
+check('SHREDDER is the early-wave specialist: 11 dmg / 3 rate / 105 rng', sh && sh.stats.dmg === 11 && sh.stats.rate === 3 && sh.stats.rng === 105);
+check('SHREDDER ladder tops out on purpose (3 small tiers, cap 18 dmg)', sh && sh.track.length === 3 && sh.track[2].sets.dmg === 18 && sh.track[2].sets.rng === 115);
+check('SHREDDER has decal art', sh && sh.art === 'assets/towers/shredder.png' && fs.existsSync(path.join(ROOT, 'assets/towers/shredder.png')));
+
+console.log('--- Nerfs: Shotgunner + Sniper (shop.js) ---');
 check('SHOTGUNNER trimmed: 27 dmg / 12U base burst ring', sg.stats.dmg === 27 && sg.stats.splash === 12);
 check('SHOTGUNNER ladder trimmed (splash 20/24, dmg 36/40)', sg.track[1].sets.splash === 20 && sg.track[2].sets.splash === 24 && sg.track[2].sets.dmg === 36 && sg.track[3].sets.dmg === 40);
-check('SNIPER trimmed: 145 dmg base', sn.stats.dmg === 145);
-check('SNIPER ladder trimmed (165 / 240 / 420 rail)', sn.track[1].sets.dmg === 165 && sn.track[3].sets.dmg === 240 && sn.track[4].sets.dmg === 420);
+check('SNIPER trimmed: 130 dmg base', sn.stats.dmg === 130);
+check('SNIPER rail trimmed (150 / 215 / 375)', sn.track[1].sets.dmg === 150 && sn.track[3].sets.dmg === 215 && sn.track[4].sets.dmg === 375);
 check('sniper rng + targeting untouched by the nerf', sn.track[0].sets.targeting === 'maxhp' && sn.track[4].sets.rng === 350 && sn.track[4].sets.rate === 0.4);
 
 console.log('--- Combat wiring (combat.js) ---');
 const combat = read('combat.js');
 check('MISSILE SILO tracks air natively (no pad needed)', combat.includes("missilesilo: { air: 'yes' }"));
+check('SHREDDER is ground-only with pad AA', combat.includes("shredder: { air: 'no' }"));
+check('SHREDDER spits a chip-stream (fx-chip tracer)', combat.includes("case 'shredder':") && combat.includes("fireLine(tower, target, 'fx-chip'"));
+check('CONTAGION wiring: virus hits infect with a 5s phase burn', combat.includes("target.corrupt = { dps: es.corrupt, t: 5 }") && combat.includes("damageEnemy(enemy, enemy.corrupt.dps * dt, { phase: true, src: 'virus' })"));
+check('corruption tick guarded against friendly summons', combat.includes('if (es.corrupt && !target.friendly)'));
+check('tower panel shows live CONTAGION intel', combat.includes('<span>CONTAGION</span>'));
 check('DRONE SPAWNER is a one-per-commander rig', combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner'])"));
 check('silo fires a visible warhead (kind missile + fx-missile node)', combat.includes("case 'missilesilo':") && combat.includes("kind: 'missile'") && combat.includes("fx-shell fx-missile"));
 check('projectile loop flies shells AND missiles', combat.includes("p.kind === 'shell' || p.kind === 'missile'"));
@@ -100,7 +124,7 @@ const appjs = read('app.js');
 const serverjs = read('server.js');
 const localShop = extractLiteral(appjs, 'SHOP');
 const serverShop = extractLiteral(serverjs, 'SHOP');
-for (const id of ['dronespawner', 'missilesilo']) {
+for (const id of ['virus', 'shredder', 'dronespawner', 'missilesilo']) {
   const a = localShop[id];
   const b = serverShop[id];
   const strip = (e) => JSON.stringify({ name: e.name, unlock: e.unlock, price: e.price, currency: e.currency });
@@ -123,14 +147,15 @@ check('phantom bay fix: setProfile purges catalog-dead blueprint ids', shopjs.in
 console.log('--- Deploy chain: update log, build, cache-bust ---');
 const indexhtml = read('index.html');
 const styles = read('styles.css');
-check('BUILD bumped to 2026.10.25', appjs.includes("const BUILD = '2026.10.25';"));
-check('UPDATE LOG leads with CRIMSON VEINS entry', appjs.indexOf('CRIMSON VEINS') < appjs.indexOf('IRON RAIN') && appjs.includes("version: '2026.10.25', tag: 'CRIMSON VEINS'"));
-check('update log covers both towers + nerf + hard buff + classified field test', ['MISSILE SILO', 'DRONE SPAWNER', 'SHOTGUNNER + SNIPER tuned down', 'HARD escalates again', 'If you know, you know'].every((s) => appjs.includes(s)));
+check('BUILD bumped to 2026.10.26', appjs.includes("const BUILD = '2026.10.26';"));
+check('UPDATE LOG leads with SCRAP PROTOCOL entry', appjs.indexOf('SCRAP PROTOCOL') < appjs.indexOf('CRIMSON VEINS') && appjs.includes("version: '2026.10.26', tag: 'SCRAP PROTOCOL'"));
+check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261023c', busts.length === 6 && busts.every((v) => v === '?v=20261023c'), busts.join(' '));
-check('shell footer brands CRIMSON VEINS', indexhtml.includes('BUILD 2026.10.25 // CRIMSON VEINS') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
+check('all 6 index.html assets cache-busted to 20261023d', busts.length === 6 && busts.every((v) => v === '?v=20261023d'), busts.join(' '));
+check('shell footer brands SCRAP PROTOCOL', indexhtml.includes('BUILD 2026.10.26 // SCRAP PROTOCOL') && indexhtml.includes('THE CRIMSON WELL IS OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
+check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));
 
 console.log('--- Syntax gates ---');
 for (const f of ['combat.js', 'app.js', 'server.js', 'shop.js']) {

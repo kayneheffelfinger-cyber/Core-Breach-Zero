@@ -14,8 +14,18 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.25';
+const BUILD = '2026.10.26';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.26', tag: 'SCRAP PROTOCOL',
+    items: [
+      ['BAL', 'SENTINEL TURRET buffed — the grid standard rolls hotter: 7 damage at 1.6 rounds/s with reach out to 135 (was 6 / 1.5 / 130), and the whole ladder climbs with it — HIGHER CALIBER 12 dmg, BETTER TECH 2.0 rate, SENTINEL PROMOTION 20 dmg at 185 range. The baseline earns its hex again.'],
+      ['NEW', 'The SHREDDER decrypts at Clearance 20 — the early-wave specialist. Per salvage, nothing on the grid mulches runners, files and glitched faster: 11 damage at 3 rounds/s for only $90 deployed. And that is ALL it is good for — the ladder deliberately tops out after three small tiers, so past the opening waves the drum is salvage bait. Cheap to buy, cheap to run, priced to retire.'],
+      ['BAL', 'SNIPER tuned down again — the marksman was still overbudget. Rail damage trimmed across the ladder: 145 → 130 base, HIGHER CAL 150, 50 CAL 215, RAIL GUNNER 420 → 375. Range, rate and max-hp targeting untouched.'],
+      ['BAL', 'VIRUS reworked into a premium lane-melter — it now costs real money (1,000 → 2,400 NC / 30 → 55 BT, deploy 400 → 500 salvage, every blade tier pricier) but finally fights for it: base blades up 7 → 12 damage, the ladder grows to five tiers topping at 80 dmg / 4.2 rounds/s, and the new CONTAGION tier infects every hostile the blades touch — corruption burns 40/s for 5 seconds straight through armor plating AND shield lattices, refreshed by every hit. ZERO PATIENT pushes the burn to 70/s. Early, mid and late game: the strain is viable everywhere now.'],
+      ['FX', 'The Shredder spits a ragged amber chip-stream instead of clean tracers, and corrupted hostiles pulse the viral ring as the burn eats through them.'],
+    ],
+  },
   {
     version: '2026.10.25', tag: 'CRIMSON VEINS',
     items: [
@@ -360,9 +370,10 @@ const LOCAL = (() => {
   const SHOP = {
     sentinel: { name: 'SENTINEL TURRET', unlock: 1, price: 0, currency: 'nc' },
     lazermortar: { name: 'LAZER MORTAR', unlock: 1, price: 0, currency: 'nc', firstClear: true },
-    virus: { name: 'VIRUS', unlock: 1, price: { nc: 1000, bt: 30 }, currency: 'mixed' },
+    virus: { name: 'VIRUS', unlock: 1, price: { nc: 2400, bt: 55 }, currency: 'mixed' },
     shotgunner: { name: 'SHOTGUNNER', unlock: 3, price: { nc: 800, bt: 10 }, currency: 'mixed' },
     sniper: { name: 'SNIPER', unlock: 5, price: { nc: 1800, bt: 50 }, currency: 'mixed' },
+    shredder: { name: 'SHREDDER', unlock: 20, price: { nc: 2200, bt: 35 }, currency: 'mixed' },
     dronespawner: { name: 'DRONE SPAWNER', unlock: 20, price: { nc: 5200, bt: 85 }, currency: 'mixed' },
     missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
     zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },

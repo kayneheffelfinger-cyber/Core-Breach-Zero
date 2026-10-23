@@ -211,6 +211,7 @@ const TOWER_RULES = {
   lazermortar: { air: 'no' },
   shotgunner: { air: 'no' },
   sniper: { air: 'no' },
+  shredder: { air: 'no' },     // chaff mulcher — pad links grant AA like the Sentinel
   virus: { air: 'yes' },
   zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
   corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
@@ -809,6 +810,12 @@ function moveEnemy(enemy, dt) {
     return;
   }
   enemy.node.classList.remove('e-stunned');
+  if (enemy.corrupt && enemy.corrupt.t > 0) {
+    // VIRUS CONTAGION: phase burn ticks every frame; kills credit the strain.
+    enemy.corrupt.t -= dt;
+    damageEnemy(enemy, enemy.corrupt.dps * dt, { phase: true, src: 'virus' });
+    if (!enemy.alive) return;
+  }
   if (enemy.flight) {
     // Air route: no tracks, no phase gates, no haste zones — cryo slow, frostbite
     // and gravity still bite, otherwise flyers would ignore every control tower.
@@ -1751,6 +1758,7 @@ function openTowerPanel(tower) {
     specials.push(`<div class="tp-abil-row"><span>STRIKE DRONE</span><b>${Math.round(es.drone || 70)} DMG/HULL</b></div>`);
     specials.push(`<div class="tp-abil-row"><span>NEXT LAUNCH</span><b>${state.mode === 'waves' ? `${Math.ceil(tower.droneCd || 0)}s` : `${Math.round(es.launchEvery || 6)}s CADENCE`}</b></div>`);
   }
+  if (entry.id === 'virus' && es.corrupt) specials.push(`<div class="tp-abil-row"><span>CONTAGION</span><b>${es.corrupt}/S · 5S BURN</b></div>`);
   if (entry.id === 'zeroday') specials.push(`<div class="tp-abil-row"><span>WAVE INCOME</span><b>$${es.income || 0}/WAVE</b></div>`);
   const abilities = [];
   if (entry.id === 'corpseblossom' && trackLevel(tower) >= 4) {
@@ -1992,6 +2000,13 @@ function fireTower(tower, target) {
       fxRing(tx, ty, 'fx-ring-red');
       break;
     }
+    case 'shredder': {
+      // Chaff mulcher: same instant-hit brain as the Sentinel but the drum
+      // spits a ragged amber chip-stream instead of a clean tracer.
+      damageEnemy(target, dmg);
+      fireLine(tower, target, 'fx-chip', 1.8);
+      break;
+    }
     case 'missilesilo': {
       // Strategic strike: the warhead flies a visible arc (slow, dodgeable by
       // nothing — it always lands) and detonates for full damage in the blast.
@@ -2005,7 +2020,15 @@ function fireTower(tower, target) {
     }
     case 'virus': {
       // Melee swarm: blades land instantly — no projectile phase at all.
+      // CONTAGION tier: every hit infects the target — corruption burns for
+      // es.corrupt damage per second over 5s as PHASE damage (armor plating
+      // and shield lattices mean nothing to it), refreshed by every blade.
       damageEnemy(target, dmg);
+      const es = effStats(tower);
+      if (es.corrupt && !target.friendly) {
+        target.corrupt = { dps: es.corrupt, t: 5 };
+        fxRing(tx, ty, 'fx-ring-virus');
+      }
       const slash = svgNode('line', { class: 'fx-line fx-tracer fx-slash', x1: tower.x, y1: tower.y, x2: tx, y2: ty, 'stroke-width': 3 });
       state.layers.fx.appendChild(slash);
       setTimeout(() => slash.remove(), 160);

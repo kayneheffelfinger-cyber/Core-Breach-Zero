@@ -22,13 +22,13 @@ window.CBZShop = (() => {
   const TOWERS = [
     { id: 'sentinel', name: 'SENTINEL TURRET', cat: 'offense', unlock: 1, price: 0, cost: 100, currency: 'nc',
       tagline: 'Rapid kinetic baseline — cheap, dependable, always ready.',
-      stats: { dmg: 6, rate: 1.5, rng: 130, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      stats: { dmg: 7, rate: 1.6, rng: 135, tgt: 'SINGLE / GROUND · AA ON PADS' },
       special: '>> The grid standard. Deploy on a hex pad to link anti-air coverage.',
       art: 'assets/towers/sentinel.png',
       track: [
-        { label: 'HIGHER CALIBER', cost: 110, sets: { dmg: 11 }, info: 'DMG 6 → 11' },
-        { label: 'BETTER TECH', cost: 165, sets: { rate: 1.8, rng: 145 }, info: 'RATE 1.5 → 1.8 · RNG 130 → 145' },
-        { label: 'SENTINEL PROMOTION', cost: 280, sets: { dmg: 18, rng: 180 }, info: 'DMG 11 → 18 · RNG 145 → 180' },
+        { label: 'HIGHER CALIBER', cost: 110, sets: { dmg: 12 }, info: 'DMG 7 → 12' },
+        { label: 'BETTER TECH', cost: 165, sets: { rate: 2, rng: 150 }, info: 'RATE 1.6 → 2 · RNG 135 → 150' },
+        { label: 'SENTINEL PROMOTION', cost: 280, sets: { dmg: 20, rng: 185 }, info: 'DMG 12 → 20 · RNG 150 → 185' },
       ],
       icon: ic('<path d="M9 33h22"/><path d="M13 33v-7h14v7"/><path d="M20 26V7"/><circle cx="20" cy="6" r="2.4"/>') },
     { id: 'lazermortar', name: 'LAZER MORTAR', cat: 'offense', unlock: 1, price: 0, cost: 250, currency: 'nc', reward: true,
@@ -57,17 +57,28 @@ window.CBZShop = (() => {
       icon: ic('<path d="M7 33l12-12"/><path d="M12 35L24 23"/><path d="M24 23l5-5"/><circle cx="31" cy="12" r="2.2"/><circle cx="35" cy="17" r="2.2"/><circle cx="27" cy="7" r="1.8"/>') },
     { id: 'sniper', name: 'SNIPER', cat: 'offense', unlock: 5, price: { nc: 1800, bt: 50 }, cost: 300, currency: 'mixed',
       tagline: 'Long-reach marksman — one trigger pull, one deletion.',
-      stats: { dmg: 145, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      stats: { dmg: 130, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
       special: '>> Pinpoint rounds erase the priority threat. Tier-1 Sniper Headset locks every shot onto the highest-HP hostile in reach.',
       art: 'assets/towers/sniper.png',
       track: [
         { label: 'SNIPER HEADSET', cost: 150, sets: { rng: 270, targeting: 'maxhp' }, info: 'RNG 250 → 270 · ONLY TARGETS THE HIGHEST-HP ENEMY IN RANGE' },
-        { label: 'HIGHER CAL', cost: 200, sets: { dmg: 165 }, info: 'DMG 145 → 165' },
+        { label: 'HIGHER CAL', cost: 200, sets: { dmg: 150 }, info: 'DMG 130 → 150' },
         { label: 'AUTO RE-LOADER 9000', cost: 300, sets: { rate: 0.5 }, info: 'RATE 0.3 → 0.5' },
-        { label: '50 CAL', cost: 300, sets: { dmg: 240 }, info: 'DMG 165 → 240' },
-        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 420, rate: 0.4, rng: 350 }, info: 'DMG 240 → 420 · RATE 0.5 → 0.4 · RNG 270 → 350' },
+        { label: '50 CAL', cost: 300, sets: { dmg: 215 }, info: 'DMG 150 → 215' },
+        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 375, rate: 0.4, rng: 350 }, info: 'DMG 215 → 375 · RATE 0.5 → 0.4 · RNG 270 → 350' },
       ],
       icon: ic('<circle cx="20" cy="20" r="9"/><path d="M20 4v7"/><path d="M20 29v7"/><path d="M4 20h7"/><path d="M29 20h7"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'shredder', name: 'SHREDDER', cat: 'offense', unlock: 20, price: { nc: 2200, bt: 35 }, cost: 90, currency: 'mixed',
+      tagline: 'Chaff mulcher — a spinning drum of cheap blades that deletes the early waves and nothing else.',
+      stats: { dmg: 11, rate: 3, rng: 105, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      special: '>> The early-wave answer: per salvage, nothing on the grid clears runners, files and glitched faster. It never scales — the ladder tops out quick on purpose, so past the opening waves it is salvage bait. Deploy on a hex pad to link anti-air coverage.',
+      art: 'assets/towers/shredder.png',
+      track: [
+        { label: 'WIDER INTAKE', cost: 120, sets: { rate: 3.5 }, info: 'RATE 3 → 3.5' },
+        { label: 'CARBIDE TEETH', cost: 240, sets: { dmg: 15 }, info: 'DMG 11 → 15' },
+        { label: 'LAST CALIBER', cost: 480, sets: { dmg: 18, rng: 115 }, info: 'DMG 15 → 18 · RNG 105 → 115 — THE DRUM STOPS GROWING HERE' },
+      ],
+      icon: ic('<circle cx="20" cy="20" r="10"/><circle cx="20" cy="20" r="3"/><path d="M20 10v4M20 26v4M10 20h4M26 20h4M13 13l2.8 2.8M24.2 24.2L27 27M27 13l-2.8 2.8M15.8 24.2L13 27"/><path d="M20 30v4M14 34h12"/>') },
     { id: 'dronespawner', name: 'DRONE SPAWNER', cat: 'special', unlock: 20, price: { nc: 5200, bt: 85 }, cost: 475, currency: 'mixed', limit: 1,
       tagline: 'Automated carrier — fabricates one-way strike drones straight into traffic.',
       stats: { dmg: 0, rate: 0, rng: 190, drone: 70, launchEvery: 6, tgt: 'SPAWNER // LAUNCHES STRIKE DRONES · ONE PER COMMANDER' },
@@ -130,15 +141,17 @@ window.CBZShop = (() => {
         { label: 'TRUE CORPSE BLOSSOM', cost: 3400, sets: { rng: 250, veins: 100, veinRate: [0.4, 1.4], summonHp: 0.75, lust: 3, stainedPct: 1, scream: 1 }, info: 'RNG 230 → 250 · VEINS 60 → 100 DMG · RATE 0.4-1.4/s · SUMMONS 75% HP · STAINED +10% HP · 3 LUST/KILL · BLOOD SCREAM ABILITY' },
       ],
       icon: ic('<circle cx="20" cy="20" r="4"/><path d="M20 16c-5-2-7-6-6-10 4 0 7 3 8 7M24 16c5-2 7-6 6-10-4 0-7 3-8 7M16 22c-4 2-8 2-11-1 2-3 6-4 10-3M24 22c4 2 8 2 11-1-2-3-6-4-10-3M17 25c-3 4-7 5-11 4 1-4 4-6 8-6M23 25c3 4 7 5 11 4-1-4-4-6-8-6"/>') },
-    { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 1000, bt: 30 }, cost: 400, currency: 'mixed',
-      tagline: 'Melee swarm chassis — blades that feast at contact range.',
-      stats: { dmg: 7, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
-      special: '>> Shreds anything that steps into blade range — walkers and flyers alike.',
+    { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 2400, bt: 55 }, cost: 500, currency: 'mixed',
+      tagline: 'Melee swarm chassis — blades that feast at contact range and infect what they touch.',
+      stats: { dmg: 12, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
+      special: '>> Shreds anything that steps into blade range — walkers and flyers alike. The CONTAGION ladder teaches the strain to infect: corrupted hostiles burn for its full tick every second, straight through armor plating and shield lattices. Expensive to field and to upgrade — but nothing mid-lane melts tanks like a maxed strain.',
       art: 'assets/towers/virus.png',
       track: [
-        { label: 'LARGER BLADES', cost: 500, sets: { dmg: 14, rate: 2.7, rng: 100 }, info: 'DMG 7 → 14 · RATE 3 → 2.7 · RNG 90 → 100' },
-        { label: 'SUPER VIRUS', cost: 700, sets: { dmg: 18, rate: 3.2, rng: 105 }, info: 'DMG 14 → 18 · RATE 2.7 → 3.2 · RNG 100 → 105' },
-        { label: 'MALWARE VIRUS', cost: 1400, sets: { rate: 3.5, rng: 110, dmg: 30 }, info: 'DMG 18 → 30 · RATE 3.2 → 3.5 · RNG 105 → 110' },
+        { label: 'LARGER BLADES', cost: 650, sets: { dmg: 20, rng: 100 }, info: 'DMG 12 → 20 · RNG 90 → 100' },
+        { label: 'SUPER VIRUS', cost: 900, sets: { dmg: 30, rate: 3.2, rng: 105 }, info: 'DMG 20 → 30 · RATE 3 → 3.2 · RNG 100 → 105' },
+        { label: 'MALWARE STRAIN', cost: 1600, sets: { dmg: 44, rate: 3.5, rng: 110 }, info: 'DMG 30 → 44 · RATE 3.2 → 3.5 · RNG 105 → 110' },
+        { label: 'CONTAGION', cost: 2400, sets: { dmg: 58, rate: 3.8, rng: 115, corrupt: 40 }, info: 'DMG 44 → 58 · RATE 3.5 → 3.8 · RNG 110 → 115 · HITS INFECT: 40/S CORRUPTION FOR 5S — IGNORES ARMOR + SHIELDS' },
+        { label: 'ZERO PATIENT', cost: 3600, sets: { dmg: 80, rate: 4.2, rng: 120, corrupt: 70 }, info: 'DMG 58 → 80 · RATE 3.8 → 4.2 · RNG 115 → 120 · CORRUPTION 40 → 70/S' },
       ],
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
@@ -271,8 +284,9 @@ window.CBZShop = (() => {
     const income = entry.stats.income ? `<div class="tc-meter"><span>INCOME</span><div class="tm-track"><i style="width:${pct(entry.stats.income, 1000)}"></i></div><b>$${format(entry.stats.income)}/WAVE</b></div>` : '';
     const summon = entry.stats.summon ? `<div class="tc-meter"><span>SUMMON</span><div class="tm-track"><i style="width:${pct(entry.stats.summon, 100)}"></i></div><b>${entry.stats.summon}% HP</b></div>` : '';
     const drone = entry.stats.drone ? `<div class="tc-meter"><span>DRONE</span><div class="tm-track"><i style="width:${pct(entry.stats.drone, 300)}"></i></div><b>${entry.stats.drone} DMG/HULL</b></div>` : '';
+    const corrupt = entry.stats.corrupt ? `<div class="tc-meter"><span>CONTAGION</span><div class="tm-track"><i style="width:${pct(entry.stats.corrupt, 80)}"></i></div><b>${entry.stats.corrupt}/S · 5S</b></div>` : '';
     const row = (label, value, cap, suffix = '') => (value ? `<div class="tc-meter"><span>${label}</span><div class="tm-track"><i style="width:${pct(value, cap)}"></i></div><b>${value >= 999 ? 'INF' : value}${suffix}</b></div>` : '');
-    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}`;
+    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}${corrupt}`;
   }
 
   function cardHtml(entry) {

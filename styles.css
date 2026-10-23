@@ -556,6 +556,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .fx-chain { stroke: #c49bef; stroke-width: 2; animation-duration: .24s; }
 .fx-pellet { stroke: #ffb45a; stroke-width: 2.5; animation-duration: .18s; }
 .fx-sniper { stroke: #b8ffe3; stroke-width: 1.6; animation-duration: .3s; }
+.fx-chip { stroke: #ffd23f; stroke-width: 1.8; stroke-dasharray: 3 4; animation-duration: .16s; }
 .fx-dawn { stroke: #ff3549; stroke-width: 2.4; animation-duration: .26s; filter: drop-shadow(0 0 4px rgba(255,60,80,.9)); }
 .fx-chain-stun { stroke: #eafffa; }
 .fx-beam-rail { stroke: #70e1d0; stroke-width: 4.5; }
