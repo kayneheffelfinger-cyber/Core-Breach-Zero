@@ -279,6 +279,28 @@ async function api(path, payload) {
     check('persisted mapWins spire + hard ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2 && p.mapWins['easy:hard'] === 1, JSON.stringify(p.mapWins));
     check('persisted lifetime XP + Ultimatum ledger', typeof p.totalXp === 'number' && p.totalXp >= 100000 && p.ultCores === 0 && p.ultClaims === 1, JSON.stringify({ totalXp: p.totalXp, ultCores: p.ultCores, ultClaims: p.ultClaims }));
     check('persisted uncapped clearance past LV 30', p.level > 30, `level=${p.level}`);
+    // --- INSANE ERA: second core tier (GRAVE WARDEN) + free L50 claim (EXECUTIONER) ---
+    const wardenBroke = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
+    check('grave warden with 0 cores 402 (2-core tier enforced)', wardenBroke.status === 402, JSON.stringify(wardenBroke.data));
+    for (let i = 0; i < 36; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // +180k lifetime XP — banks two more cores (60 total redeems ≈ 320k)
+    const farmed2 = await api('/api/profile', { token });
+    check('second farm pushes lifetime XP past 200k', farmed2.data.profile.totalXp >= 200000, `totalXp=${farmed2.data.profile.totalXp}`);
+    await api('/api/ultimatum', { token, action: 'exchange' });
+    const core2 = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('two milestone exchanges bank cores 2-3 (claims 3)', core2.status === 200 && core2.data.profile.ultCores === 2 && core2.data.profile.ultClaims === 3, JSON.stringify(core2.data));
+    const wardenBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
+    check('grave warden costs exactly 2 cores 200', wardenBuy.status === 200 && wardenBuy.data.profile.owned.includes('gravewarden') && wardenBuy.data.profile.ultCores === 0, JSON.stringify(wardenBuy.data));
+    const wardenRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
+    check('grave warden rebuy 409', wardenRebuy.status === 409, JSON.stringify(wardenRebuy.data));
+    const headsman = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
+    check('executioner claims FREE at clearance 50+ 200 (cores untouched)', headsman.status === 200 && headsman.data.profile.owned.includes('executioner') && headsman.data.profile.ultCores === 0, JSON.stringify(headsman.data));
+    const headsmanRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
+    check('executioner rebuy 409', headsmanRebuy.status === 409, JSON.stringify(headsmanRebuy.data));
+    const bothApex = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'gravewarden', 'executioner'] });
+    check('one-card rule: warden + executioner cannot co-arm 400', bothApex.status === 400, JSON.stringify(bothApex.data));
+    const headsmanArm = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'executioner'] });
+    check('executioner arms as the solo apex card 200', headsmanArm.status === 200 && headsmanArm.data.profile.loadout.includes('executioner'), JSON.stringify(headsmanArm.data));
+    await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);
   }

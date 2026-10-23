@@ -28,7 +28,7 @@ function extractLiteral(src, name) {
 
 console.log('--- Crimson clock (app.js) ---');
 const appjs = read('app.js');
-check('BUILD bumped to 2026.10.29', appjs.includes("const BUILD = '2026.10.29';"));
+check('BUILD bumped to 2026.10.30', appjs.includes("const BUILD = '2026.10.30';"));
 check('deadline is a fixed UTC instant (static-host safe)', appjs.includes("Date.parse('2026-10-30T18:00:00Z')"));
 check('192h gate: window is 7 days after unlock', appjs.includes("Date.parse('2026-11-06T18:00:00Z')"));
 check('phase machine: sealed -> live -> passed', /now >= CRIMSON_END\).*passed[\s\S]*?now >= CRIMSON_DEADLINE\).*live[\s\S]*?return 'sealed'/.test(appjs));
@@ -48,14 +48,14 @@ const combat = read('combat.js');
 const CRIMSON_WAVES = extractLiteral(combat, 'CRIMSON_WAVES');
 const ENEMY_TYPES = extractLiteral(combat, 'ENEMY_TYPES');
 const SURGE_MODS = extractLiteral(combat, 'SURGE_MODS');
-check('MODE_HP_GROWTH.crimson = 0.13 (1.13x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, crimson: 0.13 }'));
-check('MODE_SPEED.crimson = 1.18 (+18% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.15, crimson: 1.18 }'));
-check('MODE_BOSS_LEAK.crimson = 10', combat.includes('MODE_BOSS_LEAK = { hard: 10, crimson: 10 }'));
+check('MODE_HP_GROWTH.crimson = 0.13 (1.13x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, insane: 0.105, crimson: 0.13 }'));
+check('MODE_SPEED.crimson = 1.18 (+18% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.15, insane: 1.16, crimson: 1.18 }'));
+check('MODE_BOSS_LEAK.crimson = 10', combat.includes('MODE_BOSS_LEAK = { hard: 10, insane: 10, crimson: 10 }'));
 check('DAWNFIRE SURGE defined (+80% HP / +25% speed)', SURGE_MODS && SURGE_MODS.dawnfire && SURGE_MODS.dawnfire.hp === 1.8 && SURGE_MODS.dawnfire.speed === 1.25);
-check('crimson pays 0.7x wave salvage', combat.includes("state.protocol === 'hard' ? 0.85 : state.protocol === 'crimson' ? 0.7 : 1"));
-check('crimson rebuild window 3s', combat.includes("state.protocol === 'crimson' ? 3 : state.protocol === 'hard' ? 4.5 : 7"));
-check('crimson opening salvage stripped 30%', combat.includes("(mode === 'crimson' ? 0.7 : 0.8)"));
-check('crimson wave ladder registered in WAVES map', combat.includes('WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, crimson: CRIMSON_WAVES }'));
+check('crimson pays 0.7x wave salvage', combat.includes("state.protocol === 'hard' ? 0.85 : state.protocol === 'insane' ? 0.8 : state.protocol === 'crimson' ? 0.7 : 1"));
+check('crimson rebuild window 3s', combat.includes("state.protocol === 'crimson' ? 3 : state.protocol === 'insane' ? 3.5 : state.protocol === 'hard' ? 4.5 : 7"));
+check('crimson opening salvage stripped 30%', combat.includes("(mode === 'crimson' ? 0.7 : mode === 'insane' ? 0.75 : 0.8)"));
+check('crimson wave ladder registered in WAVES map', combat.includes('WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, insane: INSANE_WAVES, crimson: CRIMSON_WAVES }'));
 check('CRIMSON ladder has 20 waves', Array.isArray(CRIMSON_WAVES) && CRIMSON_WAVES.length === 20, String(CRIMSON_WAVES && CRIMSON_WAVES.length));
 const badKeys = new Set(); const badMods = new Set(); let bosses = 0; let hostiles = 0;
 for (const wave of CRIMSON_WAVES) {
@@ -101,7 +101,7 @@ const indexhtml = read('index.html');
 const styles = read('styles.css');
 check('menu button ??? with crimson subtext', indexhtml.includes('data-menu="crimson"') && indexhtml.includes('???</strong>') && indexhtml.includes('The Crimson Dawn Approaches'));
 check('countdown line lives on the button', indexhtml.includes('id="crimson-count"'));
-check('all 6 assets cache-busted to 20261024c', (indexhtml.match(/\?v=20261024c/g) || []).length === 6);
+check('all 6 assets cache-busted to 20261024d', (indexhtml.match(/\?v=20261024d/g) || []).length === 6);
 check('eerie glow styles: menu pulse + big countdown + deploy button', styles.includes('.menu-item.menu-crimson') && styles.includes('.crimson-big') && styles.includes('.crimson-deploy'));
 check('dawn beam style for the relic', styles.includes('.fx-dawn'));
 check('footer brands the Well', indexhtml.includes('THE CRIMSON WELL IS OPEN'));
@@ -122,7 +122,7 @@ check('base drone core dmg untouched outside crimson (2)', ENEMY_TYPES && ENEMY_
 check('leakEnemy routes through the leakDamage helper', /function leakEnemy[\s\S]{0,200}?const leakDmg = leakDamage\(enemy\);/.test(combat));
 check('leakDamage honors per-protocol overrides before boss multiplier', /function leakDamage[\s\S]*?overrides\[enemy\.key\] != null[\s\S]*?MODE_BOSS_LEAK/.test(combat));
 check('hostile intel tip reports protocol-adjusted CORE DMG', combat.includes('<div><span>CORE DMG</span><b>${leakDamage(enemy)}</b></div>'));
-check('boss 10x leak rule untouched', combat.includes('MODE_BOSS_LEAK = { hard: 10, crimson: 10 }'));
+check('boss 10x leak rule untouched', combat.includes('MODE_BOSS_LEAK = { hard: 10, insane: 10, crimson: 10 }'));
 const pads = (CRIMSON_MAP && Array.isArray(CRIMSON_MAP.pads)) ? CRIMSON_MAP.pads : [];
 check('CRIMSON_MAP lays 20 AA pads', pads.length === 20, String(pads.length));
 const hasPad = (x, y) => pads.some(([px, py]) => px === x && py === y);

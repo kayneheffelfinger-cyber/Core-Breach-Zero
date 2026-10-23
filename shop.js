@@ -141,6 +141,32 @@ window.CBZShop = (() => {
         { label: 'TRUE CORPSE BLOSSOM', cost: 3400, sets: { rng: 250, veins: 100, veinRate: [0.4, 1.4], summonHp: 0.75, lust: 3, stainedPct: 1, scream: 1 }, info: 'RNG 230 → 250 · VEINS 60 → 100 DMG · RATE 0.4-1.4/s · SUMMONS 75% HP · STAINED +10% HP · 3 LUST/KILL · BLOOD SCREAM ABILITY' },
       ],
       icon: ic('<circle cx="20" cy="20" r="4"/><path d="M20 16c-5-2-7-6-6-10 4 0 7 3 8 7M24 16c5-2 7-6 6-10-4 0-7 3-8 7M16 22c-4 2-8 2-11-1 2-3 6-4 10-3M24 22c4 2 8 2 11-1-2-3-6-4-10-3M17 25c-3 4-7 5-11 4 1-4 4-6 8-6M23 25c3 4 7 5 11 4-1-4-4-6-8-6"/>') },
+    { id: 'gravewarden', name: 'GRAVE WARDEN', cat: 'special', unlock: 20, cost: 400, limit: 1, ultimatum: true,
+      tagline: 'ULTIMATUM CARD — the second apex rig. A walled yard where the dead pay toll and the bell never rests.',
+      stats: { dmg: 0, rate: 0, rng: 170, tgt: 'AURA // YARD CONTROL · ONE PER COMMANDER' },
+      special: '>> The Warden keeps a walled yard: everything hostile inside drags its heels once the CHILL GRAVE is laid, and every death inside the yard rings the bell sooner. When the DEATH TOLL sounds, the whole yard takes the pulse and chaff is stunned where it stands. Commanders are beneath its notice. Obtained only in the ULTIMATUM vault: one card armed at a time.',
+      art: 'assets/towers/gravewarden.png',
+      track: [
+        { label: 'WIDER YARD', cost: 200, sets: { rng: 190 }, info: 'RNG 170 → 190' },
+        { label: 'DEATH TOLL', cost: 600, sets: { bell: 70 }, info: 'BELL PULSE: 70 DMG EVERY 8s · 0.8s STUN · YARD KILLS RING IT SOONER' },
+        { label: 'CHILL GRAVE', cost: 900, sets: { yardSlow: 0.35 }, info: 'YARD HOSTILES MOVE 35% SLOWER — WALKERS AND FLYERS ALIKE' },
+        { label: 'TOLLING HOURS', cost: 1600, sets: { bell: 140, bellEvery: 6, rng: 210 }, info: 'BELL 70 → 140 DMG · CADENCE 8s → 6s · RNG 190 → 210' },
+        { label: 'LAST TOLL', cost: 3200, sets: { bell: 260, bellEvery: 4.5, yardSlow: 0.45, tollStun: 1.2, rng: 230 }, info: 'BELL 140 → 260 DMG · CADENCE 4.5s · YARD -45% SPEED · STUN 1.2s' },
+      ],
+      icon: ic('<circle cx="20" cy="21" r="8"/><path d="M20 13v-4M16 9h8"/><circle cx="20" cy="21" r="2.2" fill="currentColor" stroke="none"/><path d="M8 21c2-2 4-2 6 0M26 21c2-2 4-2 6 0"/>') },
+    { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, cost: 450, limit: 1, ultimatum: true,
+      tagline: 'ULTIMATUM CARD — the headsman\u2019s rail. Free for commanders who climbed past Clearance 50. It only has one job.',
+      stats: { dmg: 90, rate: 0.5, rng: 240, tgt: 'MAX-HULL // AIR + GROUND · ONE PER COMMANDER', targeting: 'maxhp' },
+      special: '>> The rail never wastes a round on the small stuff — chaff soaks a token 15% of the shot, while commanders (mini-bosses and bosses) pay full price. Its true work is the sentence: mark a commander below the execute threshold and the next round takes its head clean off. Only the final boss is beyond the blade. Claimed at Clearance 50 — no cores, no NC, just the climb. One card armed at a time.',
+      art: 'assets/towers/executioner.png',
+      track: [
+        { label: 'WIDENED SLOTS', cost: 250, sets: { rng: 260 }, info: 'RNG 240 → 260' },
+        { label: 'HARDENED ROUNDS', cost: 650, sets: { dmg: 160 }, info: 'DMG 90 → 160' },
+        { label: 'BLOOD PRICE', cost: 1200, sets: { dmg: 260, rate: 0.6 }, info: 'DMG 160 → 260 · RATE 0.5 → 0.6' },
+        { label: 'HEADSMAN', cost: 2200, sets: { execute: 0.22 }, info: 'EXECUTE THRESHOLD 15% → 22% OF COMMANDER HULL' },
+        { label: 'FINAL RITUAL', cost: 3600, sets: { dmg: 420, rate: 0.75, execute: 0.28, chaffPct: 0.2 }, info: 'DMG 260 → 420 · RATE 0.75 · EXECUTE 28% · CHAFF PAYOUT 20%' },
+      ],
+      icon: ic('<path d="M20 6v22M14 28h12"/><path d="M20 10l9-4-3 8"/><circle cx="20" cy="17" r="3.4"/><path d="M11 28h18" stroke-dasharray="2 2"/>') },
     { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 2400, bt: 55 }, cost: 500, currency: 'mixed',
       tagline: 'Melee swarm chassis — blades that feast at contact range and infect what they touch.',
       stats: { dmg: 12, rate: 3, rng: 90, tgt: 'MELEE / GROUND + AIR' },
@@ -162,6 +188,10 @@ window.CBZShop = (() => {
   const ULT_CARDS = [
     { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cores: 1, unlock: 20,
       blurb: 'The CLASSIFIED vault is open. One core — one hundred thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
+    { id: 'gravewarden', name: 'GRAVE WARDEN', cores: 2, unlock: 20,
+      blurb: 'The second apex rig: a walled yard where the dead pay toll. Two cores bank the Warden — the bell never rests, and nothing hostile walks his yard at full speed.' },
+    { id: 'executioner', name: 'EXECUTIONER', cores: 0, unlock: 50,
+      blurb: 'The headsman\u2019s rail costs no cores — it costs the climb. Clearance 50 and beyond claims it free: a bosses-only executioner that takes a commander\u2019s head below the threshold. Only the final boss is beyond the blade.' },
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0, admin: false };
@@ -465,10 +495,12 @@ window.CBZShop = (() => {
         ? `<button class="ult-buy${armedHere ? ' on' : ''}" type="button" data-equip="${card.id}">${armedHere ? 'UNEQUIP CARD' : 'ARM CARD'}</button>`
         : locked
           ? `<button class="ult-buy cant" type="button" disabled>CLEARANCE ${card.unlock} REQUIRED</button>`
-          : `<button class="ult-buy${(profile.ultCores || 0) >= card.cores ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'SPEND THE CORE?' : `<i class="tok tok-ult">UC</i>${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</button>`;
+          : card.cores === 0
+            ? `<button class="ult-buy${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'TAKE THE OATH?' : 'CLAIM // FREE AT CLEARANCE ' + card.unlock}</button>`
+            : `<button class="ult-buy${(profile.ultCores || 0) >= card.cores ? '' : ' cant'}${arming ? ' arm' : ''}" type="button" data-ult-buy="${card.id}">${arming ? 'SPEND THE CORE?' : `<i class="tok tok-ult">UC</i>${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</button>`;
       return `
         <article class="ult-card${owned ? ' owned' : ''}" data-ult-card="${card.id}">
-          <div class="ult-card-top"><span>// ULTIMATUM CARD</span><b>${owned ? 'IN THE ARMORY' : `${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</b></div>
+          <div class="ult-card-top"><span>// ULTIMATUM CARD</span><b>${owned ? 'IN THE ARMORY' : card.cores === 0 ? `CLEARANCE ${card.unlock}` : `${card.cores} CORE${card.cores === 1 ? '' : 'S'}`}</b></div>
           ${tower ? artHtml(tower) : ''}
           <h4>${card.name}</h4>
           <p>${card.blurb}</p>

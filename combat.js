@@ -174,14 +174,14 @@ const CRIMSON_WAVES = [
 // CRIMSON DAWN (event) compounds steeper still at 1.13x — wave 20 ≈ 21.7x hull —
 // and every hostile moves 18% faster. Nothing comes back from that.
 const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 }; // legacy linear curve (easy/medium)
-const MODE_HP_GROWTH = { hard: 0.1, crimson: 0.13 }; // compounding hull curves — hell and the dawn are exponential
-const MODE_SPEED = { hard: 1.15, crimson: 1.18 };     // hostile protocol speed multipliers
+const MODE_HP_GROWTH = { hard: 0.1, insane: 0.105, crimson: 0.13 }; // compounding hull curves — hell, the spiral and the dawn are exponential
+const MODE_SPEED = { hard: 1.15, insane: 1.16, crimson: 1.18 };     // hostile protocol speed multipliers
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
 // Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
 // commander all but ends the run (virus 60, leak 80, warden 120, overseer 250).
 // Crimson Dawn keeps the same rule: at 21x hull, one leak should end you.
-const MODE_BOSS_LEAK = { hard: 10, crimson: 10 };
+const MODE_BOSS_LEAK = { hard: 10, insane: 10, crimson: 10 };
 // Flight Corridor pass: OVERCLOCKED DRONES burn the Well's core for 1 per leak,
 // down from 2 — the event map's AA hexes sit far off the flight corridors, so a
 // leaked armada shouldn't core you through the middle. Absolute per-hostile
@@ -192,7 +192,45 @@ function leakDamage(enemy) {
   if (!enemy.t.boss && overrides[enemy.key] != null) return overrides[enemy.key];
   return Math.round(enemy.t.dmg * (enemy.t.boss ? (MODE_BOSS_LEAK[state.protocol] || 1) : 1));
 }
-const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, crimson: CRIMSON_WAVES };
+// --- Insane Protocol: 30 waves on the spiral ----------------------------------------
+// Built from the HARD ladder and pushed past it: counts climb another 6-10%,
+// DAWNFIRE burns on two mid-ladder indices (TRIPLE THREAT + SIEGE WALL), and the
+// hull curve compounds at 1.105x/wave — wave 30 arrives at ~20x hull. On paper it
+// sits just under CRIMSON DAWN's peak; in practice the dawn stays meaner because
+// the Well only offers two entrances and 3s rebuilds. INSANE runs on ANY battle map.
+const INSANE_WAVES = [
+  { groups: [['glitched', 32], ['runner', 22]] },
+  { groups: [['glitched', 30], ['file', 30], ['runner', 22]] },
+  { groups: [['shielded', 26], ['glitched', 32], ['hexbug', 10]], phase: 'NANITE DEBUT', mod: 'hardened' },
+  { groups: [['runner', 44], ['drone', 20], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 26], ['glitched', 34], ['phantom', 12]], phase: 'PHASE PRESSURE' },
+  { groups: [['nullcore', 13], ['file', 48], ['hexbug', 12]], mod: 'overclock' },
+  { groups: [['shielded', 32], ['drone', 28], ['runner', 26]], mod: 'hardened' },
+  { groups: [['nullcore', 15], ['leak', 1], ['file', 40], ['phantom', 12]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 62], ['runner', 32], ['hexbug', 16]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 1], ['shielded', 28], ['juggernaut', 4]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
+  { groups: [['nullcore', 22], ['drone', 32], ['runner', 30]], mod: 'overclock' },
+  { groups: [['drone', 46], ['runner', 36], ['phantom', 14]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 36], ['nullcore', 18], ['glitched', 46], ['hexbug', 14]], mod: 'hellfire' },
+  { groups: [['virus', 2], ['leak', 2], ['file', 60], ['drone', 30], ['juggernaut', 4]], phase: 'VIRULENT SURGE', mod: 'hardened' },
+  { groups: [['leak', 2], ['nullcore', 20], ['drone', 34]], phase: 'LEAK STORM', mod: 'hellfire' },
+  { groups: [['runner', 52], ['drone', 32], ['file', 48], ['phantom', 14]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 22], ['shielded', 34], ['virus', 2], ['juggernaut', 4]], phase: 'ARMOR COLUMN', mod: 'hardened' },
+  { groups: [['drone', 48], ['runner', 40], ['glitched', 52]], mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 2], ['shielded', 32], ['warden', 1]], phase: 'FIREWALL RISING', mod: 'hardened' },
+  { groups: [['nullcore', 24], ['drone', 36], ['file', 58], ['juggernaut', 4], ['phantom', 12]], phase: 'DENSE ASSAULT', mod: 'hellfire' },
+  { groups: [['runner', 58], ['drone', 36], ['hexbug', 18]], phase: 'FULL SPRINT', mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 3], ['nullcore', 20], ['juggernaut', 4]], phase: 'TRIPLE THREAT', mod: 'dawnfire' },
+  { groups: [['shielded', 40], ['drone', 38], ['runner', 40], ['file', 54]], mod: 'overclock' },
+  { groups: [['nullcore', 22], ['virus', 3], ['leak', 3], ['drone', 36], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['file', 66], ['nullcore', 22], ['drone', 34], ['phantom', 16]], phase: 'GRID LOCK', mod: 'hellfire' },
+  { groups: [['shielded', 40], ['nullcore', 22], ['runner', 40], ['juggernaut', 6]], mod: 'hellfire' },
+  { groups: [['virus', 4], ['leak', 4], ['drone', 38], ['hexbug', 18]], phase: 'SIEGE WALL', mod: 'dawnfire' },
+  { groups: [['nullcore', 24], ['file', 66], ['glitched', 54], ['warden', 2]], phase: 'DEAD STACK', mod: 'hardened' },
+  { groups: [['runner', 56], ['drone', 40], ['shielded', 36], ['phantom', 16]], phase: 'LAST BREACH', mod: 'overclock' },
+  { groups: [['shielded', 36], ['nullcore', 22], ['warden', 3], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 38], ['juggernaut', 5], ['phantom', 12]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+];
+const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, insane: INSANE_WAVES, crimson: CRIMSON_WAVES };
 function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
 
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
@@ -225,13 +263,15 @@ const TOWER_RULES = {
   virus: { air: 'yes' },
   zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
   corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
+  gravewarden: { air: 'no' },  // yard keeper — never targets; the bell tolls for everything inside
+  executioner: { air: 'yes' }, // headsman rail — tracks anything with a hull; commanders pay full price
   dawnbreaker: { air: 'yes' },  // CRIMSON RELIC — dawn-forged lance tracks air natively
   missilesilo: { air: 'yes' },  // MISSILE SILO — warheads track air and ground without a pad
   dronespawner: { air: 'no' },  // spawner — never targets; strike drones hit anything they intercept
 };
 
 // One-off rigs: only a single unit of these chassis may deploy per commander.
-const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner']);
+const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden', 'executioner']);
 const NUKE_DAMAGE = 2200;      // Nuclear Fall Out: flat strike damage inside the blast
 const NUKE_RADIUS = 240;       // strike decimates everything inside this ring
 const NUKE_COST = 500;         // salvage price per cast
@@ -516,6 +556,7 @@ function killEnemy(enemy, src) {
   enemy.node.classList.add('dying');
   setTimeout(() => enemy.node.remove(), 300);
   corpseBlossomFeed(enemy, x, y, src);
+  graveWardenFeed(enemy, x, y);
   updateHud();
   if (enemy.t.boss) updateBossBar();
 }
@@ -533,6 +574,33 @@ function corpseBlossomFeed(enemy, x, y, src) {
     }
     spawnSummon(enemy, tower, src === 'veins' && lvl >= 2);
   }
+}
+
+// --- Grave Warden: the yard keeps its dead, and the bell keeps the score ----------
+// Every hostile that dies inside the yard rings up a charge; charges knock time
+// off the next toll. When the bell sounds, everything hostile in the yard takes
+// the pulse and chaff is stunned where it stands — commanders walk through unmoved.
+function graveWardenFeed(enemy, x, y) {
+  for (const tower of state.towers) {
+    if (tower.id !== 'gravewarden') continue;
+    if (Math.hypot(x - tower.x, y - tower.y) > effStats(tower).rng) continue;
+    tower.tollCharges = (tower.tollCharges || 0) + 1;
+    tower.bellCd = Math.max(0, (tower.bellCd || 0) - 0.4);
+    if (state.panelTower === tower) openTowerPanel(tower); // live toll counter
+  }
+}
+
+// Grave Yard slow: hostiles inside a CHILL GRAVE yard drag their heels — flyers too.
+function wardenYardMult(enemy) {
+  let mult = 1;
+  const [px, py] = posOf(enemy);
+  for (const tower of state.towers) {
+    if (tower.id !== 'gravewarden') continue;
+    const es = effStats(tower);
+    if (!es.yardSlow || es.yardSlow >= 1) continue;
+    if (Math.hypot(px - tower.x, py - tower.y) <= es.rng) mult = Math.min(mult, 1 - es.yardSlow);
+  }
+  return mult;
 }
 
 function spawnSummon(enemy, tower, stained) {
@@ -830,7 +898,7 @@ function moveEnemy(enemy, dt) {
     // Air route: no tracks, no phase gates, no haste zones — cryo slow, frostbite
     // and gravity still bite, otherwise flyers would ignore every control tower.
     enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-    enemy.dist += enemy.speed * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
+    enemy.dist += enemy.speed * wardenYardMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
     if (enemy.dist >= enemy.flight.total) { leakEnemy(enemy); return; }
     const [fx, fy] = flightPos(enemy, enemy.dist);
     const [px, py] = flightPos(enemy, enemy.dist - 8);
@@ -869,7 +937,7 @@ function moveEnemy(enemy, dt) {
     banner('FIREWALL WARDEN', '// PACKET STORM — HEX CRAWLERS SPILLED', 'banner-red');
   }
   enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-  enemy.dist += enemy.speed * haste * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
+  enemy.dist += enemy.speed * haste * wardenYardMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
   const sampler = state.samplers[enemy.pathIdx];
   for (const event of state.gateEvents) {
     if (enemy.usedGates.has(event.index)) continue;
@@ -913,7 +981,7 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
-    const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, and the dawn bleeds you for 70%
+    const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'insane' ? 0.8 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, the SPIRAL pays 80%, and the dawn bleeds you for 70%
     const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
     state.earned += bonus;
@@ -925,7 +993,7 @@ function runWaves(dt) {
     if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
-    state.intermission = state.protocol === 'crimson' ? 3 : state.protocol === 'hard' ? 4.5 : 7; // HARD: 4.5s to rebuild — the swarm never waits. CRIMSON: 3s
+    state.intermission = state.protocol === 'crimson' ? 3 : state.protocol === 'insane' ? 3.5 : state.protocol === 'hard' ? 4.5 : 7; // HARD: 4.5s to rebuild — the swarm never waits. INSANE: 3.5s. CRIMSON: 3s
     updateHud();
   }
   if (state.intermission > 0) {
@@ -1240,7 +1308,7 @@ const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
   { id: 'hard', label: 'HARD', sub: '30 WAVES // COMPOUNDING HULLS · +15% SPEED · HELLFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
-  { id: 'insane', label: 'INSANE', sub: 'SPIRAL OVERDRIVE', ready: false },
+  { id: 'insane', label: 'INSANE', sub: '30 WAVES // COMPOUNDING HULLS · +16% SPEED · DAWNFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
 ];
 
@@ -1322,7 +1390,7 @@ function startMission(map, skipVote = false, forcedProtocol = null) {
 function launchCombat(mode) {
   closeVote();
   state.protocol = mode;
-  if (mode === 'hard' || mode === 'crimson') state.cash = Math.round(state.cash * (mode === 'crimson' ? 0.7 : 0.8)); // HELL strips 20% of opening salvage; the DAWN strips 30% — you deploy wounded
+  if (mode === 'hard' || mode === 'insane' || mode === 'crimson') state.cash = Math.round(state.cash * (mode === 'crimson' ? 0.7 : mode === 'insane' ? 0.75 : 0.8)); // HELL strips 20% of opening salvage, the SPIRAL 25%, and the DAWN 30% — you deploy wounded
   const proto = document.querySelector('#combat-protocol');
   if (proto) proto.textContent = String(mode).toUpperCase();
   state.mode = 'countdown';
@@ -1646,6 +1714,7 @@ function placeTower(entry, x, y) {
   state.layers.towers.appendChild(node);
   const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, lvl: 0 };
   if (entry.id === 'corpseblossom') { tower.veinCd = 0.6; tower.lust = 0; tower.screamCd = 0; }
+  if (entry.id === 'gravewarden') { tower.bellCd = 2.5; tower.tollCharges = 0; }
   if (entry.id === 'zeroday') tower.nukeCd = 0;
   const pad = padAt(x, y);
   if (pad) {
@@ -1773,6 +1842,18 @@ function openTowerPanel(tower) {
     specials.push(`<div class="tp-abil-row"><span>NEXT LAUNCH</span><b>${state.mode === 'waves' ? `${Math.ceil(tower.droneCd || 0)}s` : `${Math.round(es.launchEvery || 6)}s CADENCE`}</b></div>`);
   }
   if (entry.id === 'virus' && es.corrupt) specials.push(`<div class="tp-abil-row"><span>CONTAGION</span><b>${es.corrupt}/S · 5S BURN</b></div>`);
+  if (entry.id === 'gravewarden') {
+    if (es.bell) {
+      specials.push(`<div class="tp-abil-row"><span>DEATH TOLL</span><b>${es.bell} DMG · ${es.tollStun || 0.8}s STUN</b></div>`);
+      specials.push(`<div class="tp-abil-row"><span>NEXT TOLL</span><b>${state.mode === 'waves' ? `${Math.ceil(tower.bellCd || 0)}s` : `${es.bellEvery || 8}s CADENCE`}</b></div>`);
+      specials.push(`<div class="tp-abil-row"><span>TOLL CHARGES</span><b>${tower.tollCharges || 0}</b></div>`);
+    }
+    if (es.yardSlow) specials.push(`<div class="tp-abil-row"><span>GRAVE YARD</span><b>-${Math.round(es.yardSlow * 100)}% SPEED</b></div>`);
+  }
+  if (entry.id === 'executioner') {
+    specials.push(`<div class="tp-abil-row"><span>EXECUTE</span><b>COMMANDERS BELOW ${Math.round((es.execute || 0.15) * 100)}% HULL</b></div>`);
+    specials.push(`<div class="tp-abil-row"><span>CHAFF PAYOUT</span><b>${Math.round((es.chaffPct || 0.15) * 100)}% DMG</b></div>`);
+  }
   if (entry.id === 'zeroday') specials.push(`<div class="tp-abil-row"><span>WAVE INCOME</span><b>$${es.income || 0}/WAVE</b></div>`);
   const abilities = [];
   if (entry.id === 'corpseblossom' && trackLevel(tower) >= 4) {
@@ -1885,6 +1966,30 @@ function updateTowers(dt) {
       if (tower.droneCd <= 0 && launchStrikeDrone(tower)) {
         tower.droneCd = effStats(tower).launchEvery || 6;
         if (state.panelTower === tower) openTowerPanel(tower); // live launch countdown
+      }
+    }
+    if (tower.id === 'gravewarden') {
+      // DEATH TOLL: the bell rings on cadence — everything hostile in the yard
+      // takes the pulse, chaff eats a stun, and every yard kill rings it sooner.
+      tower.bellCd = Math.max(0, (tower.bellCd || 0) - dt);
+      const es = effStats(tower);
+      if (es.bell && tower.bellCd <= 0) {
+        tower.bellCd = es.bellEvery || 8;
+        let toll = 0;
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || enemy.friendly) continue;
+          const [px, py] = posOf(enemy);
+          if (Math.hypot(px - tower.x, py - tower.y) <= es.rng) {
+            damageEnemy(enemy, es.bell, { src: 'toll' });
+            if (enemy.alive && !enemy.t.boss) enemy.stun = Math.max(enemy.stun || 0, es.tollStun || 0.8);
+            toll += 1;
+          }
+        }
+        if (toll) {
+          fxRing(tower.x, tower.y, 'fx-ring-crimson');
+          floatText(tower.x, tower.y - 46, `DEATH TOLL — ${toll} CAUGHT`, 'lust-float');
+          playSound();
+        }
       }
     }
     if (tower.id === 'zeroday') tower.nukeCd = Math.max(0, (tower.nukeCd || 0) - dt);
@@ -2047,6 +2152,21 @@ function fireTower(tower, target) {
       state.layers.fx.appendChild(slash);
       setTimeout(() => slash.remove(), 160);
       fxRing(tx, ty, 'fx-ring-virus');
+      break;
+    }
+    case 'executioner': {
+      // THE HEADSMAN: a commanders-only rail. Chaff soaks a token fraction of
+      // the round; bosses pay full price — and a marked commander below the
+      // execute threshold just dies. The final boss is beyond the blade.
+      const es = effStats(tower);
+      damageEnemy(target, target.t.boss ? dmg : Math.max(1, Math.round(dmg * (es.chaffPct || 0.15))));
+      fireLine(tower, target, 'fx-sniper', 2.6);
+      fxRing(tx, ty, 'fx-ring-red');
+      if (target.alive && target.t.boss && target.key !== 'overseer' && target.hp <= target.maxHp * (es.execute || 0.15)) {
+        damageEnemy(target, 999999999, { phase: true, src: 'execute' });
+        floatText(tx, ty - target.t.size - 12, 'EXECUTED', 'core-float');
+        fxRing(tx, ty, 'fx-ring-crimson');
+      }
       break;
     }
     case 'dawnbreaker': {

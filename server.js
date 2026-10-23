@@ -48,9 +48,13 @@ const SHOP = {
 // ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (100,000 XP per core);
 // cores buy ULTIMATUM cards. Mirrored in app.js LOCAL — keep in sync.
 const ULT_XP_PER_CORE = 100000;
-const ULT_CARDS = { corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 } };
+const ULT_CARDS = {
+  corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
+  gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
+  executioner: { name: 'EXECUTIONER', cores: 0, unlock: 50 },
+};
 // ULTIMATUM-class towers: at most ONE may be armed in the loadout at a time.
-const ULT_TOWERS = new Set(['corpseblossom']);
+const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'executioner']);
 
 // Admin surface: accounts flagged by redeeming the admin key code (ADMINLOG101011)
 // or listed here by exact name. Admins see/purchase CLASSIFIED blueprints.
@@ -63,6 +67,7 @@ const REWARDS = {
   easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
   medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
   hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
+  insane: { waveNC: 13, waveXP: 20, bossNC: 20, bossBT: 1, bossXP: 70, winNC: 350, winXP: 400, flawlessNC: 140, flawlessBT: 6, flawlessXP: 160, firstClearBT: 5 },
   crimson: { waveNC: 15, waveXP: 25, bossNC: 25, bossBT: 2, bossXP: 80, winNC: 500, winXP: 600, flawlessNC: 200, flawlessBT: 10, flawlessXP: 300, firstClearBT: 10 },
 };
 const PROTOCOLS = Object.keys(REWARDS);
@@ -476,7 +481,7 @@ for (const [id, name] of [
   rooms.set(id, { id, name, players: [], map: null, protocol: null, started: false });
 }
 const MAP_PROTOCOLS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
-const PROTOCOL_CHOICES = ['easy', 'medium', 'hard']; // combat protocols a room lead can lock in
+const PROTOCOL_CHOICES = ['easy', 'medium', 'hard', 'insane']; // combat protocols a room lead can lock in
 const MAX_PLAYERS = 4;
 
 const webSockets = new WebSocketServer({ server, path: '/rooms' });

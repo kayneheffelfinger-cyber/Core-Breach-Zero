@@ -14,8 +14,17 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.29';
+const BUILD = '2026.10.30';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.30', tag: 'INSANE ERA',
+    items: [
+      ['NEW', 'INSANE PROTOCOL goes live — 30 waves on the spiral, playable on ANY battle map and lockable in squad rooms. Built from the HARD ladder and pushed past it: hostile counts climb another 6-10%, hulls compound at 1.105x per wave (wave 30 arrives at ~20x hull), hostiles run 16% faster, and DAWNFIRE surges burn on TRIPLE THREAT and SIEGE WALL. Opening salvage stripped 25%, wave pay 80%, 3.5s rebuilds, boss leaks still near-kill the core. On paper it sits just under CRIMSON DAWN — in practice the dawn stays meaner, because the Well only offers two entrances. Pays 350 NC / 400 XP per win.'],
+      ['NEW', 'GRAVE WARDEN joins the ULTIMATUM vault — the second apex card, 2 cores. A walled yard where the dead pay toll: every yard death rings the bell sooner, the DEATH TOLL pulse damages everything hostile in the yard and stuns chaff, and the CHILL GRAVE slows walkers AND flyers up to 45%. Commanders are beneath its notice.'],
+      ['NEW', 'EXECUTIONER — the headsman\u2019s rail. The third Ultimatum card costs NO cores: it claims free at Clearance 50 and beyond. A commanders-only rail that tracks the beefiest hull in range — chaff soaks a token 15% of the round while bosses pay full price, and any marked commander below the execute threshold loses its head on the spot (mini-bosses and wardens included; the final boss is beyond the blade).'],
+      ['BAL', 'One-card rule extends to the new apex rigs: GRAVE WARDEN and EXECUTIONER arm under the same ULTIMATUM constraint — at most one apex card in the loadout at a time, enforced server-side and in the LOCAL validator.'],
+    ],
+  },
   {
     version: '2026.10.29', tag: 'FLIGHT CORRIDOR',
     items: [
@@ -194,7 +203,7 @@ const menus = {
   },
   play: {
     tag: 'DEPLOYMENT HUB', title: 'PLAY MENU',
-    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves) and HARD (30 waves of pure hell — compounding hulls, 15% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core).',
+    description: 'Enter one of four rooms for up to four commanders, or recon any of the 5 battle maps solo. Combat protocols live: EASY (20 waves), MEDIUM (30 waves), HARD (30 waves of pure hell — compounding hulls, 15% faster hostiles, HELLFIRE surges and boss breaches that near-kill the core) and INSANE (30 waves on the spiral — hulls compound past HARD, +16% speed, DAWNFIRE surges, runs on any battle map; only the two-entranced Well keeps CRIMSON DAWN meaner).',
     stats: [['ROOMS', '4 DEPLOYMENT BAYS'], ['SQUAD SIZE', 'UP TO 4 COMMANDERS'], ['SERVER PORT', port]],
   },
   perks: {
@@ -409,6 +418,7 @@ const LOCAL = (() => {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
     medium: { waveNC: 10, waveXP: 15, bossNC: 12, bossBT: 1, bossXP: 40, winNC: 100, winXP: 140, flawlessNC: 40, flawlessBT: 3, flawlessXP: 80, firstClearBT: 5 },
     hard: { waveNC: 12, waveXP: 18, bossNC: 18, bossBT: 1, bossXP: 65, winNC: 250, winXP: 260, flawlessNC: 100, flawlessBT: 4, flawlessXP: 130, firstClearBT: 5 },
+    insane: { waveNC: 13, waveXP: 20, bossNC: 20, bossBT: 1, bossXP: 70, winNC: 350, winXP: 400, flawlessNC: 140, flawlessBT: 6, flawlessXP: 160, firstClearBT: 5 },
     crimson: { waveNC: 15, waveXP: 25, bossNC: 25, bossBT: 2, bossXP: 80, winNC: 500, winXP: 600, flawlessNC: 200, flawlessBT: 10, flawlessXP: 300, firstClearBT: 10 },
   };
   let down = false;
@@ -437,8 +447,12 @@ const LOCAL = (() => {
   // ULTIMATUM vault — lifetime XP banks cores; cores buy ULTIMATUM cards.
   // Mirrors server.js ULT_* — keep in sync.
   const ULT_XP_PER_CORE = 100000;
-  const ULT_CARDS = { corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 } };
-  const ULT_TOWERS = new Set(['corpseblossom']);
+  const ULT_CARDS = {
+    corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
+    gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
+    executioner: { name: 'EXECUTIONER', cores: 0, unlock: 50 },
+  };
+  const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'executioner']);
   // Enforce access rules on a LOCAL meta: perk-slot default + economy migrations.
   // ULTIMATUM era: legacy metas get their lifetime XP ledger backfilled from the
   // level history — nobody loses owned towers, levels only ever climb now.
@@ -2272,7 +2286,7 @@ function renderBays() {
 }
 
 // Combat protocols a room can run — keep in sync with server.js PROTOCOL_CHOICES.
-const ROOM_PROTOCOLS = ['easy', 'medium', 'hard'];
+const ROOM_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];
 
 function isRoomLead(room) {
   return room.commanders.some((commander) => commander.isHost && commander.callsign === myCallsign);
