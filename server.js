@@ -44,6 +44,10 @@ const SHOP = {
   missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
   zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
   executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' },
+  sparkcoil: { name: 'SPARK COIL', unlock: 6, price: { nc: 950, bt: 15 }, currency: 'mixed' },
+  flakpost: { name: 'FLAK POST', unlock: 10, price: { nc: 1400, bt: 20 }, currency: 'mixed' },
+  tarsprayer: { name: 'TAR SPRAYER', unlock: 12, price: { nc: 1750, bt: 25 }, currency: 'mixed' },
+  relay: { name: 'COMMAND RELAY', unlock: 18, price: { nc: 4300, bt: 70 }, currency: 'mixed' },
 };
 
 // ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (50,000 XP per core);
@@ -77,6 +81,7 @@ const PROTOCOLS = Object.keys(REWARDS);
 function achievementsFrom(mapWins) {
   const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
   const hardWins = Object.keys(wins).reduce((sum, key) => sum + (key.endsWith(':hard') ? (wins[key] || 0) : 0), 0);
+  const bigWins = Object.keys(wins).reduce((sum, key) => sum + (/:(hard|insane|crimson)$/.test(key) ? (wins[key] || 0) : 0), 0);
   return {
     overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
     hardline: Boolean(hardWins >= 1),
@@ -84,6 +89,7 @@ function achievementsFrom(mapWins) {
     spirebreaker: Boolean((wins['insane:hard'] || 0) > 0),
     grandslam: Boolean(['easy', 'medium', 'hard', 'insane', 'cbz'].every((mapId) => (wins[`${mapId}:hard`] || 0) > 0)),
     apexpredator: Boolean(hardWins >= 10),
+    warmachine: Boolean(bigWins >= 15),
   };
 }
 
@@ -99,6 +105,7 @@ const PERK_ACH = {
   fieldrep: 'spirebreaker',
   bounty: 'grandslam',
   overclock: 'apexpredator',
+  saturation: 'warmachine',
 };
 
 // Enforce access rules on a meta: perk-slot default + economy migrations.

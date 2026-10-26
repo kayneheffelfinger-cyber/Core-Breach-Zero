@@ -14,8 +14,19 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.33';
+const BUILD = '2026.11.01';
 const UPDATE_LOG = [
+  {
+    version: '2026.11.01', tag: 'WAR CHEST',
+    items: [
+      ['BAL', 'The nerf hammer falls on the whole top shelf — the heavy hitters were broken and everyone knew it. DAWNBRINGER 420→330 damage / 0.9→0.8 rate with SUNSLAUGHTER rolled down to 1250 / 40U burn; VIRUS ZERO PATIENT 80→64 damage / 4.2→3.8 rate / corruption 70→55 a second; SNIPER RAIL GUNNER 375→330; MISSILE SILO MIRV 780→650 with the crater trimmed to 80U and cluster bomblets down to 35%; DRONE SPAWNER apex payload 240→200; and the ZERO DAY nuke 2200→1700. The ladders still climb — they just don\u2019t touch the sky anymore.'],
+      ['WARDEN', 'GRAVE WARDEN mastery: every line of the rig climbs — base yard 170→180 reach, DEATH TOLL 70→90 damage, CHILL GRAVE 35→40%, TOLLING HOURS 180 damage on a 5.5s cadence, LAST TOLL 330 damage / 4s / 50% slow / 1.4s stun — and a new Tier 6 that costs more than any upgrade ever minted: SOUL CHOIR ($5,200). The Warden now pulls vengeful souls OUT OF THE CORE: they march the lane like a Blossom risen and detonate on the first hostile they touch. Soul hull = 10 x TOLL CHARGES (min 50) — the yard\u2019s dead forge the payload. And the choir does not sing for free: $900 per soul, 45s between hymns.'],
+      ['NEW', 'Three filler chassis decrypt for commanders who like options more than power: SPARK COIL (Clearance 6) — a jury-rigged zapper whose ladder tops out fast; FLAK POST (Clearance 10) — twin barrels that shred flyers and completely ignore the ground war; TAR SPRAYER (Clearance 12) — no gun at all, just a slick that drags walkers 15-25%. Filler, by design — priced like it too.'],
+      ['NEW', 'COMMAND RELAY (Clearance 18, one per commander) — the first true support rig. Every tower inside its ring hits harder, and the ladder rewires the network: a wider ring (WIDE NET), +15% damage (POWER GRID), +10% range (TARGET UPLINK), +10% fire rate (MORALE CORE) and RALLY CRY — a $600 cast that floods the ring with +50% fire rate for 6 seconds. No guns. It makes YOUR guns better.'],
+      ['CAP', 'The command ceiling comes back down — 20 units was a siege, 15 is a doctrine. Every commander deploys max 15 towers again (co-op squads still stack +9 per extra commander). And for the commanders who NEED the old ceiling back: the new WAR MACHINE achievement (15 HARD-protocol or better victories) decrypts the SATURATION DOCTRINE perk — equip it and the ceiling climbs back to 20.'],
+      ['ART', 'Every chassis on the grid gets its own face — 17 unique field rigs. Per-tower chassis kits (the Shredder\u2019s drum, the Blossom\u2019s petals, the Warden\u2019s bell, the Relay\u2019s halo mast, the Virus\u2019s blades...) and a unique paint job per unit, live on the board, in the armory cards, in the locked-card previews AND the mission loadout bar. New decals ship for all four new towers.'],
+    ],
+  },
   {
     version: '2026.10.33', tag: 'DAWN FORGE',
     items: [
@@ -355,10 +366,18 @@ const ACHIEVEMENTS = [
     desc: 'Rack up 10 HARD protocol victories. The grid learns to fear your ledger.',
     reward: 'Decrypts the OVERCLOCK MATRIX perk — every turret fires 5% faster.',
   },
+  {
+    id: 'warmachine', name: 'WAR MACHINE', glyph: '⬢', map: 'any',
+    protocols: ['hard'],
+    count: 15,
+    desc: 'Rack up 15 victories on the HARD protocol or better — HARD, INSANE and the Crimson Dawn all count. The grid clears you for full saturation.',
+    reward: 'Decrypts the SATURATION DOCTRINE perk — +5 deployment slots (command ceiling 15 → 20).',
+  },
 ];
 function achievementsFrom(mapWins) {
   const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
   const hardWins = Object.keys(wins).reduce((sum, key) => sum + (key.endsWith(':hard') ? (wins[key] || 0) : 0), 0);
+  const bigWins = Object.keys(wins).reduce((sum, key) => sum + (/:(hard|insane|crimson)$/.test(key) ? (wins[key] || 0) : 0), 0);
   return {
     overdrive: Boolean((wins['insane:easy'] || 0) > 0 && (wins['insane:medium'] || 0) > 0),
     hardline: Boolean(hardWins >= 1),
@@ -366,6 +385,7 @@ function achievementsFrom(mapWins) {
     spirebreaker: Boolean((wins['insane:hard'] || 0) > 0),
     grandslam: Boolean(['easy', 'medium', 'hard', 'insane', 'cbz'].every((mapId) => (wins[`${mapId}:hard`] || 0) > 0)),
     apexpredator: Boolean(hardWins >= 10),
+    warmachine: Boolean(bigWins >= 15),
   };
 }
 const PERKS = [
@@ -398,6 +418,11 @@ const PERKS = [
     id: 'overclock', name: 'OVERCLOCK MATRIX', ach: 'apexpredator',
     desc: 'Weapons-grade clock boost across the whole network — every turret fires 5% faster.',
     req: 'APEX PREDATOR ACHIEVEMENT',
+  },
+  {
+    id: 'saturation', name: 'SATURATION DOCTRINE', ach: 'warmachine',
+    desc: 'Full-spectrum deployment clearance — the command ceiling climbs from 15 to 20 deployed units.',
+    req: 'WAR MACHINE ACHIEVEMENT',
   },
 ];
 window.CBZPerks = {
@@ -437,6 +462,10 @@ const LOCAL = (() => {
     missilesilo: { name: 'MISSILE SILO', unlock: 30, price: { nc: 9000, bt: 120 }, currency: 'mixed' },
     zeroday: { name: 'ZERO DAY-EXPLOIT RIG', unlock: 15, price: { nc: 3600, bt: 30 }, currency: 'mixed' },
     executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' },
+    sparkcoil: { name: 'SPARK COIL', unlock: 6, price: { nc: 950, bt: 15 }, currency: 'mixed' },
+    flakpost: { name: 'FLAK POST', unlock: 10, price: { nc: 1400, bt: 20 }, currency: 'mixed' },
+    tarsprayer: { name: 'TAR SPRAYER', unlock: 12, price: { nc: 1750, bt: 25 }, currency: 'mixed' },
+    relay: { name: 'COMMAND RELAY', unlock: 18, price: { nc: 4300, bt: 70 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -465,6 +494,7 @@ const LOCAL = (() => {
     fieldrep: 'spirebreaker',
     bounty: 'grandslam',
     overclock: 'apexpredator',
+    saturation: 'warmachine',
   };
   const ADMIN_NAMES = new Set(['JACKSONLOOMIS-COMMITS']);
   const isAdminName = (name) => ADMIN_NAMES.has(String(name || '').toUpperCase());

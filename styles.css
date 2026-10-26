@@ -451,6 +451,7 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .lo-slot { position: relative; display: grid; justify-items: center; gap: 3px; width: 128px; padding: 10px 6px 7px; border: 1px solid #2b3f46; background: rgba(9,16,21,.94); transition: border-color .15s, transform .15s, box-shadow .15s; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); }
 .lo-slot .lo-key { position: absolute; top: 4px; left: 6px; padding: 0 4px; border: 1px solid var(--line); color: var(--muted); font: 8px var(--mono); }
 .lo-icon { display: grid; place-items: center; color: var(--cyan); filter: drop-shadow(0 0 7px rgba(112,225,208,.4)); }
+.lo-icon .tw-art { width: 100%; height: 100%; object-fit: cover; border: none; background: transparent; }
 .lo-icon.cat-control { color: var(--violet); filter: drop-shadow(0 0 7px rgba(196,155,239,.4)); }
 .lo-icon.cat-support { color: var(--green); filter: drop-shadow(0 0 7px rgba(165,213,139,.4)); }
 .lo-icon.cat-special { color: var(--amber); filter: drop-shadow(0 0 7px rgba(255,180,90,.4)); }
@@ -560,6 +561,8 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .fx-pellet { stroke: #ffb45a; stroke-width: 2.5; animation-duration: .18s; }
 .fx-sniper { stroke: #b8ffe3; stroke-width: 1.6; animation-duration: .3s; }
 .fx-chip { stroke: #ffd23f; stroke-width: 1.8; stroke-dasharray: 3 4; animation-duration: .16s; }
+.fx-spark { stroke: #bfe1ff; stroke-linecap: round; animation-duration: .14s; filter: drop-shadow(0 0 4px rgba(140,200,255,.95)); }
+.fx-flak { stroke: #ffd23f; stroke-linecap: round; stroke-dasharray: 2 3; animation-duration: .15s; filter: drop-shadow(0 0 3px rgba(255,190,68,.8)); }
 .fx-dawn { stroke: #ff3549; stroke-width: 2.6; animation-duration: .26s; filter: drop-shadow(0 0 4px rgba(255,60,80,.9)); }
 .fx-dawn-halo { stroke: rgba(255,190,80,.30); stroke-linecap: round; animation-duration: .26s; filter: blur(.6px) drop-shadow(0 0 9px rgba(255,150,40,.65)); }
 /* DAWNBRINGER relic rig — burning corona rings, solar core, sun-disc muzzle */
@@ -573,6 +576,60 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .tw-muzzle { fill: #fff3c4; stroke: rgba(60,30,0,.7); stroke-width: 1; filter: drop-shadow(0 0 6px rgba(255,205,90,1)); }
 @keyframes corona-spin { to { transform: rotate(360deg); } }
 @keyframes sun-pulse { 0%, 100% { opacity: .72; } 50% { opacity: 1; } }
+
+/* --- WAR CHEST: per-kind field kits + unique paint per chassis -------------------
+   Every tower gets its own silhouette (kindKit parts in combat.js) and its own
+   palette — no two rigs on the grid read alike anymore. */
+.tw-kit-crate { fill: rgba(9,18,23,.95); stroke: #3a5058; stroke-width: 1; }
+.tw-kit-vent { fill: rgba(234,255,250,.28); }
+.tw-kit-plate { fill: rgba(9,18,23,.95); stroke: #3a5058; stroke-width: 1; }
+.tw-kit-tube { fill: rgba(9,18,23,.95); stroke-width: 1.2; }
+.tw-kit-mouth { fill: rgba(234,255,250,.14); stroke-width: 1.2; }
+.tw-kit-rail { fill: rgba(9,18,23,.95); stroke-width: 1.2; }
+.tw-kit-scope { fill: rgba(234,255,250,.1); stroke-width: 1.2; }
+.tw-kit-drum { fill: rgba(9,18,23,.95); stroke-width: 1.4; }
+.tw-kit-tooth { fill: rgba(234,255,250,.55); }
+.tw-kit-blade { stroke-width: 2; stroke-linecap: round; fill: none; }
+.tw-kit-pustule { fill: rgba(234,255,250,.75); }
+.tw-kit-rack { fill: rgba(9,18,23,.95); stroke: #3a5058; stroke-width: 1; }
+.tw-kit-dronebit { fill: #eafffa; }
+.tw-kit-silo { fill: rgba(9,18,23,.95); stroke-width: 1.2; }
+.tw-kit-hatch { fill: rgba(234,255,250,.12); stroke-width: 1.2; }
+.tw-kit-mast { stroke-width: 1.6; stroke-linecap: round; fill: none; }
+.tw-kit-dish { fill: rgba(234,255,250,.08); stroke-width: 1.2; }
+.tw-kit-petal { fill: rgba(9,18,23,.8); stroke-width: 1.2; }
+.tw-kit-heart { fill: rgba(234,255,250,.85); }
+.tw-kit-cage { fill: none; stroke-width: 1.4; stroke-dasharray: 3 3; }
+.tw-kit-bell { stroke-width: 1.2; }
+.tw-kit-clapper { stroke-width: 1; }
+.tw-kit-brake { fill: rgba(234,255,250,.7); }
+.tw-kit-sight { fill: #ff4d5e; filter: drop-shadow(0 0 3px rgba(255,77,94,.9)); }
+.tw-kit-coil { fill: none; stroke-width: 1.4; }
+.tw-kit-sparktip { fill: #eafffa; filter: drop-shadow(0 0 4px rgba(140,200,255,1)); }
+.tw-kit-fin { stroke-width: 1.2; }
+.tw-kit-vat { fill: rgba(9,18,23,.95); stroke-width: 1.3; }
+.tw-kit-nozzle { fill: rgba(9,18,23,.95); stroke-width: 1.2; }
+.tw-kit-drip { fill: rgba(234,255,250,.4); }
+.tw-kit-halo { fill: none; stroke-width: 1.3; stroke-dasharray: 4 4; transform-box: fill-box; transform-origin: center; animation: corona-spin 9s linear infinite; }
+.tw-kit-halo.wide { animation-duration: 14s; animation-direction: reverse; stroke-dasharray: 2 6; }
+.tw-kit-beacon { fill: #eafffa; filter: drop-shadow(0 0 5px rgba(255,224,138,1)); animation: sun-pulse 1.6s ease-in-out infinite; }
+/* Unique paint jobs — one palette per chassis */
+.tw-sentinel .tw-base { stroke: #70e1d0; } .tw-sentinel .tw-barrel, .tw-sentinel .tw-kit-tube { fill: #70e1d0; stroke: rgba(8,26,22,.85); }
+.tw-lazermortar .tw-base { stroke: #ffd166; } .tw-lazermortar .tw-barrel, .tw-lazermortar .tw-kit-tube { fill: #ffd166; stroke: rgba(43,29,2,.85); } .tw-lazermortar .tw-kit-mouth { stroke: #ffd166; }
+.tw-shotgunner .tw-base { stroke: #f2884b; } .tw-shotgunner .tw-barrel, .tw-shotgunner .tw-kit-tube { fill: #f2884b; stroke: rgba(43,17,2,.85); }
+.tw-sniper .tw-base { stroke: #9ad1ff; } .tw-sniper .tw-barrel, .tw-sniper .tw-kit-rail { fill: #9ad1ff; stroke: rgba(9,29,43,.85); } .tw-sniper .tw-kit-scope { stroke: #9ad1ff; }
+.tw-shredder .tw-base { stroke: #ffb45a; } .tw-shredder .tw-barrel { fill: #ffb45a; } .tw-shredder .tw-kit-drum { stroke: #ffb45a; } .tw-shredder .tw-kit-tooth { fill: #ffd9a8; }
+.tw-virus .tw-base { stroke: #ff5e7a; } .tw-virus .tw-barrel { fill: #ff5e7a; } .tw-virus .tw-kit-blade { stroke: #ff8a9c; } .tw-virus .tw-kit-pustule { fill: #ffd7de; }
+.tw-dronespawner .tw-base { stroke: #7fd0ff; } .tw-dronespawner .tw-barrel, .tw-dronespawner .tw-kit-tube { fill: #7fd0ff; stroke: rgba(6,30,43,.85); } .tw-dronespawner .tw-kit-dronebit { fill: #d6f1ff; }
+.tw-missilesilo .tw-base { stroke: #ff7a45; } .tw-missilesilo .tw-barrel { fill: #ff7a45; } .tw-missilesilo .tw-kit-silo, .tw-missilesilo .tw-kit-hatch { stroke: #ff7a45; } .tw-missilesilo .tw-kit-mast { stroke: #ff7a45; }
+.tw-zeroday .tw-base { stroke: #a5d58b; } .tw-zeroday .tw-barrel, .tw-zeroday .tw-kit-crate { fill: #a5d58b; stroke: rgba(17,33,11,.85); } .tw-zeroday .tw-kit-dish, .tw-zeroday .tw-kit-mast { stroke: #a5d58b; }
+.tw-corpseblossom .tw-base { stroke: #ff7ab8; } .tw-corpseblossom .tw-barrel { fill: #ff7ab8; } .tw-corpseblossom .tw-kit-petal { stroke: #ff7ab8; fill: rgba(64,10,34,.85); } .tw-corpseblossom .tw-kit-heart { fill: #ffd7ea; }
+.tw-gravewarden .tw-base { stroke: #7fe6ae; } .tw-gravewarden .tw-barrel { fill: #7fe6ae; } .tw-gravewarden .tw-kit-cage, .tw-gravewarden .tw-kit-bell, .tw-gravewarden .tw-kit-clapper { stroke: #7fe6ae; fill: rgba(8,40,26,.9); } .tw-gravewarden .tw-kit-clapper { fill: #d9ffe9; stroke: none; }
+.tw-executioner .tw-base { stroke: #ff4d5e; } .tw-executioner .tw-barrel, .tw-executioner .tw-kit-rail { fill: #ff4d5e; stroke: rgba(43,3,6,.85); } .tw-executioner .tw-kit-brake { fill: #ffd7db; }
+.tw-sparkcoil .tw-base { stroke: #8cc8ff; } .tw-sparkcoil .tw-barrel { fill: #8cc8ff; } .tw-sparkcoil .tw-kit-coil { stroke: #bfe1ff; } .tw-sparkcoil .tw-kit-sparktip { filter: drop-shadow(0 0 4px rgba(140,200,255,1)); }
+.tw-flakpost .tw-base { stroke: #e8c15a; } .tw-flakpost .tw-barrel, .tw-flakpost .tw-kit-tube { fill: #e8c15a; stroke: rgba(43,32,2,.85); } .tw-flakpost .tw-kit-fin { fill: rgba(232,193,90,.4); stroke: #e8c15a; }
+.tw-tarsprayer .tw-base { stroke: #a08f77; } .tw-tarsprayer .tw-barrel, .tw-tarsprayer .tw-kit-nozzle { fill: #a08f77; stroke: rgba(28,24,17,.85); } .tw-tarsprayer .tw-kit-vat { stroke: #a08f77; } .tw-tarsprayer .tw-kit-drip { fill: #4d4436; }
+.tw-relay .tw-base { stroke: #ffe08a; } .tw-relay .tw-barrel { fill: #ffe08a; } .tw-relay .tw-kit-mast { stroke: #ffe08a; } .tw-relay .tw-kit-halo { stroke: #ffe08a; filter: drop-shadow(0 0 4px rgba(255,224,138,.8)); }
 .fx-chain-stun { stroke: #eafffa; }
 .fx-beam-rail { stroke: #70e1d0; stroke-width: 4.5; }
 .fx-beam-quantum { stroke: #eafffa; }
@@ -753,6 +810,11 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .e-summon .e-chassis { filter: hue-rotate(90deg) saturate(1.3) brightness(.85); }
 .e-summon::after { content: ''; position: absolute; }
 .summon-float { fill: #9be87a; }
+/* Vengeful soul — the Warden's choir, raised from the core */
+.e-soul .e-chassis { filter: none; }
+.soul-halo { fill: rgba(191,241,226,.10); stroke: rgba(191,241,226,.55); stroke-width: 1.2; stroke-dasharray: 3 4; transform-box: fill-box; transform-origin: center; animation: corona-spin 6s linear infinite; filter: drop-shadow(0 0 6px rgba(150,240,210,.7)); }
+.soul-core { fill: #eafffa; stroke: rgba(20,60,50,.8); stroke-width: 1; filter: drop-shadow(0 0 5px rgba(190,255,230,.95)); animation: sun-pulse 1.9s ease-in-out infinite; }
+.soul-eye { fill: #143c32; }
 .lust-float { fill: #ff5e7a; font-weight: 700; }
 
 /* --- Room combat protocol picker ----------------------------------------------------- */
@@ -775,6 +837,12 @@ dialog.shop-open { width: min(1060px, calc(100% - 28px)); }
 .tp-ability.purge:hover:not(:disabled) { background: #ff5e7a; color: #2b0509; }
 .tp-ability.scream { border-color: rgba(196,155,239,.6); background: rgba(196,155,239,.07); color: #c49bef; }
 .tp-ability.scream:hover:not(:disabled) { background: #c49bef; color: #1d0f2b; }
+.tp-ability.soul { border-color: rgba(127,230,174,.6); background: rgba(127,230,174,.07); color: #7fe6ae; }
+.tp-ability.soul:hover:not(:disabled) { background: #7fe6ae; color: #06251a; }
+.tp-ability.rally { border-color: rgba(255,190,68,.65); background: rgba(255,190,68,.07); color: #ffce5a; }
+.tp-ability.rally:hover:not(:disabled) { background: #ffce5a; color: #2b1d02; }
+.tp-abil-row.soul b { color: #7fe6ae; }
+.tp-abil-row.rally b { color: #ffce5a; }
 .tp-ability:disabled { opacity: .45; }
 .payout-ach b { color: #a5d58b; }
 

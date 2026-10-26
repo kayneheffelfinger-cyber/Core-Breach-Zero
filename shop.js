@@ -55,6 +55,17 @@ window.CBZShop = (() => {
         { label: 'EXPERT TRAINING', cost: 350, sets: { rate: 1, rng: 120, dmg: 40 }, info: 'RATE 0.8 → 1 · RNG 105 → 120 · DMG 36 → 40' },
       ],
       icon: ic('<path d="M7 33l12-12"/><path d="M12 35L24 23"/><path d="M24 23l5-5"/><circle cx="31" cy="12" r="2.2"/><circle cx="35" cy="17" r="2.2"/><circle cx="27" cy="7" r="1.8"/>') },
+    { id: 'sparkcoil', name: 'SPARK COIL', cat: 'offense', unlock: 6, price: { nc: 950, bt: 15 }, cost: 120, currency: 'mixed',
+      tagline: 'Jury-rigged zapper — a wound coil that snaps cheap sparks down the lane.',
+      stats: { dmg: 9, rate: 1.2, rng: 100, tgt: 'SINGLE / GROUND · AA ON PADS' },
+      special: '>> Grid-jury hardware: hits singles only, never splashes, and the ladder runs out of ambition after three small tiers. It clears the opening drip and then holds a hex like furniture. Filler, honestly — priced like it too. Deploy on a hex pad to link anti-air coverage.',
+      art: 'assets/towers/sparkcoil.png',
+      track: [
+        { label: 'TIGHTER WINDING', cost: 110, sets: { rate: 1.4 }, info: 'RATE 1.2 → 1.4' },
+        { label: 'LONGER ARC', cost: 190, sets: { rng: 115, dmg: 12 }, info: 'RNG 100 → 115 · DMG 9 → 12' },
+        { label: 'LAST DISCHARGE', cost: 340, sets: { dmg: 16 }, info: 'DMG 12 → 16 — THE COIL STOPS GROWING HERE' },
+      ],
+      icon: ic('<path d="M20 34V14"/><circle cx="20" cy="10" r="2.4"/><path d="M14 30h12M13 26h14M15 22h10"/><path d="M12 34h16"/>') },
     { id: 'sniper', name: 'SNIPER', cat: 'offense', unlock: 5, price: { nc: 1800, bt: 50 }, cost: 300, currency: 'mixed',
       tagline: 'Long-reach marksman — one trigger pull, one deletion.',
       stats: { dmg: 130, rate: 0.3, rng: 250, tgt: 'SINGLE / GROUND · AA ON PADS' },
@@ -65,9 +76,20 @@ window.CBZShop = (() => {
         { label: 'HIGHER CAL', cost: 200, sets: { dmg: 150 }, info: 'DMG 130 → 150' },
         { label: 'AUTO RE-LOADER 9000', cost: 300, sets: { rate: 0.5 }, info: 'RATE 0.3 → 0.5' },
         { label: '50 CAL', cost: 300, sets: { dmg: 215 }, info: 'DMG 150 → 215' },
-        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 375, rate: 0.4, rng: 350 }, info: 'DMG 215 → 375 · RATE 0.5 → 0.4 · RNG 270 → 350' },
+        { label: 'RAIL GUNNER', cost: 1600, sets: { dmg: 330, rate: 0.4, rng: 350 }, info: 'DMG 215 → 330 · RATE 0.5 → 0.4 · RNG 270 → 350' },
       ],
       icon: ic('<circle cx="20" cy="20" r="9"/><path d="M20 4v7"/><path d="M20 29v7"/><path d="M4 20h7"/><path d="M29 20h7"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'flakpost', name: 'FLAK POST', cat: 'offense', unlock: 10, price: { nc: 1400, bt: 20 }, cost: 160, currency: 'mixed',
+      tagline: 'Sky-warden pair — twin flak barrels that shred drone waves and nothing else.',
+      stats: { dmg: 16, rate: 1.5, rng: 150, tgt: 'SINGLES / FLYERS ONLY · GROUND IS BENEATH IT' },
+      special: '>> One job: the sky. The twin barrels track and shred flying hostiles without any pad link — and completely ignore everything that walks. Ground waves stroll past it like it is a lawn ornament. Filler with a specialty.',
+      art: 'assets/towers/flakpost.png',
+      track: [
+        { label: 'SPANNER BARRELS', cost: 150, sets: { rate: 1.8 }, info: 'RATE 1.5 → 1.8' },
+        { label: 'FRAG ROUNDS', cost: 280, sets: { dmg: 22, splash: 8 }, info: 'DMG 16 → 22 · FLAK BURST RING 8U' },
+        { label: 'SKY SWEEP', cost: 520, sets: { dmg: 26, rate: 2, rng: 170 }, info: 'DMG 22 → 26 · RATE 1.8 → 2 · RNG 150 → 170' },
+      ],
+      icon: ic('<path d="M12 34h16"/><path d="M14 34l3-10h6l3 10"/><path d="M17 24V10M23 24V10"/><path d="M17 10h-4M23 10h4"/>') },
     { id: 'shredder', name: 'SHREDDER', cat: 'offense', unlock: 20, price: { nc: 2200, bt: 35 }, cost: 90, currency: 'mixed',
       tagline: 'Chaff mulcher — a spinning drum of cheap blades that deletes the early waves and nothing else.',
       stats: { dmg: 11, rate: 3, rng: 105, tgt: 'SINGLE / GROUND · AA ON PADS' },
@@ -79,6 +101,16 @@ window.CBZShop = (() => {
         { label: 'LAST CALIBER', cost: 480, sets: { dmg: 18, rng: 115 }, info: 'DMG 15 → 18 · RNG 105 → 115 — THE DRUM STOPS GROWING HERE' },
       ],
       icon: ic('<circle cx="20" cy="20" r="10"/><circle cx="20" cy="20" r="3"/><path d="M20 10v4M20 26v4M10 20h4M26 20h4M13 13l2.8 2.8M24.2 24.2L27 27M27 13l-2.8 2.8M15.8 24.2L13 27"/><path d="M20 30v4M14 34h12"/>') },
+    { id: 'tarsprayer', name: 'TAR SPRAYER', cat: 'control', unlock: 12, price: { nc: 1750, bt: 25 }, cost: 180, currency: 'mixed',
+      tagline: 'Field hazard — no gun at all, just a slick of cold tar across the lane.',
+      stats: { dmg: 0, rate: 0, rng: 85, slow: 0.15, tgt: 'FIELD HAZARD · NO DAMAGE · WALKERS ONLY' },
+      special: '>> It pumps tar. Everything that walks through the slick drags at 15% less speed while inside — flyers skim right over it, and nothing ever dies to it. Cheap traffic control that never kills anything: pure filler with a purpose.',
+      art: 'assets/towers/tarsprayer.png',
+      track: [
+        { label: 'HEAVIER BLEND', cost: 210, sets: { slow: 0.2 }, info: 'SLOW 15% → 20%' },
+        { label: 'WIDE NOZZLE', cost: 430, sets: { rng: 105, slow: 0.25 }, info: 'RNG 85 → 105 · SLOW 20% → 25%' },
+      ],
+      icon: ic('<path d="M20 30V12"/><path d="M20 12c-4-1-6-4-6-7 3 0 5 2 6 4 1-2 3-4 6-4 0 3-2 6-6 7"/><path d="M14 34h12"/><circle cx="20" cy="33" r="1.4"/>') },
     { id: 'dronespawner', name: 'DRONE SPAWNER', cat: 'special', unlock: 20, price: { nc: 5200, bt: 85 }, cost: 475, currency: 'mixed', limit: 1,
       tagline: 'Automated carrier — fabricates one-way strike drones straight into traffic.',
       stats: { dmg: 0, rate: 0, rng: 190, drone: 70, launchEvery: 6, tgt: 'SPAWNER // LAUNCHES STRIKE DRONES · ONE PER COMMANDER' },
@@ -88,7 +120,7 @@ window.CBZShop = (() => {
         { label: 'HUNGER DRONES', cost: 240, sets: { launchEvery: 5 }, info: 'LAUNCH CADENCE 6s → 5s' },
         { label: 'WARBIRD CHASSIS', cost: 420, sets: { drone: 110 }, info: 'DRONE DMG/HULL 70 → 110' },
         { label: 'SWARM LOGIC', cost: 850, sets: { launchEvery: 4, drone: 160 }, info: 'LAUNCH 5s → 4s · DRONE 110 → 160' },
-        { label: 'APEX CARRIER', cost: 1900, sets: { rng: 230, launchEvery: 3, drone: 240 }, info: 'RNG 190 → 230 · LAUNCH 4s → 3s · DRONE 160 → 240' },
+        { label: 'APEX CARRIER', cost: 1900, sets: { rng: 230, launchEvery: 3, drone: 200 }, info: 'RNG 190 → 230 · LAUNCH 4s → 3s · DRONE 160 → 200' },
       ],
       icon: ic('<rect x="10" y="22" width="20" height="8" rx="1"/><path d="M14 22v-4M26 22v-4"/><path d="M14 14h4M22 14h4"/><circle cx="16" cy="12" r="2.4"/><circle cx="24" cy="12" r="2.4"/><path d="M20 30v4M12 34h16"/>') },
     { id: 'missilesilo', name: 'MISSILE SILO', cat: 'offense', unlock: 30, price: { nc: 9000, bt: 120 }, cost: 650, currency: 'mixed',
@@ -100,7 +132,7 @@ window.CBZShop = (() => {
         { label: 'WARHEAD CACHE', cost: 520, sets: { dmg: 420 }, info: 'DMG 300 → 420' },
         { label: 'CLUSTER PAYLOAD', cost: 780, sets: { splash: 75 }, info: 'SPLASH 55 → 75' },
         { label: 'SILO AUTOLOADER', cost: 1200, sets: { rate: 0.3, dmg: 500 }, info: 'RATE 0.22 → 0.3 · DMG 420 → 500' },
-        { label: 'MIRV PROTOCOL', cost: 2800, sets: { dmg: 780, splash: 90, rng: 340, cluster: 1 }, info: 'DMG 500 → 780 · SPLASH 75 → 90 · RNG 300 → 340 · MIRV CLUSTER BOMBLETS' },
+        { label: 'MIRV PROTOCOL', cost: 2800, sets: { dmg: 650, splash: 80, rng: 340, cluster: 1 }, info: 'DMG 500 → 650 · SPLASH 75 → 80 · RNG 300 → 340 · MIRV CLUSTER BOMBLETS' },
       ],
       icon: ic('<path d="M12 34h16"/><path d="M14 34V14l6-8 6 8v20"/><path d="M17 20h6"/><circle cx="20" cy="26" r="2.4"/><path d="M8 34h24" stroke-dasharray="3 3"/>') },
     { id: 'zeroday', name: 'ZERO DAY-EXPLOIT RIG', cat: 'support', unlock: 15, price: { nc: 3600, bt: 30 }, cost: 350, currency: 'mixed', limit: 1,
@@ -117,15 +149,28 @@ window.CBZShop = (() => {
         { label: 'NUCLEAR FALL OUT', cost: 500, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
       ],
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'relay', name: 'COMMAND RELAY', cat: 'support', unlock: 18, price: { nc: 4300, bt: 70 }, cost: 400, currency: 'mixed', limit: 1,
+      tagline: 'Network pylon — no guns, it just makes every gun inside its ring better.',
+      stats: { dmg: 0, rate: 0, rng: 170, dmgBuff: 0.1, tgt: 'AURA // BUFFS EVERY TOWER IN THE RING · ONE PER COMMANDER' },
+      special: '>> The first true support rig. Every tower inside the relay ring hits harder — and the ladder rewires the whole network: a wider ring, more damage, longer reach (TARGET UPLINK), faster clocks (MORALE CORE) and RALLY CRY, a salvage cast that floods the ring with overdrive fire rate. Only one relay deploys per commander.',
+      art: 'assets/towers/relay.png',
+      track: [
+        { label: 'WIDE NET', cost: 320, sets: { rng: 200 }, info: 'RELAY RING 170 → 200' },
+        { label: 'POWER GRID', cost: 640, sets: { dmgBuff: 0.15 }, info: 'RING DAMAGE BUFF +10% → +15%' },
+        { label: 'TARGET UPLINK', cost: 980, sets: { rangeBuff: 0.1 }, info: 'TOWERS IN RING GAIN +10% RANGE' },
+        { label: 'MORALE CORE', cost: 1500, sets: { rateBuff: 0.1 }, info: 'TOWERS IN RING FIRE +10% FASTER' },
+        { label: 'RALLY CRY', cost: 2400, sets: { rally: 1, rallyCost: 600, rallyCd: 45 }, info: 'ABILITY: $600 CAST · RING TOWERS +50% FIRE RATE FOR 6s · 45s COOLDOWN' },
+      ],
+      icon: ic('<path d="M20 34V16"/><circle cx="20" cy="12" r="2.2"/><path d="M13 15a10 10 0 0 1 3-6M27 15a10 10 0 0 0-3-6"/><path d="M9 19a15 15 0 0 1 4-9M31 19a15 15 0 0 0-4-9"/><path d="M12 34h16"/>') },
     { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: 0, cost: 900, currency: 'nc', event: true, limit: 1,
       tagline: 'CRIMSON RELIC — a dawn-forged solar lance that treats armor as a rumor.',
-      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR · ONE PER COMMANDER' }, art: 'assets/towers/dawnbreaker.png',
-      special: '>> Forged in the only Crimson Dawn the grid will ever see. Every beam burns straight through armor plating at full damage, tracks air and ground without a hex pad, and the ladder ends in SUNSLAUGHTER: 1600 damage rounds with a burning 45-unit splash. The strongest chassis to ever deploy. It will never be sold, crafted or given again — survive the dawn or never hold it.',
+      stats: { dmg: 330, rate: 0.8, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR · ONE PER COMMANDER' }, art: 'assets/towers/dawnbreaker.png',
+      special: '>> Forged in the only Crimson Dawn the grid will ever see. Every beam burns straight through armor plating at full damage, tracks air and ground without a hex pad, and the ladder ends in SUNSLAUGHTER: 1250-damage rounds with a burning 40-unit splash. Still the strongest chassis to ever deploy — the forge just cooled it to something the rest of the roster can breathe around. It will never be sold, crafted or given again — survive the dawn or never hold it.',
       track: [
-        { label: 'FIRST LIGHT', cost: 800, sets: { dmg: 640, rate: 1 }, info: 'DMG 420 → 640 · RATE 0.9 → 1.0' },
-        { label: 'MERIDIAN', cost: 1400, sets: { rng: 360, dmg: 900 }, info: 'RNG 320 → 360 · DMG 640 → 900' },
-        { label: 'HIGH NOON', cost: 2200, sets: { dmg: 1200, rate: 1.1 }, info: 'DMG 900 → 1200 · RATE 1.0 → 1.1' },
-        { label: 'SUNSLAUGHTER', cost: 3600, sets: { dmg: 1600, splash: 45 }, info: 'DMG 1200 → 1600 · SOLAR BURN SPLASH 45U' },
+        { label: 'FIRST LIGHT', cost: 800, sets: { dmg: 500, rate: 0.9 }, info: 'DMG 330 → 500 · RATE 0.8 → 0.9' },
+        { label: 'MERIDIAN', cost: 1400, sets: { rng: 360, dmg: 700 }, info: 'RNG 320 → 360 · DMG 500 → 700' },
+        { label: 'HIGH NOON', cost: 2200, sets: { dmg: 950, rate: 1 }, info: 'DMG 700 → 950 · RATE 0.9 → 1.0' },
+        { label: 'SUNSLAUGHTER', cost: 3600, sets: { dmg: 1250, splash: 40 }, info: 'DMG 950 → 1250 · SOLAR BURN SPLASH 40U' },
       ],
       icon: ic('<circle cx="20" cy="20" r="6"/><path d="M20 4v6M20 30v6M4 20h6M30 20h6M8.6 8.6l4.3 4.3M27.1 27.1l4.3 4.3M31.4 8.6l-4.3 4.3M12.9 27.1l-4.3 4.3"/>') },
     { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, cost: 350, limit: 1, ultimatum: true,
@@ -142,16 +187,17 @@ window.CBZShop = (() => {
       ],
       icon: ic('<circle cx="20" cy="20" r="4"/><path d="M20 16c-5-2-7-6-6-10 4 0 7 3 8 7M24 16c5-2 7-6 6-10-4 0-7 3-8 7M16 22c-4 2-8 2-11-1 2-3 6-4 10-3M24 22c4 2 8 2 11-1-2-3-6-4-10-3M17 25c-3 4-7 5-11 4 1-4 4-6 8-6M23 25c3 4 7 5 11 4-1-4-4-6-8-6"/>') },
     { id: 'gravewarden', name: 'GRAVE WARDEN', cat: 'special', unlock: 20, cost: 400, limit: 1, ultimatum: true,
-      tagline: 'ULTIMATUM CARD — the second apex rig. A walled yard where the dead pay toll and the bell never rests.',
-      stats: { dmg: 0, rate: 0, rng: 170, tgt: 'AURA // YARD CONTROL · ONE PER COMMANDER' },
-      special: '>> The Warden keeps a walled yard: everything hostile inside drags its heels once the CHILL GRAVE is laid, and every death inside the yard rings the bell sooner. When the DEATH TOLL sounds, the whole yard takes the pulse and chaff is stunned where it stands. Commanders are beneath its notice. Obtained only in the ULTIMATUM vault: one card armed at a time.',
+      tagline: 'ULTIMATUM CARD — the second apex rig. A walled yard where the dead pay toll, the bell never rests, and the core gives up its souls.',
+      stats: { dmg: 0, rate: 0, rng: 180, tgt: 'AURA // YARD CONTROL · ONE PER COMMANDER' },
+      special: '>> The Warden keeps a walled yard: everything hostile inside drags its heels once the CHILL GRAVE is laid, and every death inside the yard rings the bell sooner. When the DEATH TOLL sounds, the whole yard takes the pulse and chaff is stunned where it stands. Tier 6 raises the SOUL CHOIR: the Warden pulls vengeful souls out of the core itself — hulls forged from the yard\u2019s toll — and the choir does not sing for free. Commanders are beneath its notice. Obtained only in the ULTIMATUM vault: one card armed at a time.',
       art: 'assets/towers/gravewarden.png',
       track: [
-        { label: 'WIDER YARD', cost: 200, sets: { rng: 190 }, info: 'RNG 170 → 190' },
-        { label: 'DEATH TOLL', cost: 600, sets: { bell: 70 }, info: 'BELL PULSE: 70 DMG EVERY 8s · 0.8s STUN · YARD KILLS RING IT SOONER' },
-        { label: 'CHILL GRAVE', cost: 900, sets: { yardSlow: 0.35 }, info: 'YARD HOSTILES MOVE 35% SLOWER — WALKERS AND FLYERS ALIKE' },
-        { label: 'TOLLING HOURS', cost: 1600, sets: { bell: 140, bellEvery: 6, rng: 210 }, info: 'BELL 70 → 140 DMG · CADENCE 8s → 6s · RNG 190 → 210' },
-        { label: 'LAST TOLL', cost: 3200, sets: { bell: 260, bellEvery: 4.5, yardSlow: 0.45, tollStun: 1.2, rng: 230 }, info: 'BELL 140 → 260 DMG · CADENCE 4.5s · YARD -45% SPEED · STUN 1.2s' },
+        { label: 'WIDER YARD', cost: 200, sets: { rng: 200 }, info: 'RNG 180 → 200' },
+        { label: 'DEATH TOLL', cost: 600, sets: { bell: 90 }, info: 'BELL PULSE: 90 DMG EVERY 8s · 0.8s STUN · YARD KILLS RING IT SOONER' },
+        { label: 'CHILL GRAVE', cost: 900, sets: { yardSlow: 0.4 }, info: 'YARD HOSTILES MOVE 40% SLOWER — WALKERS AND FLYERS ALIKE' },
+        { label: 'TOLLING HOURS', cost: 1600, sets: { bell: 180, bellEvery: 5.5, rng: 220 }, info: 'BELL 90 → 180 DMG · CADENCE 8s → 5.5s · RNG 200 → 220' },
+        { label: 'LAST TOLL', cost: 3200, sets: { bell: 330, bellEvery: 4, yardSlow: 0.5, tollStun: 1.4, rng: 245 }, info: 'BELL 180 → 330 DMG · CADENCE 4s · YARD -50% SPEED · STUN 1.4s' },
+        { label: 'SOUL CHOIR', cost: 5200, sets: { soul: 1, soulCost: 900, soulCd: 45 }, info: 'SUMMON A VENGEFUL SOUL FROM THE CORE · HULL = 10 x TOLL CHARGES (MIN 50) · $900 PER SOUL · 45s COOLDOWN' },
       ],
       icon: ic('<circle cx="20" cy="21" r="8"/><path d="M20 13v-4M16 9h8"/><circle cx="20" cy="21" r="2.2" fill="currentColor" stroke="none"/><path d="M8 21c2-2 4-2 6 0M26 21c2-2 4-2 6 0"/>') },
     { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, price: { nc: 12000, bt: 150 }, cost: 450, currency: 'mixed', limit: 3,
@@ -175,9 +221,9 @@ window.CBZShop = (() => {
       track: [
         { label: 'LARGER BLADES', cost: 650, sets: { dmg: 20, rng: 100 }, info: 'DMG 12 → 20 · RNG 90 → 100' },
         { label: 'SUPER VIRUS', cost: 900, sets: { dmg: 30, rate: 3.2, rng: 105 }, info: 'DMG 20 → 30 · RATE 3 → 3.2 · RNG 100 → 105' },
-        { label: 'MALWARE STRAIN', cost: 1600, sets: { dmg: 44, rate: 3.5, rng: 110 }, info: 'DMG 30 → 44 · RATE 3.2 → 3.5 · RNG 105 → 110' },
-        { label: 'CONTAGION', cost: 2400, sets: { dmg: 58, rate: 3.8, rng: 115, corrupt: 40 }, info: 'DMG 44 → 58 · RATE 3.5 → 3.8 · RNG 110 → 115 · HITS INFECT: 40/S CORRUPTION FOR 5S — IGNORES ARMOR + SHIELDS' },
-        { label: 'ZERO PATIENT', cost: 3600, sets: { dmg: 80, rate: 4.2, rng: 120, corrupt: 70 }, info: 'DMG 58 → 80 · RATE 3.8 → 4.2 · RNG 115 → 120 · CORRUPTION 40 → 70/S' },
+        { label: 'MALWARE STRAIN', cost: 1600, sets: { dmg: 42, rate: 3.5, rng: 110 }, info: 'DMG 30 → 42 · RATE 3.2 → 3.5 · RNG 105 → 110' },
+        { label: 'CONTAGION', cost: 2400, sets: { dmg: 52, rate: 3.8, rng: 115, corrupt: 40 }, info: 'DMG 42 → 52 · RATE 3.5 → 3.8 · RNG 110 → 115 · HITS INFECT: 40/S CORRUPTION FOR 5S — IGNORES ARMOR + SHIELDS' },
+        { label: 'ZERO PATIENT', cost: 3600, sets: { dmg: 64, rate: 3.8, rng: 120, corrupt: 55 }, info: 'DMG 52 → 64 · RATE 3.8 · RNG 115 → 120 · CORRUPTION 40 → 55/S' },
       ],
       icon: ic('<circle cx="20" cy="21" r="7"/><path d="M20 14V6"/><path d="M20 6l-4 3M20 6l4 3"/><path d="M14 25l-7 5"/><path d="M26 25l7 5"/><circle cx="20" cy="21" r="2.4" fill="currentColor" stroke="none"/>') },
   ];
@@ -332,8 +378,10 @@ window.CBZShop = (() => {
     const summon = entry.stats.summon ? `<div class="tc-meter"><span>SUMMON</span><div class="tm-track"><i style="width:${pct(entry.stats.summon, 100)}"></i></div><b>${entry.stats.summon}% HP</b></div>` : '';
     const drone = entry.stats.drone ? `<div class="tc-meter"><span>DRONE</span><div class="tm-track"><i style="width:${pct(entry.stats.drone, 300)}"></i></div><b>${entry.stats.drone} DMG/HULL</b></div>` : '';
     const corrupt = entry.stats.corrupt ? `<div class="tc-meter"><span>CONTAGION</span><div class="tm-track"><i style="width:${pct(entry.stats.corrupt, 80)}"></i></div><b>${entry.stats.corrupt}/S · 5S</b></div>` : '';
+    const slow = entry.stats.slow ? `<div class="tc-meter"><span>SLICK</span><div class="tm-track"><i style="width:${pct(entry.stats.slow * 100, 50)}"></i></div><b>SLOW ${Math.round(entry.stats.slow * 100)}%</b></div>` : '';
+    const buff = entry.stats.dmgBuff ? `<div class="tc-meter"><span>NETWORK</span><div class="tm-track"><i style="width:${pct((entry.stats.dmgBuff || 0) * 100, 30)}"></i></div><b>+${Math.round((entry.stats.dmgBuff || 0) * 100)}% DMG</b></div>` : '';
     const row = (label, value, cap, suffix = '') => (value ? `<div class="tc-meter"><span>${label}</span><div class="tm-track"><i style="width:${pct(value, cap)}"></i></div><b>${value >= 999 ? 'INF' : value}${suffix}</b></div>` : '');
-    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}${corrupt}`;
+    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}${corrupt}${slow}${buff}`;
   }
 
   function cardHtml(entry) {
@@ -342,7 +390,7 @@ window.CBZShop = (() => {
       return `
         <article class="tower-card state-locked cat-${entry.cat}" data-id="${entry.id}">
           <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">CLEARANCE ${entry.unlock}</span></div>
-          <div class="tc-icon">${entry.icon}</div>
+          <div class="tc-icon">${artHtml(entry) || entry.icon}</div>
           <h4>${entry.name}</h4>
           <p class="tc-tagline">${entry.tagline}</p>
           <div class="tc-stats">${meters(entry)}</div>
@@ -370,7 +418,7 @@ window.CBZShop = (() => {
       return `
         <article class="tower-card state-locked state-reward cat-${entry.cat}" data-id="${entry.id}">
           <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">REWARD BLUEPRINT</span></div>
-          <div class="tc-icon">${entry.icon}</div>
+          <div class="tc-icon">${artHtml(entry) || entry.icon}</div>
           <h4>${entry.name}</h4>
           <p class="tc-tagline">${entry.tagline}</p>
           <div class="tc-stats">${meters(entry)}</div>
@@ -624,5 +672,5 @@ window.CBZShop = (() => {
     return data.granted || null;
   }
 
-  return { render, setProfile, submitMission, redeemCode, setPerks, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_BAYS, ULT_CARDS, ULT_XP_PER_CORE };
+  return { render, setProfile, submitMission, redeemCode, setPerks, profile: () => profile, loadout: () => (profile.loadout || []).map(towerById).filter(Boolean), TOWERS, xpToNext, HORIZON, MAX_BAYS, ULT_CARDS, ULT_XP_PER_CORE, artHtml };
 })();

@@ -246,20 +246,27 @@ const PAD_SNAP = 24;         // hex AA pads: deploy this close to a pad center t
 const PAD_AIR_BOOST = 1.5;   // pads overcharge linked units: +50% damage vs flying hostiles
 const TRACK_CLEAR = 36;      // nothing deploys on the convoy lane itself
 // Tower limit scales with the squad: every extra commander brings their own
-// hardware allotment to the shared grid.
-const TOWER_BASE = 20;       // solo ceiling
+// hardware allotment to the shared grid. SATURATION DOCTRINE (perk) buys the
+// old 20-unit ceiling back while equipped.
+const TOWER_BASE = 15;       // solo ceiling
 const TOWER_PER_ALLY = 9;    // +9 slots per additional commander in the room
 function towerLimit() {
   const players = (typeof window !== 'undefined' && Number(window.CBZ_ROOM_PLAYERS)) || 1;
-  return TOWER_BASE + TOWER_PER_ALLY * (Math.max(1, Math.min(4, players)) - 1);
+  const base = TOWER_BASE + TOWER_PER_ALLY * (Math.max(1, Math.min(4, players)) - 1);
+  return window.CBZPerks && CBZPerks.has('saturation') ? base + 5 : base;
 }
-// air: 'no' = ground only (a hex pad grants AA), 'yes' = anything
+// air: 'no' = ground only (a hex pad grants AA), 'yes' = anything,
+// 'only' = FLYERS ONLY (the Flak Post idles through ground waves on purpose).
 const TOWER_RULES = {
   sentinel: { air: 'no' },
   lazermortar: { air: 'no' },
   shotgunner: { air: 'no' },
   sniper: { air: 'no' },
   shredder: { air: 'no' },     // chaff mulcher — pad links grant AA like the Sentinel
+  sparkcoil: { air: 'no' },    // filler zapper — pad links grant AA like the Sentinel
+  flakpost: { air: 'only' },   // sky-warden pair — tracks flyers natively, ignores the ground war
+  tarsprayer: { air: 'no' },   // field hazard — never targets; the slick drags walkers only
+  relay: { air: 'no' },        // network pylon — never targets; it buffs the guns that do
   virus: { air: 'yes' },
   zeroday: { air: 'no' },      // economy rig — never fires; rule kept for pad-link copy
   corpseblossom: { air: 'no' }, // spawner — never targets; veins curse flyers directly
@@ -285,7 +292,7 @@ function limitToast(entry) {
     ? `${entry.name} is a one-off rig — only one deploys per commander.`
     : `${entry.name} is capped — only ${entry.limit} deploy per commander.`;
 }
-const NUKE_DAMAGE = 2200;      // Nuclear Fall Out: flat strike damage inside the blast
+const NUKE_DAMAGE = 1700;      // Nuclear Fall Out: flat strike damage inside the blast (nerfed from 2200 — the rig prints money, the strike no longer deletes commanders)
 const NUKE_RADIUS = 240;       // strike decimates everything inside this ring
 const NUKE_COST = 500;         // salvage price per cast
 const NUKE_COOLDOWN = 300;     // seconds between casts
@@ -907,6 +914,7 @@ function moveEnemy(enemy, dt) {
     return;
   }
   enemy.node.classList.remove('e-stunned');
+  if (enemy.tarT) enemy.tarT -= dt; // tar slick linger decays fast
   if (enemy.corrupt && enemy.corrupt.t > 0) {
     // VIRUS CONTAGION: phase burn ticks every frame; kills credit the strain.
     enemy.corrupt.t -= dt;
@@ -917,7 +925,7 @@ function moveEnemy(enemy, dt) {
     // Air route: no tracks, no phase gates, no haste zones — cryo slow, frostbite
     // and gravity still bite, otherwise flyers would ignore every control tower.
     enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-    enemy.dist += enemy.speed * wardenYardMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
+    enemy.dist += enemy.speed * wardenYardMult(enemy) * tarMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
     if (enemy.dist >= enemy.flight.total) { leakEnemy(enemy); return; }
     const [fx, fy] = flightPos(enemy, enemy.dist);
     const [px, py] = flightPos(enemy, enemy.dist - 8);
@@ -956,7 +964,7 @@ function moveEnemy(enemy, dt) {
     banner('FIREWALL WARDEN', '// PACKET STORM — HEX CRAWLERS SPILLED', 'banner-red');
   }
   enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-  enemy.dist += enemy.speed * haste * wardenYardMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
+  enemy.dist += enemy.speed * haste * wardenYardMult(enemy) * tarMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
   const sampler = state.samplers[enemy.pathIdx];
   for (const event of state.gateEvents) {
     if (enemy.usedGates.has(event.index)) continue;
@@ -1311,12 +1319,15 @@ function showSummonTip(summon, event) {
   ensureTip();
   state.tipTarget = summon;
   const t = summon.t;
+  const soul = summon.key === 'soul';
   const drone = summon.key === 'drone';
-  const head = drone ? 'STRIKE DRONE' : `RISEN ${t.name}`;
-  const tag = drone ? 'DRONE SPAWNER PAYLOAD' : 'CORPSE BLOSSOM SPAWN';
-  const flavor = drone
-    ? 'One-way strike unit — rockets across the grid and detonates on the first hostile it intercepts for its full payload.'
-    : 'A risen copy marches back up the lane and detonates on the first hostile it touches for damage equal to its hull. Your towers ignore it.';
+  const head = soul ? 'VENGEFUL SOUL' : drone ? 'STRIKE DRONE' : `RISEN ${t.name}`;
+  const tag = soul ? 'GRAVE WARDEN CHOIR' : drone ? 'DRONE SPAWNER PAYLOAD' : 'CORPSE BLOSSOM SPAWN';
+  const flavor = soul
+    ? 'The Warden\u2019s choir: a soul raised from the core marches the lane and detonates on the first hostile it touches for damage equal to its hull — 10 x TOLL CHARGES, minimum 50. Your towers ignore it.'
+    : drone
+      ? 'One-way strike unit — rockets across the grid and detonates on the first hostile it intercepts for its full payload.'
+      : 'A risen copy marches back up the lane and detonates on the first hostile it touches for damage equal to its hull. Your towers ignore it.';
   state.tip.innerHTML = `
     <div class="tip-head summon"><b>${head}</b><span class="tip-tag">${tag}</span></div>
     <div class="tip-hp"><div class="tip-hp-track"><div class="tip-hp-fill" style="width:${(summon.hp / summon.maxHp) * 100}%"></div></div><span>${Math.ceil(summon.hp)}/${summon.maxHp} HP</span></div>
@@ -1579,7 +1590,8 @@ function ensureLoadoutBar() {
   const slots = [0, 1, 2, 3, 4].map((index) => {
     const entry = loadout[index];
     if (!entry) return `<div class="lo-slot lo-empty"><span class="lo-key">${index + 1}</span><b>EMPTY BAY</b><small>EQUIP IN NEXUS SHOP</small></div>`;
-    return `<button class="lo-slot" type="button" data-tower="${entry.id}"><span class="lo-key">${index + 1}</span><span class="lo-icon cat-${entry.cat}">${entry.icon}</span><b>${entry.name}</b><span class="lo-cost">$${entry.cost}</span></button>`;
+    const art = window.CBZShop && CBZShop.artHtml ? CBZShop.artHtml(entry) : '';
+    return `<button class="lo-slot" type="button" data-tower="${entry.id}"><span class="lo-key">${index + 1}</span><span class="lo-icon cat-${entry.cat}">${art || entry.icon}</span><b>${entry.name}</b><span class="lo-cost">$${entry.cost}</span></button>`;
   }).join('');
   bar.innerHTML = `
     <div class="lo-head"><span>// DEPLOYMENT LOADOUT</span><b>${loadout.length}/5 BAYS ARMED</b></div>
@@ -1758,8 +1770,9 @@ function placeTower(entry, x, y) {
   state.layers.towers.appendChild(node);
   const tower = { id: entry.id, entry, x, y, node, head: node.querySelector('.tw-head'), cd: 0.35, boost: 1, lvl: 0 };
   if (entry.id === 'corpseblossom') { tower.veinCd = 0.6; tower.lust = 0; tower.screamCd = 0; }
-  if (entry.id === 'gravewarden') { tower.bellCd = 2.5; tower.tollCharges = 0; }
+  if (entry.id === 'gravewarden') { tower.bellCd = 2.5; tower.tollCharges = 0; tower.soulCd = 0; }
   if (entry.id === 'zeroday') tower.nukeCd = 0;
+  if (entry.id === 'relay') tower.rallyCd = 0;
   const pad = padAt(x, y);
   if (pad) {
     tower.onPad = true;
@@ -1802,11 +1815,109 @@ function towerNode(entry, x, y) {
     head.appendChild(svgNode('circle', { class: 'tw-muzzle', cx: 21.5, cy: 0, r: 3.4 }));
     head.appendChild(svgNode('circle', { class: 'tw-suncore', r: 5.6 }));
   }
+  // Per-kind field kit: every chassis gets its own silhouette on the grid —
+  // drums, dishes, petals, bells, rails and halos so no two rigs read alike.
+  kindKit(entry, chassis, head);
   chassis.appendChild(head);
   g.appendChild(chassis);
   g.appendChild(svgNode('text', { class: 'tw-tag', y: -28, 'text-anchor': 'middle' }, entry.name.split(' ')[0]));
   g.setAttribute('transform', `translate(${x} ${y})`);
   return g;
+}
+
+// --- Per-kind field kits: one silhouette per chassis -----------------------------
+// Rotating pieces go on the head (aim with the gun), static ornaments on the
+// chassis. Combined with the per-kind paint rules in styles.css, every tower
+// on the grid reads as its own machine.
+function kindKit(entry, chassis, head) {
+  switch (entry.id) {
+    case 'sentinel':
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-crate', x: -14, y: 7, width: 9, height: 6 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-vent', x: 8, y: -4, width: 3, height: 8 }));
+      break;
+    case 'lazermortar':
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-plate', x: -12, y: 7, width: 24, height: 5 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 2, y: -4, width: 15, height: 8 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-mouth', cx: 19, cy: 0, r: 3.4 }));
+      break;
+    case 'shotgunner':
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-plate', x: -11, y: 8, width: 22, height: 4 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 3, y: -5.2, width: 14, height: 3.4 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 3, y: 1.8, width: 14, height: 3.4 }));
+      break;
+    case 'sniper':
+      head.appendChild(svgNode('rect', { class: 'tw-kit-rail', x: 4, y: -1.6, width: 24, height: 3.2 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-scope', cx: 1, cy: -5, r: 2.6 }));
+      break;
+    case 'shredder':
+      head.appendChild(svgNode('circle', { class: 'tw-kit-drum', r: 7 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tooth', x: -8, y: -1, width: 16, height: 2 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tooth', x: -1, y: -8, width: 2, height: 16 }));
+      break;
+    case 'virus':
+      head.appendChild(svgNode('line', { class: 'tw-kit-blade', x1: 3, y1: 0, x2: 21, y2: -7 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-blade', x1: 3, y1: 0, x2: 19, y2: 9 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-blade', x1: 3, y1: 0, x2: 11, y2: 15 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-pustule', r: 3 }));
+      break;
+    case 'dronespawner':
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-rack', x: -11, y: 8, width: 22, height: 5 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-dronebit', cx: -5, cy: 10.5, r: 1.6 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-dronebit', cx: 5, cy: 10.5, r: 1.6 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 2, y: -3, width: 12, height: 6 }));
+      break;
+    case 'missilesilo':
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-silo', x: -9, y: -9, width: 18, height: 18 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-hatch', r: 4.5 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-mast', x1: 0, y1: 0, x2: 0, y2: -12 }));
+      break;
+    case 'zeroday':
+      chassis.appendChild(svgNode('line', { class: 'tw-kit-mast', x1: -8, y1: 4, x2: -8, y2: -10 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-dish', cx: -8, cy: -12, r: 3.4 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-crate', x: 4, y: -3, width: 9, height: 6 }));
+      break;
+    case 'corpseblossom':
+      for (let i = 0; i < 6; i += 1) {
+        chassis.appendChild(svgNode('ellipse', { class: 'tw-kit-petal', cx: 0, cy: -11.5, rx: 3.6, ry: 7.5, transform: `rotate(${i * 60})` }));
+      }
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-heart', r: 4 }));
+      break;
+    case 'gravewarden':
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-cage', r: 9.5 }));
+      chassis.appendChild(svgNode('path', { class: 'tw-kit-bell', d: 'M-4.5 5 L-2.5 -6 L2.5 -6 L4.5 5 Z' }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-clapper', cy: 6.5, r: 1.6 }));
+      break;
+    case 'executioner':
+      head.appendChild(svgNode('rect', { class: 'tw-kit-rail', x: 4, y: -1.5, width: 21, height: 3 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-brake', x: 23, y: -4, width: 2, height: 8 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-brake', x: 19, y: -4, width: 2, height: 8 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-sight', cx: -7, cy: -7, r: 1.4 }));
+      break;
+    case 'sparkcoil':
+      head.appendChild(svgNode('circle', { class: 'tw-kit-coil', cx: 8, cy: 0, r: 2.4 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-coil', cx: 12.5, cy: 0, r: 3.6 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-coil', cx: 17.5, cy: 0, r: 4.8 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-sparktip', cx: 21, cy: 0, r: 1.8 }));
+      break;
+    case 'flakpost':
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 3, y: -4.6, width: 11, height: 3 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-tube', x: 3, y: 1.6, width: 11, height: 3 }));
+      chassis.appendChild(svgNode('path', { class: 'tw-kit-fin', d: 'M-4 -8 L-9 -13 L-11 -9 Z' }));
+      break;
+    case 'tarsprayer':
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-vat', cx: -6, cy: 5, r: 5.5 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-nozzle', x: 3, y: -3, width: 10, height: 6 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-drip', cx: 15.5, cy: 0, r: 2 }));
+      break;
+    case 'relay':
+      chassis.appendChild(svgNode('line', { class: 'tw-kit-mast', x1: 0, y1: 2, x2: 0, y2: -14 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-halo', cy: -17, r: 4.5 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-halo wide', cy: -17, r: 8 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-beacon', cy: -17, r: 1.8 }));
+      break;
+    default:
+      break; // dawnbreaker rides its own forge-built rig above
+  }
 }
 
 // --- Upgrade ladder: one linear track per chassis, bought with salvage -------------
@@ -1838,11 +1949,120 @@ function trackInvested(tower) {
 
 function paintTowerRange(tower) {
   const es = effStats(tower);
-  const r = es.infinite ? 300 : es.rng;
+  const r = es.infinite ? 300 : Math.round(es.rng * relayMult(tower, 'range'));
   const range = tower.node.querySelector('.tw-range');
   if (range) range.setAttribute('r', r);
   const aura = tower.node.querySelector('.tw-aura');
   if (aura) aura.setAttribute('r', r);
+}
+
+// --- Command Relay: the network pylon buffs every tower inside its ring ------------
+// kind 'dmg' multiplies fire damage, 'rate' multiplies fire rate, 'range'
+// multiplies acquisition + painted reach. The relay itself never fires.
+function relayMult(tower, kind) {
+  let mult = 1;
+  for (const other of state.towers) {
+    if (other.id !== 'relay' || other === tower) continue;
+    const es = effStats(other);
+    const buff = kind === 'dmg' ? es.dmgBuff : kind === 'rate' ? es.rateBuff : es.rangeBuff;
+    if (!buff) continue;
+    if (Math.hypot(tower.x - other.x, tower.y - other.y) <= es.rng) mult += buff;
+  }
+  return mult;
+}
+
+// RALLY CRY: the relay floods its ring with overdrive — +50% fire rate for 6s.
+function castRally(tower) {
+  if (trackLevel(tower) < 5) return;
+  const es = effStats(tower);
+  if ((tower.rallyCd || 0) > 0) { playSound('alarm'); showToast(`Rally recharging — ${Math.ceil(tower.rallyCd)}s left.`); return; }
+  const cost = es.rallyCost || 600;
+  if (state.cash < cost) { playSound('alarm'); showToast(`Need $${cost} salvage for RALLY CRY.`); return; }
+  state.cash -= cost;
+  tower.rallyCd = es.rallyCd || 45;
+  let boosted = 0;
+  for (const other of state.towers) {
+    if (other === tower) continue;
+    if (Math.hypot(other.x - tower.x, other.y - tower.y) <= es.rng) { other.rallyT = 6; boosted += 1; fxRing(other.x, other.y, 'fx-ring-amber'); }
+  }
+  floatText(tower.x, tower.y - 46, `RALLY CRY — ${boosted} BOOSTED`, 'lust-float');
+  fxRing(tower.x, tower.y, 'fx-ring-amber');
+  playSound();
+  openTowerPanel(tower);
+  updateHud();
+}
+
+// --- Grave Warden Tier 6: the SOUL CHOIR -------------------------------------------
+// The Warden reaches into the core and raises a vengeful soul on the lane of
+// the most advanced hostile. Like a Blossom risen it marches the track and
+// detonates on the first hostile it touches — but its hull is forged from the
+// yard itself: 10 x TOLL CHARGES (min 50). $900 a soul, 45s between hymns.
+function launchWardenSoul(tower) {
+  if (state.enemies.filter((item) => item.friendly && item.alive).length >= SUMMON_CAP) return false;
+  const pool = state.enemies.filter((enemy) => enemy.alive && !enemy.friendly);
+  if (!pool.length) return false;
+  const prey = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
+  const hull = Math.max(50, 10 * (tower.tollCharges || 0));
+  const t = { name: 'VENGEFUL SOUL', tag: 'SUMMON', hp: hull, speed: 55, size: 12, bounty: 0, dmg: 0, color: '#bff1e2', ability: 'The Warden\u2019s choir — detonates on the first hostile it touches for damage equal to its hull. Hull = 10 x TOLL CHARGES.' };
+  const g = svgNode('g', { class: 'enemy e-summon e-soul' });
+  const chassis = svgNode('g', { class: 'e-chassis' });
+  chassis.appendChild(svgNode('circle', { class: 'soul-halo', r: 11 }));
+  chassis.appendChild(svgNode('circle', { class: 'soul-core', r: 5 }));
+  chassis.appendChild(svgNode('circle', { class: 'soul-eye', cx: -2, cy: -1.4, r: 1.2 }));
+  chassis.appendChild(svgNode('circle', { class: 'soul-eye', cx: 2.4, cy: -1.4, r: 1.2 }));
+  g.appendChild(chassis);
+  const barY = -(t.size + 13);
+  g.appendChild(svgNode('rect', { class: 'hp-bg', x: -11, y: barY, width: 22, height: 3.4 }));
+  const fill = svgNode('rect', { class: 'hp-fill', x: -11, y: barY, width: 22, height: 3.4 });
+  g.appendChild(fill);
+  const lane = state.samplers[prey.pathIdx];
+  const soul = {
+    key: 'soul', t, node: g, fill, shieldFill: fill, nid: ++state.nidSeq,
+    hp: hull, maxHp: hull, shield: 0, maxShield: 0,
+    pathIdx: prey.pathIdx, dist: Math.max(0, lane.len - 4),
+    speed: t.speed, alive: true, friendly: true, reverse: true,
+    usedGates: new Set(), angle: 0,
+  };
+  const [sx, sy] = lane.at(soul.dist);
+  soul.fx = sx;
+  soul.fy = sy;
+  g.setAttribute('transform', `translate(${sx.toFixed(1)} ${sy.toFixed(1)})`);
+  const bloom = svgNode('circle', { class: 'fx-ring fx-bloom', cx: sx, cy: sy, r: 8 });
+  state.layers.fx.appendChild(bloom);
+  setTimeout(() => bloom.remove(), 720);
+  g.classList.add('spawn-in');
+  setTimeout(() => g.classList.remove('spawn-in'), 420);
+  state.layers.enemies.appendChild(g);
+  state.enemies.push(soul);
+  g.addEventListener('pointerenter', (event) => showSummonTip(soul, event));
+  g.addEventListener('pointermove', moveTip);
+  g.addEventListener('pointerleave', () => hideTip(soul));
+  fxRing(sx, sy, 'fx-ring-crimson');
+  floatText(sx, sy - 24, 'A SOUL RISES FROM THE CORE', 'summon-float');
+  paintBars(soul);
+  return true;
+}
+
+function castSoul(tower) {
+  if (trackLevel(tower) < 6) return;
+  const es = effStats(tower);
+  if ((tower.soulCd || 0) > 0) { playSound('alarm'); showToast(`The choir rests — ${Math.ceil(tower.soulCd)}s until the next hymn.`); return; }
+  const cost = es.soulCost || 900;
+  if (state.cash < cost) { playSound('alarm'); showToast(`Need $${cost} salvage to raise a soul from the core.`); return; }
+  if (!state.enemies.some((enemy) => enemy.alive && !enemy.friendly)) { playSound('alarm'); showToast('The choir needs an audience — no hostiles on the grid.'); return; }
+  state.cash -= cost;
+  tower.soulCd = es.soulCd || 45;
+  launchWardenSoul(tower);
+  playSound();
+  openTowerPanel(tower);
+  updateHud();
+}
+
+// Tar Sprayer slick: walkers drag through the tar field — flyers skim over it.
+// The sprayer re-inks the tar every upkeep tick; the linger decays fast after.
+function tarMult(enemy) {
+  if (enemy.t.flying || !enemy.tarT || enemy.tarT <= 0) return 1;
+  return 1 - (enemy.tar || 0);
 }
 
 function buyTrack(tower) {
@@ -1905,6 +2125,14 @@ function openTowerPanel(tower) {
       specials.push(`<div class="tp-abil-row"><span>TOLL CHARGES</span><b>${tower.tollCharges || 0}</b></div>`);
     }
     if (es.yardSlow) specials.push(`<div class="tp-abil-row"><span>GRAVE YARD</span><b>-${Math.round(es.yardSlow * 100)}% SPEED</b></div>`);
+    if (es.soul) specials.push(`<div class="tp-abil-row soul"><span>SOUL CHOIR</span><b>NEXT HULL ${Math.max(50, 10 * (tower.tollCharges || 0))} · $${es.soulCost || 900} PER SOUL</b></div>`);
+  }
+  if (entry.id === 'relay') {
+    const parts = [`+${Math.round((es.dmgBuff || 0) * 100)}% DMG`];
+    if (es.rangeBuff) parts.push(`+${Math.round(es.rangeBuff * 100)}% RANGE`);
+    if (es.rateBuff) parts.push(`+${Math.round(es.rateBuff * 100)}% RATE`);
+    specials.push(`<div class="tp-abil-row"><span>NETWORK</span><b>${parts.join(' · ')}</b></div>`);
+    if (es.rally) specials.push(`<div class="tp-abil-row rally"><span>RALLY CRY</span><b>${state.mode === 'waves' ? `${Math.ceil(tower.rallyCd || 0)}s CD` : `$${es.rallyCost || 600} · ${es.rallyCd || 45}s CD`}</b></div>`);
   }
   if (entry.id === 'executioner') {
     specials.push(`<div class="tp-abil-row"><span>EXECUTE</span><b>COMMANDERS BELOW ${Math.round((es.execute || 0.15) * 100)}% HULL</b></div>`);
@@ -1918,6 +2146,14 @@ function openTowerPanel(tower) {
   if (entry.id === 'corpseblossom' && trackLevel(tower) >= 5) {
     const cd = Math.ceil(tower.screamCd || 0);
     abilities.push(`<button class="tp-ability scream" type="button" id="tp-scream" ${cd > 0 ? 'disabled' : ''}>BLOOD SCREAM${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
+  }
+  if (entry.id === 'gravewarden' && trackLevel(tower) >= 6) {
+    const cd = Math.ceil(tower.soulCd || 0);
+    abilities.push(`<button class="tp-ability soul" type="button" id="tp-soul" ${cd > 0 ? 'disabled' : ''}>SUMMON SOUL — $${effStats(tower).soulCost || 900}${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
+  }
+  if (entry.id === 'relay' && trackLevel(tower) >= 5) {
+    const cd = Math.ceil(tower.rallyCd || 0);
+    abilities.push(`<button class="tp-ability rally" type="button" id="tp-rally" ${cd > 0 ? 'disabled' : ''}>RALLY CRY — $${effStats(tower).rallyCost || 600}${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
   }
   const panel = document.createElement('div');
   panel.className = `tower-panel tw-${entry.cat}`;
@@ -1955,6 +2191,10 @@ function openTowerPanel(tower) {
   if (purge) purge.addEventListener('click', () => bloodPurge(tower));
   const scream = panel.querySelector('#tp-scream');
   if (scream) scream.addEventListener('click', () => bloodScream(tower));
+  const soul = panel.querySelector('#tp-soul');
+  if (soul) soul.addEventListener('click', () => castSoul(tower));
+  const rally = panel.querySelector('#tp-rally');
+  if (rally) rally.addEventListener('click', () => castRally(tower));
   refreshPanelAfford();
 }
 
@@ -1985,7 +2225,11 @@ function sellTower(tower) {
 // --- Tower combat brain ------------------------------------------------------------------
 function updateTowers(dt) {
   if (!state.layers || !state.towers.length) { paintNukeButton(); return; }
-  for (const tower of state.towers) tower.boost = 1;
+  // Rally clock: RALLY CRY keeps the ring's fire rate flooded for its duration.
+  for (const tower of state.towers) {
+    tower.rallyT = Math.max(0, (tower.rallyT || 0) - dt);
+    tower.boost = tower.rallyT > 0 ? 1.5 : 1;
+  }
   // Special chassis upkeep: Blossom curse pulses + ability cooldowns, rig nuke clock.
   for (const tower of state.towers) {
     if (tower.id === 'corpseblossom') {
@@ -2028,6 +2272,7 @@ function updateTowers(dt) {
       // DEATH TOLL: the bell rings on cadence — everything hostile in the yard
       // takes the pulse, chaff eats a stun, and every yard kill rings it sooner.
       tower.bellCd = Math.max(0, (tower.bellCd || 0) - dt);
+      tower.soulCd = Math.max(0, (tower.soulCd || 0) - dt);
       const es = effStats(tower);
       if (es.bell && tower.bellCd <= 0) {
         tower.bellCd = es.bellEvery || 8;
@@ -2049,12 +2294,24 @@ function updateTowers(dt) {
       }
     }
     if (tower.id === 'zeroday') tower.nukeCd = Math.max(0, (tower.nukeCd || 0) - dt);
+    if (tower.id === 'relay') tower.rallyCd = Math.max(0, (tower.rallyCd || 0) - dt);
+    if (tower.id === 'tarsprayer') {
+      // TAR SPRAYER: re-inks the slick every tick — walkers inside drag, flyers skim.
+      const es = effStats(tower);
+      if (es.slow) {
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || enemy.friendly || enemy.t.flying) continue;
+          const [px, py] = posOf(enemy);
+          if (Math.hypot(px - tower.x, py - tower.y) <= es.rng) { enemy.tar = es.slow; enemy.tarT = 0.4; }
+        }
+      }
+    }
   }
   paintNukeButton();
   // Fire control.
   const overclockMult = window.CBZPerks && CBZPerks.has('overclock') ? 1.05 : 1;
   for (const tower of state.towers) {
-    const rate = effStats(tower).rate * tower.boost * overclockMult;
+    const rate = effStats(tower).rate * tower.boost * overclockMult * relayMult(tower, 'rate');
     if (rate <= 0) continue;
     tower.cd -= dt;
     if (tower.cd > 0) continue;
@@ -2072,7 +2329,8 @@ function acquireTarget(tower) {
   // Shotgunner anti-air coverage without an AA pad link.
   const rule = { ...(TOWER_RULES[tower.id] || {}) };
   if (es.air) rule.air = es.air;
-  const rng = es.infinite ? 9999 : es.rng;
+  // COMMAND RELAY: TARGET UPLINK widens every gun's acquisition ring.
+  const rng = es.infinite ? 9999 : Math.round(es.rng * relayMult(tower, 'range'));
   // Stickiness: pad AA guns ride their target until it dies or escapes the ring —
   // re-picking fresher flyers leaves every drone one burst short of dying.
   if (tower.onPad && tower.target && tower.target.alive && tower.target.t.flying) {
@@ -2081,6 +2339,7 @@ function acquireTarget(tower) {
   }
   let pool = state.enemies.filter((enemy) => {
     if (!enemy.alive) return false;
+    if (rule.air === 'only' && !enemy.t.flying) return false; // flak post: the ground war is beneath it
     if (enemy.friendly) return false; // Blossom risen + strike drones are OURS — guns never track friendlies
     if (rule.air === 'no' && enemy.t.flying && !tower.onPad) return false;
     const [ex, ey] = posOf(enemy);
@@ -2132,6 +2391,8 @@ function fireLine(tower, target, cls, width = 2) {
 
 function fireTower(tower, target) {
   let dmg = effStats(tower).dmg;
+  // COMMAND RELAY: POWER GRID — towers inside the ring hit harder.
+  dmg *= relayMult(tower, 'dmg');
   const [tx, ty] = posOf(target);
   // Pads overcharge linked units against flying hostiles.
   if (tower.onPad && target.t.flying) dmg *= PAD_AIR_BOOST;
@@ -2181,6 +2442,28 @@ function fireTower(tower, target) {
       // spits a ragged amber chip-stream instead of a clean tracer.
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-chip', 1.8);
+      break;
+    }
+    case 'sparkcoil': {
+      // Filler zapper: instant arc, jagged cyan spark instead of a clean tracer.
+      damageEnemy(target, dmg);
+      fireLine(tower, target, 'fx-spark', 1.8);
+      break;
+    }
+    case 'flakpost': {
+      // Sky-warden pair: flyers only (fire-control never pools walkers) —
+      // FRAG ROUNDS adds a tiny burst ring around the intercepted flyer.
+      damageEnemy(target, dmg);
+      fireLine(tower, target, 'fx-flak', 1.6);
+      const flak = effStats(tower).splash || 0;
+      if (flak > 0) {
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || enemy === target || enemy.friendly || !enemy.t.flying) continue;
+          const [px, py] = posOf(enemy);
+          if (Math.hypot(px - tx, py - ty) <= flak) damageEnemy(enemy, Math.round(dmg * 0.5));
+        }
+      }
+      fxRing(tx, ty, 'fx-ring-amber');
       break;
     }
     case 'missilesilo': {
@@ -2272,14 +2555,14 @@ function updateProjectiles(dt) {
           if (Math.hypot(px - p.tx, py - p.ty) <= (p.splash || 40)) damageEnemy(enemy, p.dmg);
         }
         // MIRV PROTOCOL: the shell cracks open — cluster bomblets pepper a wide
-        // secondary ring around the impact crater for partial damage.
+        // secondary ring around the impact crater for partial damage (35% post-nerf).
         if (p.cluster) {
           fxRing(p.tx, p.ty, 'fx-ring-amber');
           for (const enemy of state.enemies) {
             if (!enemy.alive) continue;
             const [px, py] = posOf(enemy);
             const d = Math.hypot(px - p.tx, py - p.ty);
-            if (d > (p.splash || 40) && d <= 130) damageEnemy(enemy, Math.round(p.dmg * 0.4));
+            if (d > (p.splash || 40) && d <= 130) damageEnemy(enemy, Math.round(p.dmg * 0.35));
           }
         }
       } else {
