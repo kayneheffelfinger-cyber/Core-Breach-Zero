@@ -14,8 +14,17 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.10.32';
+const BUILD = '2026.10.33';
 const UPDATE_LOG = [
+  {
+    version: '2026.10.33', tag: 'DAWN FORGE',
+    items: [
+      ['ECON', 'ULTIMATUM cores reprice — 50,000 lifetime XP per core, down from 100,000. And the ledger math is confirmed: the exchange NEVER spends your TOTAL XP — banking a core only counts milestones, the ★ lifetime number never drops. The vault panel now labels the bar PROGRESS INTO THE NEXT CORE so the remainder after a bank can not be misread as your total. Both sanitizers also reconcile the ledger against your clearance history on every read: if the stored total ever sits below what your level implies, it heals up — never down.'],
+      ['RELIC', 'DAWNBRINGER is now strictly one per commander — the relic is singular, so the deploy cap says so. The rig itself got the forge treatment: two counter-rotating corona rings and a pulsing solar under-glow on the chassis, a sun-disc muzzle and white-hot core on the turret head, and its lance now fires as a layered beam — a wide corona sheath under the crimson core. New card art to match.'],
+      ['BAL', 'EXECUTIONER brought in line — base rail 90→72 damage, rate 0.5→0.45, execute cut 15%→12%; the FINAL RITUAL tier lands at 330 damage / 0.68 rate / 22% execute / 16% chaff payout (was 420 / 0.75 / 28% / 20%). The cap lifts to match the price tag: up to three rails deploy per commander — headsman squads are legal, still never against the overseer.'],
+      ['FIX', 'CORPSE BLOSSOM spawns are finally ignored by your own guns — the risen copies and strike drones were legal targets for every tower\u2019s fire-control, so turrets burned salvos on friendlies that shrug off the damage. Fire-control now skips them entirely, the dawn\u2019s splash skips them too, and hovering any spawn shows a green friendly-intel card: live HP, contact payload, and who it answers to.'],
+    ],
+  },
   {
     version: '2026.10.32', tag: 'OPEN ROSTER',
     items: [
@@ -461,24 +470,23 @@ const LOCAL = (() => {
   const isAdminName = (name) => ADMIN_NAMES.has(String(name || '').toUpperCase());
   // ULTIMATUM vault — lifetime XP banks cores; cores buy ULTIMATUM cards.
   // Mirrors server.js ULT_* — keep in sync.
-  const ULT_XP_PER_CORE = 100000;
+  const ULT_XP_PER_CORE = 50000;
   const ULT_CARDS = {
     corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
     gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
   };
   const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden']);
   // Enforce access rules on a LOCAL meta: perk-slot default + economy migrations.
-  // ULTIMATUM era: legacy metas get their lifetime XP ledger backfilled from the
-  // level history — nobody loses owned towers, levels only ever climb now.
+  // ULTIMATUM era: legacy metas get their lifetime XP ledger reconciled from the
+  // level history — the ledger never sits below what the clearance history implies,
+  // and a correct one is never lowered. Mirrors server.js sanitizeMeta.
   function sanitizeMeta(account) {
     if (!account || !account.meta) return;
     const meta = account.meta;
     if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
-    if (!Number.isFinite(meta.totalXp)) {
-      let back = Number(meta.xp) || 0;
-      for (let l = 1; l < (meta.level || 1); l += 1) back += xpToNext(l);
-      meta.totalXp = back;
-    }
+    let back = Number(meta.xp) || 0;
+    for (let l = 1; l < (meta.level || 1); l += 1) back += xpToNext(l);
+    if (back > (meta.totalXp || 0)) meta.totalXp = back;
     if (!Number.isFinite(meta.ultCores)) meta.ultCores = 0;
     if (!Number.isFinite(meta.ultClaims)) meta.ultClaims = 0;
     // DAWN CLEARANCE — full clearance decrypts every blueprint the grid can mint,

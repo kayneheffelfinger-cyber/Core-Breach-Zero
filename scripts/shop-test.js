@@ -230,16 +230,16 @@ async function api(path, payload) {
     check('blossom no longer sold for NC/BT (Ultimatum-only) 404', blossomNC.status === 404, JSON.stringify(blossomNC.data));
     const ultShallow = await api('/api/ultimatum', { token, action: 'exchange' });
     check('ultimatum exchange with shallow XP bank 400', ultShallow.status === 400, JSON.stringify(ultShallow.data));
-    for (let i = 0; i < 24; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // repeatable +5000 XP — farms past one 100k core
+    for (let i = 0; i < 12; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // repeatable +5000 XP — farms past one 50k core
     const farmed = await api('/api/profile', { token });
     check('level cap removed: clearance sails past LV 30', farmed.data.profile.level > 30, `level=${farmed.data.profile.level}`);
-    check('lifetime totalXp ledger banks past 100k', farmed.data.profile.totalXp >= 100000, `totalXp=${farmed.data.profile.totalXp}`);
+    check('lifetime totalXp ledger banks past 50k', farmed.data.profile.totalXp >= 50000, `totalXp=${farmed.data.profile.totalXp}`);
     check('no cores banked before the exchange', farmed.data.profile.ultCores === 0 && farmed.data.profile.ultClaims === 0, JSON.stringify(farmed.data.profile));
     const ultEx = await api('/api/ultimatum', { token, action: 'exchange' });
-    check('100k lifetime XP exchanges for 1 Ultimatum core', ultEx.data.ok && ultEx.data.profile.ultCores === 1 && ultEx.data.profile.ultClaims === 1, JSON.stringify(ultEx.data));
+    check('50k lifetime XP exchanges for 1 Ultimatum core', ultEx.data.ok && ultEx.data.profile.ultCores === 1 && ultEx.data.profile.ultClaims === 1, JSON.stringify(ultEx.data));
     check('exchange never touched the level or owned towers', ultEx.data.profile.level === farmed.data.profile.level && ultEx.data.profile.owned.length === farmed.data.profile.owned.length, 'level/armory intact');
     const ultDupe = await api('/api/ultimatum', { token, action: 'exchange' });
-    check('double exchange before the next 100k rejected 400', ultDupe.status === 400, JSON.stringify(ultDupe.data));
+    check('double exchange before the next 50k rejected 400', ultDupe.status === 400, JSON.stringify(ultDupe.data));
     const ultBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
     check('Ultimatum card: CORPSE BLOSSOM acquired for 1 core', ultBuy.data.ok && ultBuy.data.profile.owned.includes('corpseblossom') && ultBuy.data.profile.ultCores === 0, JSON.stringify(ultBuy.data));
     const ultRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
@@ -292,12 +292,12 @@ async function api(path, payload) {
     check('persisted redeemed ledger (4 codes, repeatable skips ledger)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
     check('persisted achievement overdrive + hardline', p.achievements && p.achievements.overdrive === true && p.achievements.hardline === true, JSON.stringify(p.achievements));
     check('persisted mapWins spire + hard ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2 && p.mapWins['easy:hard'] === 1, JSON.stringify(p.mapWins));
-    check('persisted lifetime XP + Ultimatum ledger', typeof p.totalXp === 'number' && p.totalXp >= 100000 && p.ultCores === 0 && p.ultClaims === 1, JSON.stringify({ totalXp: p.totalXp, ultCores: p.ultCores, ultClaims: p.ultClaims }));
+    check('persisted lifetime XP + Ultimatum ledger', typeof p.totalXp === 'number' && p.totalXp >= 50000 && p.ultCores === 0 && p.ultClaims === 1, JSON.stringify({ totalXp: p.totalXp, ultCores: p.ultCores, ultClaims: p.ultClaims }));
     check('persisted uncapped clearance past LV 30', p.level > 30, `level=${p.level}`);
     // --- INSANE ERA: second core tier (GRAVE WARDEN) + free L50 claim (EXECUTIONER) ---
     const wardenBroke = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
     check('grave warden with 0 cores 402 (2-core tier enforced)', wardenBroke.status === 402, JSON.stringify(wardenBroke.data));
-    for (let i = 0; i < 36; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // +180k lifetime XP — banks two more cores (60 total redeems ≈ 320k)
+    for (let i = 0; i < 36; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // +180k lifetime XP — banks three more 50k cores (48 total redeems ≈ 245k)
     const farmed2 = await api('/api/profile', { token });
     check('second farm pushes lifetime XP past 200k', farmed2.data.profile.totalXp >= 200000, `totalXp=${farmed2.data.profile.totalXp}`);
     await api('/api/ultimatum', { token, action: 'exchange' });

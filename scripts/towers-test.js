@@ -89,7 +89,7 @@ check('SHREDDER spits a chip-stream (fx-chip tracer)', combat.includes("case 'sh
 check('CONTAGION wiring: virus hits infect with a 5s phase burn', combat.includes("target.corrupt = { dps: es.corrupt, t: 5 }") && combat.includes("damageEnemy(enemy, enemy.corrupt.dps * dt, { phase: true, src: 'virus' })"));
 check('corruption tick guarded against friendly summons', combat.includes('if (es.corrupt && !target.friendly)'));
 check('tower panel shows live CONTAGION intel', combat.includes('<span>CONTAGION</span>'));
-check('DRONE SPAWNER is a one-per-commander rig', combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden', 'executioner'])"));
+check('DRONE SPAWNER is a one-per-commander rig', combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden'])"));
 check('silo fires a visible warhead (kind missile + fx-missile node)', combat.includes("case 'missilesilo':") && combat.includes("kind: 'missile'") && combat.includes("fx-shell fx-missile"));
 check('projectile loop flies shells AND missiles', combat.includes("p.kind === 'shell' || p.kind === 'missile'"));
 check('MIRV cluster pass: 40% dmg out to 130u beyond the crater', combat.includes('if (p.cluster)') && combat.includes('Math.round(p.dmg * 0.4)') && combat.includes('d <= 130'));
@@ -168,7 +168,7 @@ check('veteran backfill from clearance history (server + LOCAL)', serverjs.inclu
 const appUltCards = extractLiteral(appjs, 'ULT_CARDS');
 const serverUltCards = extractLiteral(serverjs, 'ULT_CARDS');
 check('ULT card catalog mirrors (corpseblossom: 1 core, L20)', JSON.stringify(appUltCards) === JSON.stringify(serverUltCards) && Boolean(appUltCards && appUltCards.corpseblossom) && appUltCards.corpseblossom.cores === 1 && appUltCards.corpseblossom.unlock === 20);
-check('ULT_XP_PER_CORE mirrors at 100000', /const ULT_XP_PER_CORE = 100000;/.test(appjs) && /const ULT_XP_PER_CORE = 100000;/.test(serverjs));
+check('ULT_XP_PER_CORE mirrors at 50000 (app/server/shop)', /const ULT_XP_PER_CORE = 50000;/.test(appjs) && /const ULT_XP_PER_CORE = 50000;/.test(serverjs) && /const ULT_XP_PER_CORE = 50000;/.test(shopjs));
 check('/api/ultimatum lives on server + LOCAL', serverjs.includes("pathname === '/api/ultimatum'") && appjs.includes("path === '/api/ultimatum'"));
 check('exchange is a milestone claim (banked vs claims, both sides)', serverjs.includes('banked <= (meta.ultClaims || 0)') && appjs.includes('banked <= (meta.ultClaims || 0)'));
 check('purchase guards: 409 dupe + 403 clearance + 402 cores (server)', serverjs.includes("'Ultimatum card already in your armory.'") && serverjs.includes('Clearance level ${card.unlock} required.') && serverjs.includes('Not enough Ultimatum cores'));
@@ -176,7 +176,7 @@ check('one-card rule enforced in both loadout validators', serverjs.includes('On
 check('blossom left the NC/BT shop mirrors (Ultimatum-only)', !localShop.corpseblossom && !serverShop.corpseblossom);
 check('shop catalog flags the blossom ULTIMATUM (adminOnly retired)', shopjs.includes('ultimatum: true') && !shopjs.includes('adminOnly: true'));
 check('vault tab + panel + exchange wired in the shop', shopjs.includes('shop-tab-ult') && shopjs.includes('data-cat="__ult"') && shopjs.includes('id="shop-ultimatum"') && shopjs.includes('onUltClick'));
-check('exchange button labels the 100k milestone', shopjs.includes('EXCHANGE 100,000 XP // BANK ') && shopjs.includes('REACH 100,000 TOTAL XP TO BANK A CORE'));
+check('exchange button labels the 50k milestone dynamically', shopjs.includes('EXCHANGE ${format(ULT_XP_PER_CORE)} XP // BANK ') && shopjs.includes('REACH ${format(ULT_XP_PER_CORE)} TOTAL XP TO BANK A CORE'));
 check('TOTAL XP counter lives in the shop wallet', shopjs.includes('TOTAL XP // LIFETIME') && shopjs.includes('id="shop-totalxp"'));
 check('vault card renders blossom art + arm/buy actions', shopjs.includes('data-ult-buy="${card.id}"') && shopjs.includes("ULTIMATUM CARD ACQUIRED"));
 check('client one-card guard + setProfile heal in shop.js', shopjs.includes('ONLY ONE ULTIMATUM CARD CAN BE ARMED') && shopjs.includes('let ultSeen = false;'));
@@ -184,13 +184,13 @@ check('blueprint grid excludes ULTIMATUM cards', shopjs.includes('!entry.ultimat
 check('ultimatum vault styled (gold hero + card + exchange)', styles.includes('.ult-hero') && styles.includes('.ult-card') && styles.includes('.ult-exchange.ready') && styles.includes('.tok-ult'));
 
 console.log('--- Deploy chain: update log, build, cache-bust ---');
-check('BUILD bumped to 2026.10.32', appjs.includes("const BUILD = '2026.10.32';"));
+check('BUILD bumped to 2026.10.33', appjs.includes("const BUILD = '2026.10.33';"));
 check('UPDATE LOG leads with ULTIMATUM entry', appjs.indexOf("version: '2026.10.28', tag: 'ULTIMATUM'") < appjs.indexOf("version: '2026.10.27'") && appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL'));
 check('update log covers cap removal + vault + blossom card + migration', ['clearance cap is GONE', 'ULTIMATUM system goes live', 'first ULTIMATUM card', 'backfilled from their clearance history'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024f', busts.length === 6 && busts.every((v) => v === '?v=20261024f'), busts.join(' '));
-check('shell footer brands OPEN ROSTER', indexhtml.includes('BUILD 2026.10.32 // OPEN ROSTER') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
+check('all 6 index.html assets cache-busted to 20261024g', busts.length === 6 && busts.every((v) => v === '?v=20261024g'), busts.join(' '));
+check('shell footer brands DAWN FORGE', indexhtml.includes('BUILD 2026.10.33 // DAWN FORGE') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));
@@ -211,7 +211,7 @@ check('insane economy: opening -25% / wave pay 80% / rebuild 3.5s', combat.inclu
 check('insane pays 350 NC / 400 XP per win, mirrored exactly', INSANE_REWARDS_LOCAL && INSANE_REWARDS_SERVER && INSANE_REWARDS_LOCAL.insane.winNC === 350 && INSANE_REWARDS_LOCAL.insane.winXP === 400 && JSON.stringify(INSANE_REWARDS_LOCAL.insane) === JSON.stringify(INSANE_REWARDS_SERVER.insane));
 check('room protocols carry insane (LOCAL + server sync)', appjs.includes("const ROOM_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];") && serverjs.includes("const PROTOCOL_CHOICES = ['easy', 'medium', 'hard', 'insane'];"));
 check('play menu copy names the spiral', appjs.includes('INSANE (30 waves on the spiral'));
-check('OPEN ROSTER: EXECUTIONER sold in the grid (no ULT flag), warden stays apex', TOWERS && TOWERS.some((t) => t.id === 'gravewarden' && t.ultimatum === true && t.limit === 1 && t.cost === 400 && t.track.length === 5) && TOWERS.some((t) => t.id === 'executioner' && !t.ultimatum && t.limit === 1 && t.unlock === 50 && t.price && t.price.nc === 12000 && t.price.bt === 150 && t.track.length === 5));
+check('OPEN ROSTER: EXECUTIONER sold in the grid (no ULT flag), warden stays apex', TOWERS && TOWERS.some((t) => t.id === 'gravewarden' && t.ultimatum === true && t.limit === 1 && t.cost === 400 && t.track.length === 5) && TOWERS.some((t) => t.id === 'executioner' && !t.ultimatum && t.limit === 3 && t.unlock === 50 && t.price && t.price.nc === 12000 && t.price.bt === 150 && t.track.length === 5));
 check('apex decals shipped + dawnbreaker decal', fs.existsSync(path.join(ROOT, 'assets/towers/gravewarden.png')) && fs.existsSync(path.join(ROOT, 'assets/towers/executioner.png')) && fs.existsSync(path.join(ROOT, 'assets/towers/dawnbreaker.png')) && shopjs.includes("art: 'assets/towers/dawnbreaker.png'"));
 check('shop ULT_CARDS: 2 cards — blossom 1 core / warden 2 cores, headsman gone', /const ULT_CARDS = \[[\s\S]*?corpseblossom[\s\S]*?cores: 1[\s\S]*?gravewarden[\s\S]*?cores: 2[\s\S]*?\];/.test(shopjs) && !shopjs.includes("id: 'executioner', name: 'EXECUTIONER', cores"));
 check('free-claim rendering retired with the headsman', !shopjs.includes('CLAIM // FREE AT CLEARANCE') && !shopjs.includes('card.cores === 0'));
@@ -219,13 +219,32 @@ check('ULT one-card set trimmed to the vault duo (server + LOCAL)', serverjs.inc
 check('server ULT_CARDS mirror: vault duo only', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(serverjs) && !serverjs.includes("executioner: { name: 'EXECUTIONER', cores"));
 check('LOCAL ULT_CARDS mirror matches server', /gravewarden: \{ name: 'GRAVE WARDEN', cores: 2, unlock: 20 \}/.test(appjs) && !appjs.includes("executioner: { name: 'EXECUTIONER', cores"));
 check('EXECUTIONER priced in both SHOP mirrors at Clearance 50', serverjs.includes("executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' }") && appjs.includes("executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' }"));
-check('combat: warden + executioner registered as unique rigs with the right AA rules', combat.includes("gravewarden: { air: 'no' }") && combat.includes("executioner: { air: 'yes' }") && combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden', 'executioner'])"));
+check('combat: warden + executioner registered as unique rigs with the right AA rules', combat.includes("gravewarden: { air: 'no' }") && combat.includes("executioner: { air: 'yes' }") && combat.includes("new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden'])"));
 check('executioner rail: max-hull targeting + boss-only full damage + execute cut', combat.includes("case 'executioner':") && /target\.t\.boss \? dmg : Math\.max\(1, Math\.round\(dmg \* \(es\.chaffPct \|\| 0\.15\)\)\)/.test(combat) && /target\.key !== 'overseer' && target\.hp <= target\.maxHp \* \(es\.execute \|\| 0\.15\)/.test(combat));
 check('grave warden: DEATH TOLL bell + yard slow + kill-charge feed', combat.includes('function graveWardenFeed') && combat.includes('function wardenYardMult') && /es\.bell && tower\.bellCd <= 0/.test(combat) && /enemy\.stun = Math\.max\(enemy\.stun \|\| 0, es\.tollStun \|\| 0\.8\)/.test(combat));
 check('yard slow bites walkers AND flyers (both move lines hooked)', (combat.match(/wardenYardMult\(enemy\)/g) || []).length >= 3);
 check('tower panel reports apex readouts', combat.includes('COMMANDERS BELOW') && combat.includes('TOLL CHARGES'));
 check('UPDATE LOG leads with INSANE ERA entry', appjs.indexOf("version: '2026.10.30', tag: 'INSANE ERA'") >= 0 && appjs.indexOf("version: '2026.10.30'") < appjs.indexOf("version: '2026.10.29'"));
 check('update log covers insane + warden + executioner + one-card extension', ['INSANE PROTOCOL goes live', 'GRAVE WARDEN joins the ULTIMATUM vault', 'headsman', 'One-card rule extends'].every((s) => appjs.includes(s)));
+
+console.log('--- DAWN FORGE: 50k cores + relic singular + headsman musters + friendly fire-control ---');
+check('update log leads with DAWN FORGE entry', appjs.indexOf("version: '2026.10.33', tag: 'DAWN FORGE'") >= 0 && appjs.indexOf("version: '2026.10.33'") < appjs.indexOf("version: '2026.10.32'"));
+check('DAWNBRINGER capped at one per commander', TOWERS.some((t) => t.id === 'dawnbreaker' && t.limit === 1 && t.stats.tgt.includes('ONE PER COMMANDER')));
+check('EXECUTIONER nerfed: 72 dmg / 0.45 rate / 12% base execute', TOWERS.some((t) => t.id === 'executioner' && t.stats.dmg === 72 && t.stats.rate === 0.45 && t.stats.execute === 0.12));
+check('EXECUTIONER ladder rolled down to FINAL RITUAL 330 / 0.68 / 22% / 16%', TOWERS.some((t) => { const tier = t.track[4]; return tier && tier.sets.dmg === 330 && tier.sets.rate === 0.68 && tier.sets.execute === 0.22 && tier.sets.chaffPct === 0.16; }));
+check('EXECUTIONER copy musters three rails', shopjs.includes('UP TO 3 PER COMMANDER') && shopjs.includes('Up to three rails per commander.'));
+check('deploy caps are count-based (limitReached + limitToast)', combat.includes('function limitReached(entry)') && combat.includes('state.towers.filter((tower) => tower.id === entry.id).length >= entry.limit') && combat.includes('function limitToast(entry)'));
+check('both deploy gates run the count check', (combat.match(/limitReached\(entry\)/g) || []).length >= 2 && !combat.includes('state.towers.some((tower) => tower.id === entry.id)'));
+check('fire-control skips friendly summons', /let pool = state\.enemies\.filter\(\(enemy\) => \{[\s\S]{0,120}if \(enemy\.friendly\) return false;/.test(combat));
+check('dawn splash skips friendlies too', combat.includes('if (!enemy.alive || enemy === target || enemy.friendly) continue;'));
+check('summon hover intel wired (risen + strike drones)', combat.includes('function showSummonTip(summon, event)') && (combat.match(/showSummonTip\(/g) || []).length >= 3 && combat.includes("'CORPSE BLOSSOM SPAWN'") && combat.includes("'DRONE SPAWNER PAYLOAD'"));
+check('friendly tip shows live HP + allegiance', combat.includes('ALLEGIANCE') && combat.includes('TOWERS IGNORE IT'));
+check('ledger reconcile floor in both sanitizers (heal up, never down)', /if \(back > \(meta\.totalXp \|\| 0\)\) meta\.totalXp = back;/.test(serverjs) && /if \(back > \(meta\.totalXp \|\| 0\)\) meta\.totalXp = back;/.test(appjs) && /if \(back > \(legacy\.totalXp \|\| 0\)\) legacy\.totalXp = back;/.test(serverjs));
+check('vault panel labels the next-core bar + reassures the ledger', shopjs.includes('PROGRESS INTO THE NEXT CORE') && shopjs.includes('banking one never resets or spends your TOTAL XP'));
+check('DAWNBRINGER relic rig: corona rings + sun core + muzzle in combat', combat.includes("entry.id === 'dawnbreaker'") && combat.includes("class: 'tw-corona'") && combat.includes("class: 'tw-suncore'") && combat.includes("class: 'tw-muzzle'"));
+check('dawn lance fires a layered beam (halo under core)', combat.includes("fireLine(tower, target, 'fx-dawn-halo', 6.5)") && combat.includes("fireLine(tower, target, 'fx-dawn', 2.6)"));
+check('relic rig styled: corona spin + sun pulse + halo sheath + green summon tip', styles.includes('@keyframes corona-spin') && styles.includes('@keyframes sun-pulse') && styles.includes('.fx-dawn-halo') && styles.includes('.tip-head.summon') && styles.includes('.tw-dawnbreaker .tw-barrel'));
+check('per-kind tower class hook shipped', combat.includes('tw-${entry.cat} tw-${entry.id}'));
 
 console.log('--- Syntax gates ---');
 for (const f of ['combat.js', 'app.js', 'server.js', 'shop.js']) {

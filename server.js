@@ -46,9 +46,9 @@ const SHOP = {
   executioner: { name: 'EXECUTIONER', unlock: 50, price: { nc: 12000, bt: 150 }, currency: 'mixed' },
 };
 
-// ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (100,000 XP per core);
+// ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (50,000 XP per core);
 // cores buy ULTIMATUM cards. Mirrored in app.js LOCAL — keep in sync.
-const ULT_XP_PER_CORE = 100000;
+const ULT_XP_PER_CORE = 50000;
 const ULT_CARDS = {
   corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
   gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
@@ -110,11 +110,14 @@ function sanitizeMeta(name) {
   if (!account) return;
   const meta = account.meta;
   if (!Array.isArray(meta.equippedPerks)) meta.equippedPerks = [];
-  if (!Number.isFinite(meta.totalXp)) {
-    let back = Number(meta.xp) || 0;
-    for (let l = 1; l < (meta.level || 1); l += 1) back += xpToNext(l);
-    meta.totalXp = back;
-  }
+  // Ledger reconcile: the lifetime XP floor is what the clearance history implies
+  // (current level progress + every threshold crossed). If the stored ledger ever
+  // sits below that floor — legacy backfill quirks, older curves, frozen counters —
+  // it heals up to the floor and never decreases a correct one. Exchange milestones
+  // only ever READ this ledger, so banking a core can never spend total XP.
+  let back = Number(meta.xp) || 0;
+  for (let l = 1; l < (meta.level || 1); l += 1) back += xpToNext(l);
+  if (back > (meta.totalXp || 0)) meta.totalXp = back;
   if (!Number.isFinite(meta.ultCores)) meta.ultCores = 0;
   if (!Number.isFinite(meta.ultClaims)) meta.ultClaims = 0;
   // DAWN CLEARANCE — full clearance decrypts every blueprint the grid can mint,
@@ -126,11 +129,10 @@ function sanitizeMeta(name) {
 // Grant legacy accounts the Nexus wallet without touching their credentials.
 for (const name of Object.keys(accounts)) {
   const legacy = accounts[name].meta && typeof accounts[name].meta === 'object' ? accounts[name].meta : {};
-  if (!Number.isFinite(legacy.totalXp)) {
-    let back = Number(legacy.xp) || 0;
-    for (let l = 1; l < (legacy.level || 1); l += 1) back += xpToNext(l);
-    legacy.totalXp = back; // backfill BEFORE the defaults spread can zero it
-  }
+  // Boot-time ledger reconcile — same floor rule as sanitizeMeta (keep in sync).
+  let back = Number(legacy.xp) || 0;
+  for (let l = 1; l < (legacy.level || 1); l += 1) back += xpToNext(l);
+  if (back > (legacy.totalXp || 0)) legacy.totalXp = back;
   accounts[name].meta = { ...defaultMeta(), ...legacy };
   sanitizeMeta(name);
 }

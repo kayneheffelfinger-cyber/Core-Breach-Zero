@@ -117,9 +117,9 @@ window.CBZShop = (() => {
         { label: 'NUCLEAR FALL OUT', cost: 500, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
       ],
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
-    { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: 0, cost: 900, currency: 'nc', event: true,
+    { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: 0, cost: 900, currency: 'nc', event: true, limit: 1,
       tagline: 'CRIMSON RELIC — a dawn-forged solar lance that treats armor as a rumor.',
-      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR' }, art: 'assets/towers/dawnbreaker.png',
+      stats: { dmg: 420, rate: 0.9, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR · ONE PER COMMANDER' }, art: 'assets/towers/dawnbreaker.png',
       special: '>> Forged in the only Crimson Dawn the grid will ever see. Every beam burns straight through armor plating at full damage, tracks air and ground without a hex pad, and the ladder ends in SUNSLAUGHTER: 1600 damage rounds with a burning 45-unit splash. The strongest chassis to ever deploy. It will never be sold, crafted or given again — survive the dawn or never hold it.',
       track: [
         { label: 'FIRST LIGHT', cost: 800, sets: { dmg: 640, rate: 1 }, info: 'DMG 420 → 640 · RATE 0.9 → 1.0' },
@@ -154,17 +154,17 @@ window.CBZShop = (() => {
         { label: 'LAST TOLL', cost: 3200, sets: { bell: 260, bellEvery: 4.5, yardSlow: 0.45, tollStun: 1.2, rng: 230 }, info: 'BELL 140 → 260 DMG · CADENCE 4.5s · YARD -45% SPEED · STUN 1.2s' },
       ],
       icon: ic('<circle cx="20" cy="21" r="8"/><path d="M20 13v-4M16 9h8"/><circle cx="20" cy="21" r="2.2" fill="currentColor" stroke="none"/><path d="M8 21c2-2 4-2 6 0M26 21c2-2 4-2 6 0"/>') },
-    { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, price: { nc: 12000, bt: 150 }, cost: 450, currency: 'mixed', limit: 1,
+    { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, price: { nc: 12000, bt: 150 }, cost: 450, currency: 'mixed', limit: 3,
       tagline: 'The headsman\u2019s rail. Decrypts at Clearance 50 — it only has one job.',
-      stats: { dmg: 90, rate: 0.5, rng: 240, tgt: 'MAX-HULL // AIR + GROUND · ONE PER COMMANDER', targeting: 'maxhp' },
-      special: '>> The rail never wastes a round on the small stuff — chaff soaks a token 15% of the shot, while commanders (mini-bosses and bosses) pay full price. Its true work is the sentence: mark a commander below the execute threshold and the next round takes its head clean off. Only the final boss is beyond the blade. The priciest chassis in the standard rotation — and the only one that hunts commanders. One rail per commander.',
+      stats: { dmg: 72, rate: 0.45, rng: 240, execute: 0.12, tgt: 'MAX-HULL // AIR + GROUND · UP TO 3 PER COMMANDER', targeting: 'maxhp' },
+      special: '>> The rail never wastes a round on the small stuff — chaff soaks a token 15% of the shot, while commanders (mini-bosses and bosses) pay full price. Its true work is the sentence: mark a commander below the execute threshold and the next round takes its head clean off. Only the final boss is beyond the blade. The priciest chassis in the standard rotation — and the only one that hunts commanders. Up to three rails per commander.',
       art: 'assets/towers/executioner.png',
       track: [
         { label: 'WIDENED SLOTS', cost: 250, sets: { rng: 260 }, info: 'RNG 240 → 260' },
-        { label: 'HARDENED ROUNDS', cost: 650, sets: { dmg: 160 }, info: 'DMG 90 → 160' },
-        { label: 'BLOOD PRICE', cost: 1200, sets: { dmg: 260, rate: 0.6 }, info: 'DMG 160 → 260 · RATE 0.5 → 0.6' },
-        { label: 'HEADSMAN', cost: 2200, sets: { execute: 0.22 }, info: 'EXECUTE THRESHOLD 15% → 22% OF COMMANDER HULL' },
-        { label: 'FINAL RITUAL', cost: 3600, sets: { dmg: 420, rate: 0.75, execute: 0.28, chaffPct: 0.2 }, info: 'DMG 260 → 420 · RATE 0.75 · EXECUTE 28% · CHAFF PAYOUT 20%' },
+        { label: 'HARDENED ROUNDS', cost: 650, sets: { dmg: 140 }, info: 'DMG 72 → 140' },
+        { label: 'BLOOD PRICE', cost: 1200, sets: { dmg: 210, rate: 0.55 }, info: 'DMG 140 → 210 · RATE 0.45 → 0.55' },
+        { label: 'HEADSMAN', cost: 2200, sets: { execute: 0.18 }, info: 'EXECUTE THRESHOLD 12% → 18% OF COMMANDER HULL' },
+        { label: 'FINAL RITUAL', cost: 3600, sets: { dmg: 330, rate: 0.68, execute: 0.22, chaffPct: 0.16 }, info: 'DMG 210 → 330 · RATE 0.68 · EXECUTE 22% · CHAFF PAYOUT 16%' },
       ],
       icon: ic('<path d="M20 6v22M14 28h12"/><path d="M20 10l9-4-3 8"/><circle cx="20" cy="17" r="3.4"/><path d="M11 28h18" stroke-dasharray="2 2"/>') },
     { id: 'virus', name: 'VIRUS', cat: 'special', unlock: 1, price: { nc: 2400, bt: 55 }, cost: 500, currency: 'mixed',
@@ -184,10 +184,10 @@ window.CBZShop = (() => {
 
   // --- ULTIMATUM vault: lifetime XP banks cores, cores buy cards -----------------
   // Mirrors server.js ULT_* — keep in sync.
-  const ULT_XP_PER_CORE = 100000;
+  const ULT_XP_PER_CORE = 50000;
   const ULT_CARDS = [
     { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cores: 1, unlock: 20,
-      blurb: 'The CLASSIFIED vault is open. One core — one hundred thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
+      blurb: 'The CLASSIFIED vault is open. One core — fifty thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
     { id: 'gravewarden', name: 'GRAVE WARDEN', cores: 2, unlock: 20,
       blurb: 'The second apex rig: a walled yard where the dead pay toll. Two cores bank the Warden — the bell never rests, and nothing hostile walks his yard at full speed.' },
   ];
@@ -509,12 +509,12 @@ window.CBZShop = (() => {
       <div class="ult-hero">
         <div class="ult-total"><span>★</span> ${format(total)}<small>TOTAL XP // EVERY MISSION, BOSS AND SALVAGE CODE — FOREVER</small></div>
         <div class="ult-core">
-          <div class="ult-core-head"><span>NEXT ULTIMATUM CORE</span><b>${format(intoCore)} / ${format(ULT_XP_PER_CORE)} XP</b></div>
+          <div class="ult-core-head"><span>PROGRESS INTO THE NEXT CORE</span><b>${format(intoCore)} / ${format(ULT_XP_PER_CORE)} XP</b></div>
           <div class="ult-core-track"><i style="width:${pct}%"></i></div>
           <div class="ult-core-foot"><span>BANKED: ${banked} · CLAIMED: ${profile.ultClaims || 0} · UNSPENT CORES: ${profile.ultCores || 0}</span><span>${ULT_XP_PER_CORE.toLocaleString('en-US')} XP PER CORE</span></div>
         </div>
-        <button class="ult-exchange${ready > 0 ? ' ready' : ''}" type="button" data-ult-exchange="1" ${ready > 0 ? '' : 'disabled'}>${ready > 0 ? `EXCHANGE 100,000 XP // BANK ${ready} ULTIMATUM CORE${ready === 1 ? '' : 'S'}` : 'REACH 100,000 TOTAL XP TO BANK A CORE'}</button>
-        <p class="ult-note">The exchange NEVER touches your clearance, wallet or armory — levels and owned towers are safe forever. Cores only ever grow.</p>
+        <button class="ult-exchange${ready > 0 ? ' ready' : ''}" type="button" data-ult-exchange="1" ${ready > 0 ? '' : 'disabled'}>${ready > 0 ? `EXCHANGE ${format(ULT_XP_PER_CORE)} XP // BANK ${ready} ULTIMATUM CORE${ready === 1 ? '' : 'S'}` : `REACH ${format(ULT_XP_PER_CORE)} TOTAL XP TO BANK A CORE`}</button>
+        <p class="ult-note">The progress bar counts into your NEXT core — banking one never resets or spends your TOTAL XP (the ★ number above). The exchange NEVER touches your clearance, wallet or armory — levels and owned towers are safe forever. Cores only ever grow.</p>
       </div>
       <div class="ult-grid">${cards}</div>`;
   }

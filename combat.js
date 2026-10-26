@@ -271,7 +271,20 @@ const TOWER_RULES = {
 };
 
 // One-off rigs: only a single unit of these chassis may deploy per commander.
-const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden', 'executioner']);
+const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden']); // limit-1 rigs; the headsman now musters three
+
+// Per-blueprint deploy caps: entry.limit is a real COUNT now — the headsman
+// musters up to three rails, the one-off rigs stay at one. Mirrored by the
+// toast copy so the reason reads right at any cap.
+function limitReached(entry) {
+  if (!entry.limit) return false;
+  return state.towers.filter((tower) => tower.id === entry.id).length >= entry.limit;
+}
+function limitToast(entry) {
+  return entry.limit === 1
+    ? `${entry.name} is a one-off rig — only one deploys per commander.`
+    : `${entry.name} is capped — only ${entry.limit} deploy per commander.`;
+}
 const NUKE_DAMAGE = 2200;      // Nuclear Fall Out: flat strike damage inside the blast
 const NUKE_RADIUS = 240;       // strike decimates everything inside this ring
 const NUKE_COST = 500;         // salvage price per cast
@@ -644,6 +657,9 @@ function spawnSummon(enemy, tower, stained) {
   setTimeout(() => g.classList.remove('spawn-in'), 420);
   state.layers.enemies.appendChild(g);
   state.enemies.push(summon);
+  g.addEventListener('pointerenter', (event) => showSummonTip(summon, event));
+  g.addEventListener('pointermove', moveTip);
+  g.addEventListener('pointerleave', () => hideTip(summon));
   fxRing(summon.fx, summon.fy, 'fx-ring-virus');
   floatText(summon.fx, summon.fy - t.size - 10, stained ? 'BLOOD STAINED RISES' : 'RISEN', 'summon-float');
   paintBars(summon);
@@ -748,6 +764,9 @@ function launchStrikeDrone(tower) {
   setTimeout(() => bloom.remove(), 720);
   state.layers.enemies.appendChild(g);
   state.enemies.push(drone);
+  g.addEventListener('pointerenter', (event) => showSummonTip(drone, event));
+  g.addEventListener('pointermove', moveTip);
+  g.addEventListener('pointerleave', () => hideTip(drone));
   paintBars(drone);
   return true;
 }
@@ -1286,6 +1305,31 @@ function hideTip(enemy) {
   state.tipTarget = null;
 }
 
+// Friendly intel — Blossom risen copies and strike drones get their own readout
+// (hostiles show bounty/core damage; friendlies show contact payload instead).
+function showSummonTip(summon, event) {
+  ensureTip();
+  state.tipTarget = summon;
+  const t = summon.t;
+  const drone = summon.key === 'drone';
+  const head = drone ? 'STRIKE DRONE' : `RISEN ${t.name}`;
+  const tag = drone ? 'DRONE SPAWNER PAYLOAD' : 'CORPSE BLOSSOM SPAWN';
+  const flavor = drone
+    ? 'One-way strike unit — rockets across the grid and detonates on the first hostile it intercepts for its full payload.'
+    : 'A risen copy marches back up the lane and detonates on the first hostile it touches for damage equal to its hull. Your towers ignore it.';
+  state.tip.innerHTML = `
+    <div class="tip-head summon"><b>${head}</b><span class="tip-tag">${tag}</span></div>
+    <div class="tip-hp"><div class="tip-hp-track"><div class="tip-hp-fill" style="width:${(summon.hp / summon.maxHp) * 100}%"></div></div><span>${Math.ceil(summon.hp)}/${summon.maxHp} HP</span></div>
+    <div class="tip-rows">
+      <div><span>CONTACT DMG</span><b>${Math.ceil(summon.maxHp)} · FULL HULL</b></div>
+      <div><span>ALLEGIANCE</span><b>YOURS</b></div>
+      <div><span>TARGETING</span><b>TOWERS IGNORE IT</b></div>
+    </div>
+    <p class="tip-ability">${flavor}</p>`;
+  state.tip.hidden = false;
+  moveTip(event);
+}
+
 // --- Banners ---------------------------------------------------------------------------
 function banner(title, sub, cls) {
   state.syncTitle = String(title || '');
@@ -1584,9 +1628,9 @@ function toggleBuild(id) {
   if (!entry) return;
   const limit = towerLimit();
   if (state.towers.length >= limit) { playSound('alarm'); showToast(`Command grid saturated — ${limit} units max at ${window.CBZ_ROOM_PLAYERS || 1} commander(s).`); return; }
-  if (entry.limit && state.towers.some((tower) => tower.id === id)) {
+  if (limitReached(entry)) {
     playSound('alarm');
-    showToast(`${entry.name} is a one-off rig — only one deploys per commander.`);
+    showToast(limitToast(entry));
     return;
   }
   if (state.cash < entry.cost) { playSound('alarm'); showToast(`Need $${entry.cost} salvage to deploy ${entry.name}.`); return; }
@@ -1703,9 +1747,9 @@ function rejectPlace(x, y, reason) {
 
 function placeTower(entry, x, y) {
   if (state.towers.length >= towerLimit()) { playSound('alarm'); showToast(`Command grid saturated — ${towerLimit()} units max.`); return false; }
-  if (entry.limit && state.towers.some((tower) => tower.id === entry.id)) {
+  if (limitReached(entry)) {
     playSound('alarm');
-    showToast(`${entry.name} is a one-off rig — only one deploys per commander.`);
+    showToast(limitToast(entry));
     return false;
   }
   if (state.cash < entry.cost) { playSound('alarm'); showToast(`Need $${entry.cost} salvage to deploy ${entry.name}.`); return false; }
@@ -1735,7 +1779,7 @@ function placeTower(entry, x, y) {
 }
 
 function towerNode(entry, x, y) {
-  const g = svgNode('g', { class: `tower tw-${entry.cat}` });
+  const g = svgNode('g', { class: `tower tw-${entry.cat} tw-${entry.id}` });
   const rng = entry.stats.rng >= 999 ? 300 : entry.stats.rng;
   g.appendChild(svgNode('circle', { class: 'tw-range', r: rng }));
   g.appendChild(svgNode('rect', { class: 'tw-footprint', x: -FOOT_HALF, y: -FOOT_HALF, width: FOOT_HALF * 2, height: FOOT_HALF * 2 }));
@@ -1743,9 +1787,21 @@ function towerNode(entry, x, y) {
   const chassis = svgNode('g', { class: 'tw-chassis' });
   chassis.appendChild(svgNode('polygon', { class: 'tw-base', points: hexPoints(0, 0, 16) }));
   chassis.appendChild(svgNode('circle', { class: 'tw-ped', r: 9 }));
+  if (entry.id === 'dawnbreaker') {
+    // CRIMSON RELIC rig: a burning corona ring and a warm solar under-glow set
+    // the dawn-forged lance apart from every production chassis on the grid.
+    chassis.appendChild(svgNode('circle', { class: 'tw-sunglow', r: 15 }));
+    chassis.appendChild(svgNode('circle', { class: 'tw-corona', r: 13.5 }));
+    chassis.appendChild(svgNode('circle', { class: 'tw-corona rev', r: 10.5 }));
+  }
   const head = svgNode('g', { class: 'tw-head' });
   head.appendChild(svgNode('rect', { class: 'tw-barrel', x: 4, y: -2.5, width: 16, height: 5 }));
   head.appendChild(svgNode('circle', { class: 'tw-hub', r: 4.5 }));
+  if (entry.id === 'dawnbreaker') {
+    // The muzzle carries a miniature sun — the lance ends in a disc of dawn.
+    head.appendChild(svgNode('circle', { class: 'tw-muzzle', cx: 21.5, cy: 0, r: 3.4 }));
+    head.appendChild(svgNode('circle', { class: 'tw-suncore', r: 5.6 }));
+  }
   chassis.appendChild(head);
   g.appendChild(chassis);
   g.appendChild(svgNode('text', { class: 'tw-tag', y: -28, 'text-anchor': 'middle' }, entry.name.split(' ')[0]));
@@ -2025,6 +2081,7 @@ function acquireTarget(tower) {
   }
   let pool = state.enemies.filter((enemy) => {
     if (!enemy.alive) return false;
+    if (enemy.friendly) return false; // Blossom risen + strike drones are OURS — guns never track friendlies
     if (rule.air === 'no' && enemy.t.flying && !tower.onPad) return false;
     const [ex, ey] = posOf(enemy);
     return rng > 900 || Math.hypot(ex - tower.x, ey - tower.y) <= rng;
@@ -2174,12 +2231,15 @@ function fireTower(tower, target) {
       // armor plating AND shield lattices (phase damage), tracks air natively,
       // and SUNSLAUGHTER tiers splash the burn onto everything near the target.
       damageEnemy(target, dmg, { phase: true, src: 'dawn' });
-      fireLine(tower, target, 'fx-dawn', 2.4);
+      // Layered solar lance: a wide corona sheath under a white-hot core —
+      // the relic's shot should read as a piece of the dawn, not a tracer.
+      fireLine(tower, target, 'fx-dawn-halo', 6.5);
+      fireLine(tower, target, 'fx-dawn', 2.6);
       fxRing(tx, ty, 'fx-ring-amber');
       const burn = effStats(tower).splash || 0;
       if (burn > 0) {
         for (const enemy of state.enemies) {
-          if (!enemy.alive || enemy === target) continue;
+          if (!enemy.alive || enemy === target || enemy.friendly) continue;
           const [px, py] = posOf(enemy);
           if (Math.hypot(px - tx, py - ty) <= burn) damageEnemy(enemy, Math.round(dmg * 0.6), { phase: true, src: 'dawn' });
         }
@@ -2458,6 +2518,6 @@ window.CBZCombat = {
   coopHandle,
   active: () => state.mode !== 'idle',
   // Read-only telemetry for QA + tests.
-  stats: () => ({ mode: state.mode, wave: state.waveIndex + 1, kills: state.kills, cash: Math.round(state.cash), base: state.baseHp, towers: state.towers.length, enemies: state.enemies.filter((enemy) => enemy.alive).length, towersDetail: state.towers.map((t) => ({ id: t.id, onPad: !!t.onPad })), flyingAlive: state.enemies.filter((e) => e.alive && e.t.flying).length }),
+  stats: () => ({ mode: state.mode, wave: state.waveIndex + 1, kills: state.kills, cash: Math.round(state.cash), base: state.baseHp, towers: state.towers.length, enemies: state.enemies.filter((enemy) => enemy.alive).length, towersDetail: state.towers.map((t) => ({ id: t.id, onPad: !!t.onPad })), flyingAlive: state.enemies.filter((e) => e.alive && e.t.flying).length, friendliesAlive: state.enemies.filter((e) => e.alive && e.friendly).length, friendlyTargeted: state.towers.some((t) => t.target && t.target.alive && t.target.friendly) }),
 };
 })();
