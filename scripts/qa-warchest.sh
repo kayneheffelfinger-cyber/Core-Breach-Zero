@@ -113,7 +113,7 @@ ok "SOUL CHOIR is tier 06 on the panel" "$($B eval "[...document.querySelectorAl
 $B eval "(() => { let n = 0; const step = () => { const btn = document.querySelector('.tp-buy:not([disabled])'); if (btn) { btn.click(); n++; if (n < 6) setTimeout(step, 140); } }; step(); return 'buying 6 tiers'; })()" > /dev/null
 sleep 2.4
 ok "all six warden tiers installed" "$($B eval "document.querySelectorAll('.tp-up.maxed').length === 6")"
-ok "SOUL CHOIR row shows the next hull + cast price" "$($B eval "(document.querySelector('.tp-abil-row.soul') || {textContent:''}).textContent.includes('SOUL CHOIR') && (document.querySelector('.tp-abil-row.soul') || {textContent:''}).textContent.includes('900')")"
+ok "SOUL CHOIR row shows the next hull + cast price" "$($B eval "(document.querySelector('.tp-abil-row.soul') || {textContent:''}).textContent.includes('SOUL CHOIR') && (document.querySelector('.tp-abil-row.soul') || {textContent:''}).textContent.includes('700')")"
 $B eval "(() => { const btn = document.querySelector('#tp-soul'); if (btn) btn.click(); return btn ? 'soul cast' : 'no button'; })()" > /dev/null
 sleep 0.6
 ok "a vengeful soul rises from the core" "$($B eval "Boolean(document.querySelector('.e-soul') && document.querySelector('.e-soul .soul-halo'))")"

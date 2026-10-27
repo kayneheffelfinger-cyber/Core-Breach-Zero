@@ -102,8 +102,8 @@ console.log('--- HARD escalation (combat.js) ---');
 const ENEMY_TYPES = extractLiteral(combat, 'ENEMY_TYPES');
 const SURGE_MODS = extractLiteral(combat, 'SURGE_MODS');
 const HARD_WAVES = extractLiteral(combat, 'HARD_WAVES');
-check('MODE_HP_GROWTH.hard = 0.1 (1.10x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, insane: 0.105, crimson: 0.13 }'));
-check('MODE_SPEED.hard = 1.15 (+15% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.15, insane: 1.16, crimson: 1.18 }'));
+check('MODE_HP_GROWTH.hard = 0.1 (1.10x compounding)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, insane: 0.135, crimson: 0.13 }'));
+check('MODE_SPEED.hard = 1.15 (+15% hostile speed)', combat.includes('MODE_SPEED = { hard: 1.15, insane: 1.22, crimson: 1.18 }'));
 check('HELLFIRE now burns exactly 6 HARD waves', HARD_WAVES.filter((w) => w.mod === 'hellfire').length === 6, `${HARD_WAVES.filter((w) => w.mod === 'hellfire').length}`);
 check('DENSE ASSAULT (w20) upgraded to hellfire + phantom escort', HARD_WAVES[19].mod === 'hellfire' && HARD_WAVES[19].groups.some(([k, c]) => k === 'phantom' && c >= 10));
 check('GRID LOCK (w25) overclock escalated to hellfire', HARD_WAVES[24].mod === 'hellfire');
@@ -184,13 +184,13 @@ check('blueprint grid excludes ULTIMATUM cards', shopjs.includes('!entry.ultimat
 check('ultimatum vault styled (gold hero + card + exchange)', styles.includes('.ult-hero') && styles.includes('.ult-card') && styles.includes('.ult-exchange.ready') && styles.includes('.tok-ult'));
 
 console.log('--- Deploy chain: update log, build, cache-bust ---');
-check('BUILD bumped to 2026.11.01', appjs.includes("const BUILD = '2026.11.01';"));
+check('BUILD bumped to 2026.11.02', appjs.includes("const BUILD = '2026.11.02';"));
 check('UPDATE LOG leads with ULTIMATUM entry', appjs.indexOf("version: '2026.10.28', tag: 'ULTIMATUM'") < appjs.indexOf("version: '2026.10.27'") && appjs.indexOf('FULL CLEARANCE') < appjs.indexOf('SCRAP PROTOCOL'));
 check('update log covers cap removal + vault + blossom card + migration', ['clearance cap is GONE', 'ULTIMATUM system goes live', 'first ULTIMATUM card', 'backfilled from their clearance history'].every((s) => appjs.includes(s)));
 check('update log covers sentinel buff + shredder + sniper nerf #3 + virus rework', ['SENTINEL TURRET buffed', 'SHREDDER decrypts at Clearance 20', 'SNIPER tuned down again', 'VIRUS reworked', 'MISSILE SILO'].every((s) => appjs.includes(s)));
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024h', busts.length === 6 && busts.every((v) => v === '?v=20261024h'), busts.join(' '));
-check('shell footer brands WAR CHEST', indexhtml.includes('BUILD 2026.11.01 // WAR CHEST') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
+check('all 6 index.html assets cache-busted to 20261024i', busts.length === 6 && busts.every((v) => v === '?v=20261024i'), busts.join(' '));
+check('shell footer brands SPIRAL ESCALATION', indexhtml.includes('BUILD 2026.11.02 // SPIRAL ESCALATION') && indexhtml.includes('THE CRIMSON WELL IS OPEN') && indexhtml.includes('ULTIMATUM VAULT OPEN'));
 check('play menu copy updated to 15% hostiles', appjs.includes('compounding hulls, 15% faster hostiles'));
 check('fx-missile warhead styled (orange glow)', styles.includes('.fx-missile') && /fx-missile[^}]*#ff7a45/.test(styles));
 check('fx-chip stream styled for the Shredder', styles.includes('.fx-chip'));
@@ -201,13 +201,13 @@ const INSANE_REWARDS_LOCAL = extractLiteral(appjs, 'REWARDS');
 const INSANE_REWARDS_SERVER = extractLiteral(serverjs, 'REWARDS');
 check('INSANE ladder registered in the WAVES map', combat.includes('WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, insane: INSANE_WAVES, crimson: CRIMSON_WAVES }'));
 check('INSANE ladder has 30 waves', Array.isArray(INSANE_WAVES) && INSANE_WAVES.length === 30, String(INSANE_WAVES && INSANE_WAVES.length));
-check('insane hull curve: 1.105x compounding (past HARD, under CRIMSON)', combat.includes('MODE_HP_GROWTH = { hard: 0.1, insane: 0.105, crimson: 0.13 }'));
-check('insane speed: +16% (hard 15 / crimson 18)', combat.includes('MODE_SPEED = { hard: 1.15, insane: 1.16, crimson: 1.18 }'));
-check('insane boss leaks near-kill the core (10x)', combat.includes('MODE_BOSS_LEAK = { hard: 10, insane: 10, crimson: 10 }'));
-check('solo vote flips INSANE to READY with the spiral copy', combat.includes("label: 'INSANE', sub: '30 WAVES // COMPOUNDING HULLS · +16% SPEED · DAWNFIRE SURGES") && /label: 'INSANE'[\s\S]{0,220}ready: true/.test(combat));
+check('insane hull curve: 1.135x compounding — the DOUBLED spiral', combat.includes('MODE_HP_GROWTH = { hard: 0.1, insane: 0.135, crimson: 0.13 }'));
+check('insane speed: +22% (hard 15 / dawn 18)', combat.includes('MODE_SPEED = { hard: 1.15, insane: 1.22, crimson: 1.18 }'));
+check('insane boss leaks near-core you (12x)', combat.includes('MODE_BOSS_LEAK = { hard: 10, insane: 12, crimson: 10 }'));
+check('solo vote flips INSANE to READY with the doubled copy', combat.includes("label: 'INSANE', sub: '30 WAVES // DOUBLED: ~35X HULL · +22% SPEED · 4 NEW ELITE CLASSES") && /label: 'INSANE'[\s\S]{0,220}ready: true/.test(combat));
 check('dawnfire burns exactly 2 insane waves (TRIPLE THREAT + SIEGE WALL)', INSANE_WAVES && INSANE_WAVES.filter((w) => w.mod === 'dawnfire').length === 2 && INSANE_WAVES[21].phase === 'TRIPLE THREAT' && INSANE_WAVES[26].phase === 'SIEGE WALL');
 check('insane final wave keeps the overseer + 3 wardens escort', INSANE_WAVES && INSANE_WAVES[29].groups.some(([k, c]) => k === 'warden' && c === 3) && INSANE_WAVES[29].groups.some(([k, c]) => k === 'overseer' && c === 1));
-check('insane economy: opening -25% / wave pay 80% / rebuild 3.5s', combat.includes("mode === 'insane' ? 0.75 : 0.8") && combat.includes("state.protocol === 'insane' ? 0.8 :") && combat.includes("state.protocol === 'insane' ? 3.5 :"));
+check('insane economy: opening -35% / wave pay 70% / rebuild 2.5s', combat.includes("mode === 'insane' ? 0.65 : 0.8") && combat.includes("state.protocol === 'insane' ? 0.7 :") && combat.includes("state.protocol === 'insane' ? 2.5 :"));
 check('insane pays 350 NC / 400 XP per win, mirrored exactly', INSANE_REWARDS_LOCAL && INSANE_REWARDS_SERVER && INSANE_REWARDS_LOCAL.insane.winNC === 350 && INSANE_REWARDS_LOCAL.insane.winXP === 400 && JSON.stringify(INSANE_REWARDS_LOCAL.insane) === JSON.stringify(INSANE_REWARDS_SERVER.insane));
 check('room protocols carry insane (LOCAL + server sync)', appjs.includes("const ROOM_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];") && serverjs.includes("const PROTOCOL_CHOICES = ['easy', 'medium', 'hard', 'insane'];"));
 check('play menu copy names the spiral', appjs.includes('INSANE (30 waves on the spiral'));
@@ -247,7 +247,7 @@ check('relic rig styled: corona spin + sun pulse + halo sheath + green summon ti
 check('per-kind tower class hook shipped', combat.includes('tw-${entry.cat} tw-${entry.id}'));
 
 console.log('--- WAR CHEST: nerf pass + warden choir + fillers + relay + cap 15 + unique kits ---');
-check('update log leads with WAR CHEST entry', appjs.indexOf("version: '2026.11.01', tag: 'WAR CHEST'") >= 0 && appjs.indexOf("version: '2026.11.01'") < appjs.indexOf("version: '2026.10.33'"));
+check('update log leads with SPIRAL ESCALATION entry', appjs.indexOf("version: '2026.11.02', tag: 'SPIRAL ESCALATION'") >= 0 && appjs.indexOf("version: '2026.11.02'") < appjs.indexOf("version: '2026.11.01'"));
 check('update log covers nerf pass + choir + fillers + relay + cap + art', ['nerf hammer falls', 'SOUL CHOIR', 'SPARK COIL', 'FLAK POST', 'TAR SPRAYER', 'COMMAND RELAY', 'max 15 towers again', 'WAR MACHINE achievement', '17 unique field rigs'].every((s) => appjs.includes(s)));
 check('DAWNBRINGER nerfed: 330 dmg / 0.8 rate base', TOWERS.some((t) => t.id === 'dawnbreaker' && t.stats.dmg === 330 && t.stats.rate === 0.8));
 check('SUNSLAUGHTER rolled down to 1250 dmg / 40 splash', TOWERS.some((t) => { const tier = t.track && t.track[3]; return t.id === 'dawnbreaker' && tier && tier.sets.dmg === 1250 && tier.sets.splash === 40; }));
@@ -258,11 +258,11 @@ check('APEX CARRIER payload trimmed to 200', TOWERS.some((t) => { const tier = t
 check('ZERO DAY nuke cut to 1700 + MIRV cluster to 35%', combat.includes('const NUKE_DAMAGE = 1700') && combat.includes('Math.round(p.dmg * 0.35)'));
 const warden = TOWERS.find((t) => t.id === 'gravewarden');
 check('GRAVE WARDEN all-around buffs: 180 base yard, 6-tier ladder', warden && warden.stats.rng === 180 && warden.track.length === 6);
-check('warden ladder rolled up (90 bell / 40% slow / 180+5.5s / 330+4s+50%+1.4s)', warden && warden.track[1].sets.bell === 90 && warden.track[2].sets.yardSlow === 0.4 && warden.track[3].sets.bell === 180 && warden.track[3].sets.bellEvery === 5.5 && warden.track[4].sets.bell === 330 && warden.track[4].sets.bellEvery === 4 && warden.track[4].sets.yardSlow === 0.5 && warden.track[4].sets.tollStun === 1.4);
+check('warden ladder rolled up again (100 bell / 45% slow / 210+5.5s / 380+4s+55%+1.6s)', warden && warden.track[1].sets.bell === 100 && warden.track[2].sets.yardSlow === 0.45 && warden.track[3].sets.bell === 210 && warden.track[3].sets.bellEvery === 5.5 && warden.track[4].sets.bell === 380 && warden.track[4].sets.bellEvery === 4 && warden.track[4].sets.yardSlow === 0.55 && warden.track[4].sets.tollStun === 1.6);
 const soulTier = warden && warden.track[5];
-check('SOUL CHOIR is the priciest tier ever minted ($5,200, soul + $900 + 45s)', soulTier && soulTier.label === 'SOUL CHOIR' && soulTier.cost === 5200 && soulTier.sets.soul === 1 && soulTier.sets.soulCost === 900 && soulTier.sets.soulCd === 45);
+check('SOUL CHOIR sings cheaper ($5,200 tier, $700 a soul, 35s hymns)', soulTier && soulTier.label === 'SOUL CHOIR' && soulTier.cost === 5200 && soulTier.sets.soul === 1 && soulTier.sets.soulCost === 700 && soulTier.sets.soulCd === 35);
 check('soul summon wired: launchWardenSoul + castSoul + core rise float', combat.includes('function launchWardenSoul(tower)') && combat.includes('function castSoul(tower)') && combat.includes("'A SOUL RISES FROM THE CORE'") && combat.includes("lane.len - 4"));
-check('soul hull forges from the yard: 10 x TOLL CHARGES (min 50)', combat.includes('Math.max(50, 10 * (tower.tollCharges || 0))'));
+check('soul hull forges from the yard: 10 x TOLL CHARGES (min 75)', combat.includes('Math.max(75, 10 * (tower.tollCharges || 0))'));
 check('soul rides the summon pipeline (friendly + reverse + kamikaze)', combat.includes("key: 'soul', t, node: g, fill, shieldFill: fill") && combat.includes('friendly: true, reverse: true,'));
 check('soul hover intel: GRAVE WARDEN CHOIR tag wired', combat.includes("'GRAVE WARDEN CHOIR'") && combat.includes("'VENGEFUL SOUL'"));
 check('warden panel shows SOUL CHOIR row + SUMMON SOUL ability', combat.includes('<span>SOUL CHOIR</span>') && combat.includes('SUMMON SOUL — $') && combat.includes("id=\"tp-soul\""));
@@ -289,6 +289,32 @@ check('four new blueprints priced in both SHOP mirrors', ['sparkcoil', 'flakpost
 check('artHtml reaches the mission bar + locked card previews', shopjs.includes('ULT_XP_PER_CORE, artHtml }') && combat.includes('CBZShop.artHtml ? CBZShop.artHtml(entry)') && (shopjs.match(/artHtml\(entry\) \|\| entry\.icon/g) || []).length >= 3);
 check('per-kind field kits live (kindKit + kit CSS + per-tower paint)', combat.includes('function kindKit(entry, chassis, head)') && combat.includes('kindKit(entry, chassis, head);') && styles.includes('.tw-kit-drum') && styles.includes('.tw-relay .tw-kit-halo') && styles.includes('.tw-tarsprayer .tw-kit-vat'));
 check('shop meters gained SLICK + NETWORK rows', shopjs.includes("<span>SLICK</span>") && shopjs.includes("<span>NETWORK</span>"));
+
+console.log('--- SPIRAL ESCALATION: insane x2 + four new elites + trims + warden buff + relic price ---');
+const escalTypes = ENEMY_TYPES;
+check('four elite classes registered (spectre cloak / leech heal / bloat / rampager)', Boolean(
+  escalTypes && escalTypes.spectre && escalTypes.spectre.cloak && escalTypes.spectre.cloak.span === 2.6 &&
+  escalTypes.leech && escalTypes.leech.heal && escalTypes.leech.heal.pct === 0.018 &&
+  escalTypes.bloat && escalTypes.rampager && escalTypes.rampager.armor === 0.1
+));
+check('elite silhouettes wired (shroud / siphon arcs / blisters / berserk spikes)', combat.includes("class: 'e-ghost e-shroud'") && combat.includes("class: 'e-siphon'") && combat.includes("class: 'e-blister'") && /key === 'rampager'/.test(combat));
+check('spawn gaps cover the four elites', combat.includes('spectre: 0.7, leech: 1.6, bloat: 1.9, rampager: 2.4'));
+check('phase shroud drops targeting locks (pool filter + pad stickiness guard)', combat.includes('if (enemy.cloaked) return false; // NULL SPECTRE phase shroud') && combat.includes('tower.target.t.flying && !tower.target.cloaked'));
+check('cloak state machine cycles in moveEnemy', combat.includes("enemy.node.classList.toggle('e-cloak', Boolean(enemy.cloaked));"));
+check('leech siphon field pulses + heals + paints bars', combat.includes('enemy.healT = (enemy.healT === undefined ? enemy.t.heal.every : enemy.healT) - dt;') && combat.includes("fxRing(enemy.fx, enemy.fy, 'fx-ring-heal')") && combat.includes('SIPHON +'));
+check('bloatware EMP: consts + empPop + killEnemy hook', combat.includes('const BLOAT_EMP_RADIUS = 85;') && combat.includes('const BLOAT_EMP_SECONDS = 2.5;') && combat.includes('function empPop(x, y)') && combat.includes("if (enemy.key === 'bloat' && !enemy.friendly) empPop(x, y);"));
+check('EMP knocks towers offline: upkeep clock + fire-control skip', combat.includes("tower.offlineT = Math.max(0, (tower.offlineT || 0) - dt);") && combat.includes("tower.node.classList.toggle('tw-offline', tower.offlineT > 0);") && combat.includes('if (tower.offlineT > 0) continue; // Bloatware EMP'));
+check('rampager enrage drives the ground move line', combat.includes('function enrageMult(enemy)') && combat.includes('enrageMult(enemy) * wardenYardMult(enemy)'));
+check('spiral ladder weaves all four elites + new phases', INSANE_WAVES && [4, 5, 7, 10, 11, 15, 22, 26].every((i) => INSANE_WAVES[i].groups.some(([k]) => k === 'spectre')) && [8, 9, 14, 16, 20, 24, 27].every((i) => INSANE_WAVES[i].groups.some(([k]) => k === 'bloat')) && [12, 13, 18, 23, 28, 29].every((i) => INSANE_WAVES[i].groups.some(([k]) => k === 'leech')) && [17, 19, 21, 25, 28].every((i) => INSANE_WAVES[i].groups.some(([k]) => k === 'rampager')) && INSANE_WAVES[4].phase === 'PHASE SHROUD' && INSANE_WAVES[17].phase === 'BERSERK LINE');
+check('every elite debuts where the log says it does', INSANE_WAVES && !INSANE_WAVES.slice(0, 4).some((w) => w.groups.some(([k]) => k === 'spectre')) && !INSANE_WAVES.slice(0, 8).some((w) => w.groups.some(([k]) => k === 'bloat')) && !INSANE_WAVES.slice(0, 12).some((w) => w.groups.some(([k]) => k === 'leech')) && !INSANE_WAVES.slice(0, 16).some((w) => w.groups.some(([k]) => k === 'rampager')));
+check('HARD gets a late taste: leech + bloatware on three final waves', HARD_WAVES[23].groups.some(([k, c]) => k === 'leech' && c === 4) && HARD_WAVES[25].groups.some(([k, c]) => k === 'bloat' && c === 5) && HARD_WAVES[28].groups.some(([k, c]) => k === 'leech' && c === 4) && HARD_WAVES[28].groups.some(([k, c]) => k === 'bloat' && c === 5));
+check('doubled economy: strip 35% / pay 70% / rebuild 2.5s / leaks 12x', combat.includes("mode === 'insane' ? 0.65 : 0.8") && combat.includes("state.protocol === 'insane' ? 0.7 :") && combat.includes("state.protocol === 'insane' ? 2.5 :") && combat.includes('MODE_BOSS_LEAK = { hard: 10, insane: 12, crimson: 10 }'));
+check('relay network aura trimmed (12% dmg / 8% range / 8% rate)', TOWERS.some((t) => { const r = t.track && t.track[1]; const u = t.track && t.track[2]; const m = t.track && t.track[3]; return t.id === 'relay' && r && r.sets.dmgBuff === 0.12 && u && u.sets.rangeBuff === 0.08 && m && m.sets.rateBuff === 0.08; }));
+check('blossom trimmed: 38% / 60% summons, veins 90, tighter pulse window', TOWERS.some((t) => { const l = t.track && t.track[2]; const f = t.track && t.track[4]; return t.id === 'corpseblossom' && l && l.sets.summonHp === 0.38 && f && f.sets.summonHp === 0.6 && f.sets.veins === 90 && f.sets.veinRate[0] === 0.45 && f.sets.veinRate[1] === 1.3; }));
+check('dawnbringer absurd: 250k NC + 2,500 BT declared, 1,600 deploy, doubled forge ladder', TOWERS.some((t) => t.id === 'dawnbreaker' && t.price && t.price.nc === 250000 && t.price.bt === 2500 && t.currency === 'mixed' && t.cost === 1600 && t.track.map((x) => x.cost).join(',') === '1600,2800,4500,7000'));
+check('relic price is the point (log + card copy)', appjs.includes('repriced into legend territory') && shopjs.includes('250,000 NC + 2,500 BT declared value'));
+check('elite FX + offline state styled', styles.includes('.e-spectre .e-body') && styles.includes('.e-leech .e-siphon') && styles.includes('.e-bloat .e-blister') && styles.includes('.e-rampager .e-body') && styles.includes('.e-cloak .e-chassis') && styles.includes('.fx-ring-heal') && styles.includes('.fx-ring-emp') && styles.includes('.tw-offline .tw-barrel'));
+check('update log covers the escalation (insane x2 + four hostiles + trims + relic)', ['INSANE PROTOCOL DOUBLED', 'FOUR NEW HOSTILES', 'NULL SPECTRE', 'DATA LEECH', 'BLOATWARE', 'RAMPAGE UNIT', 'repriced into legend', 'power creep gets a trim'].every((s) => appjs.includes(s)));
 
 console.log('--- Syntax gates ---');
 for (const f of ['combat.js', 'app.js', 'server.js', 'shop.js']) {

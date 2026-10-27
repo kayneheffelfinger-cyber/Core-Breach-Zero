@@ -22,6 +22,11 @@ const ENEMY_TYPES = {
   juggernaut: { name: 'DATA JUGGERNAUT', tag: 'SUPERARMOR', hp: 320, speed: 24, size: 17, bounty: 55, dmg: 5, color: '#98a7b8', armor: 0.45, ability: 'Ablative megaplate — absorbs 45% of all incoming damage.' },
   phantom: { name: 'PHANTOM PACKET', tag: 'PHASE', hp: 40, speed: 70, size: 9, bounty: 14, dmg: 2, color: '#9ad1ff', blink: { every: 3.2, jump: 90 }, ability: 'Phase Jump — blinks 90u up the lane every few seconds, dodging chokepoint DPS.' },
   warden: { name: 'FIREWALL WARDEN', tag: 'HARD BOSS', hp: 2400, speed: 31, size: 23, bounty: 420, dmg: 12, color: '#ff8a3d', boss: true, shield: 700, ability: 'Packet Storm — spills 4 Hex Crawlers at 60% hull. Shield Lattice — spawns with a 700 HP shield.' },
+  // SPIRAL ESCALATION elite classes — the INSANE protocol's answer to a maxed grid.
+  spectre: { name: 'NULL SPECTRE', tag: 'STEALTH', hp: 70, speed: 66, size: 10, bounty: 16, dmg: 3, color: '#dfe8ff', cloak: { every: 4.8, span: 2.6 }, ability: 'Phase Shroud — drops out of every targeting lock for a few seconds at a time. Splash, veins, the bell and the nuke still catch it while cloaked.' },
+  leech: { name: 'DATA LEECH', tag: 'SUPPORT', hp: 90, speed: 52, size: 11, bounty: 18, dmg: 2, color: '#ff6ec7', heal: { every: 1, pct: 0.018, radius: 90 }, ability: 'Siphon Field — pulses every second, knitting 1.8% of max hull back into every hostile around it. Kill the doctor first.' },
+  bloat: { name: 'BLOATWARE', tag: 'DETONATE', hp: 130, speed: 38, size: 13, bounty: 20, dmg: 4, color: '#d6ff4f', ability: 'Death Rattle — pops on death: every tower near the corpse goes OFFLINE for 2.5 seconds. Give it distance or spread the grid.' },
+  rampager: { name: 'RAMPAGE UNIT', tag: 'ENRAGE', hp: 240, speed: 46, size: 15, bounty: 42, dmg: 6, armor: 0.1, ability: 'Berserk Drive — accelerates as it bleeds: up to +85% speed at near-fatal hull. Finish it early or chase it down.' },
 };
 
 // --- Easy Mode: 20 waves, 6 boss encounters ---------------------------------------
@@ -128,12 +133,12 @@ const HARD_WAVES = [
   { groups: [['runner', 54], ['drone', 34], ['hexbug', 16]], phase: 'FULL SPRINT', mod: 'overclock' },
   { groups: [['virus', 3], ['leak', 3], ['nullcore', 18], ['juggernaut', 4]], phase: 'TRIPLE THREAT', mod: 'hellfire' },
   { groups: [['shielded', 38], ['drone', 36], ['runner', 38], ['file', 50]], mod: 'overclock' },
-  { groups: [['nullcore', 20], ['virus', 3], ['leak', 3], ['drone', 34], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['nullcore', 20], ['virus', 3], ['leak', 3], ['drone', 34], ['warden', 2], ['leech', 4]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
   { groups: [['file', 62], ['nullcore', 20], ['drone', 32], ['phantom', 14]], phase: 'GRID LOCK', mod: 'hellfire' },
-  { groups: [['shielded', 38], ['nullcore', 20], ['runner', 38], ['juggernaut', 5]], mod: 'hellfire' },
+  { groups: [['shielded', 38], ['nullcore', 20], ['runner', 38], ['juggernaut', 5], ['bloat', 5]], mod: 'hellfire' },
   { groups: [['virus', 4], ['leak', 3], ['drone', 36], ['hexbug', 16]], phase: 'SIEGE WALL', mod: 'overclock' },
   { groups: [['nullcore', 22], ['file', 62], ['glitched', 50], ['warden', 2]], phase: 'DEAD STACK', mod: 'hardened' },
-  { groups: [['runner', 52], ['drone', 38], ['shielded', 34], ['phantom', 14]], phase: 'LAST BREACH', mod: 'overclock' },
+  { groups: [['runner', 52], ['drone', 38], ['shielded', 34], ['phantom', 14], ['leech', 4], ['bloat', 5]], phase: 'LAST BREACH', mod: 'overclock' },
   { groups: [['shielded', 34], ['nullcore', 20], ['warden', 3], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 36], ['juggernaut', 5], ['phantom', 10]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 
@@ -174,14 +179,14 @@ const CRIMSON_WAVES = [
 // CRIMSON DAWN (event) compounds steeper still at 1.13x — wave 20 ≈ 21.7x hull —
 // and every hostile moves 18% faster. Nothing comes back from that.
 const MODE_HP_SCALE = { easy: WAVE_HP_SCALE, medium: 0.14, hard: 0.17 }; // legacy linear curve (easy/medium)
-const MODE_HP_GROWTH = { hard: 0.1, insane: 0.105, crimson: 0.13 }; // compounding hull curves — hell, the spiral and the dawn are exponential
-const MODE_SPEED = { hard: 1.15, insane: 1.16, crimson: 1.18 };     // hostile protocol speed multipliers
+const MODE_HP_GROWTH = { hard: 0.1, insane: 0.135, crimson: 0.13 }; // compounding hull curves — hell, the spiral and the dawn are exponential. The SPIRAL doubled: wave 30 arrives at ~35x hull (was ~20x)
+const MODE_SPEED = { hard: 1.15, insane: 1.22, crimson: 1.18 };     // hostile protocol speed multipliers — the spiral now outruns the dawn
 // Easy pass: commanders (bosses) spawn with 10% less hull — a gentler first exposure.
 const EASY_BOSS_RELIEF = 0.9;
 // Hard pass: a boss that breaches the core hits it for 10x damage — a leaked
 // commander all but ends the run (virus 60, leak 80, warden 120, overseer 250).
 // Crimson Dawn keeps the same rule: at 21x hull, one leak should end you.
-const MODE_BOSS_LEAK = { hard: 10, insane: 10, crimson: 10 };
+const MODE_BOSS_LEAK = { hard: 10, insane: 12, crimson: 10 }; // the spiral raised the stakes: a leaked mini-boss all but cores you (virus 72, leak 96, warden 144, overseer 300)
 // Flight Corridor pass: OVERCLOCKED DRONES burn the Well's core for 1 per leak,
 // down from 2 — the event map's AA hexes sit far off the flight corridors, so a
 // leaked armada shouldn't core you through the middle. Absolute per-hostile
@@ -192,49 +197,51 @@ function leakDamage(enemy) {
   if (!enemy.t.boss && overrides[enemy.key] != null) return overrides[enemy.key];
   return Math.round(enemy.t.dmg * (enemy.t.boss ? (MODE_BOSS_LEAK[state.protocol] || 1) : 1));
 }
-// --- Insane Protocol: 30 waves on the spiral ----------------------------------------
-// Built from the HARD ladder and pushed past it: counts climb another 6-10%,
-// DAWNFIRE burns on two mid-ladder indices (TRIPLE THREAT + SIEGE WALL), and the
-// hull curve compounds at 1.105x/wave — wave 30 arrives at ~20x hull. On paper it
-// sits just under CRIMSON DAWN's peak; in practice the dawn stays meaner because
-// the Well only offers two entrances and 3s rebuilds. INSANE runs on ANY battle map.
+// --- Insane Protocol: 30 waves on the doubled spiral ---------------------------------
+// SPIRAL ESCALATION: the ladder was rebuilt from the ground up — counts climb
+// another 12-25% past the old spiral, DAWNFIRE still burns TRIPLE THREAT +
+// SIEGE WALL, and four elite classes debut in the rotation: NULL SPECTRES drop
+// targeting locks (w5), BLOATWARE pops EMPs on your grid (w9), DATA LEECHES
+// knit the swarm back together (w13) and RAMPAGE UNITS go berserk as they bleed
+// (w18). The hull curve compounds at 1.135x/wave — wave 30 arrives at ~35x hull,
+// nearly double the old spiral's 20x — and every hostile moves 22% faster.
 const INSANE_WAVES = [
-  { groups: [['glitched', 32], ['runner', 22]] },
-  { groups: [['glitched', 30], ['file', 30], ['runner', 22]] },
-  { groups: [['shielded', 26], ['glitched', 32], ['hexbug', 10]], phase: 'NANITE DEBUT', mod: 'hardened' },
-  { groups: [['runner', 44], ['drone', 20], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
-  { groups: [['drone', 26], ['glitched', 34], ['phantom', 12]], phase: 'PHASE PRESSURE' },
-  { groups: [['nullcore', 13], ['file', 48], ['hexbug', 12]], mod: 'overclock' },
-  { groups: [['shielded', 32], ['drone', 28], ['runner', 26]], mod: 'hardened' },
-  { groups: [['nullcore', 15], ['leak', 1], ['file', 40], ['phantom', 12]], phase: 'MINI-BOSS // MEMORY LEAK' },
-  { groups: [['file', 62], ['runner', 32], ['hexbug', 16]], phase: 'SWARM STORM', mod: 'overclock' },
-  { groups: [['virus', 2], ['leak', 1], ['shielded', 28], ['juggernaut', 4]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
-  { groups: [['nullcore', 22], ['drone', 32], ['runner', 30]], mod: 'overclock' },
-  { groups: [['drone', 46], ['runner', 36], ['phantom', 14]], phase: 'AIR ARMADA', mod: 'overclock' },
-  { groups: [['shielded', 36], ['nullcore', 18], ['glitched', 46], ['hexbug', 14]], mod: 'hellfire' },
-  { groups: [['virus', 2], ['leak', 2], ['file', 60], ['drone', 30], ['juggernaut', 4]], phase: 'VIRULENT SURGE', mod: 'hardened' },
-  { groups: [['leak', 2], ['nullcore', 20], ['drone', 34]], phase: 'LEAK STORM', mod: 'hellfire' },
-  { groups: [['runner', 52], ['drone', 32], ['file', 48], ['phantom', 14]], phase: 'BLITZ RUN', mod: 'overclock' },
-  { groups: [['nullcore', 22], ['shielded', 34], ['virus', 2], ['juggernaut', 4]], phase: 'ARMOR COLUMN', mod: 'hardened' },
-  { groups: [['drone', 48], ['runner', 40], ['glitched', 52]], mod: 'overclock' },
-  { groups: [['virus', 3], ['leak', 2], ['shielded', 32], ['warden', 1]], phase: 'FIREWALL RISING', mod: 'hardened' },
-  { groups: [['nullcore', 24], ['drone', 36], ['file', 58], ['juggernaut', 4], ['phantom', 12]], phase: 'DENSE ASSAULT', mod: 'hellfire' },
-  { groups: [['runner', 58], ['drone', 36], ['hexbug', 18]], phase: 'FULL SPRINT', mod: 'overclock' },
-  { groups: [['virus', 3], ['leak', 3], ['nullcore', 20], ['juggernaut', 4]], phase: 'TRIPLE THREAT', mod: 'dawnfire' },
-  { groups: [['shielded', 40], ['drone', 38], ['runner', 40], ['file', 54]], mod: 'overclock' },
-  { groups: [['nullcore', 22], ['virus', 3], ['leak', 3], ['drone', 36], ['warden', 2]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
-  { groups: [['file', 66], ['nullcore', 22], ['drone', 34], ['phantom', 16]], phase: 'GRID LOCK', mod: 'hellfire' },
-  { groups: [['shielded', 40], ['nullcore', 22], ['runner', 40], ['juggernaut', 6]], mod: 'hellfire' },
-  { groups: [['virus', 4], ['leak', 4], ['drone', 38], ['hexbug', 18]], phase: 'SIEGE WALL', mod: 'dawnfire' },
-  { groups: [['nullcore', 24], ['file', 66], ['glitched', 54], ['warden', 2]], phase: 'DEAD STACK', mod: 'hardened' },
-  { groups: [['runner', 56], ['drone', 40], ['shielded', 36], ['phantom', 16]], phase: 'LAST BREACH', mod: 'overclock' },
-  { groups: [['shielded', 36], ['nullcore', 22], ['warden', 3], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 38], ['juggernaut', 5], ['phantom', 12]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
+  { groups: [['glitched', 38], ['runner', 26]] },
+  { groups: [['glitched', 36], ['file', 36], ['runner', 26]] },
+  { groups: [['shielded', 30], ['glitched', 38], ['hexbug', 12]], phase: 'NANITE DEBUT', mod: 'hardened' },
+  { groups: [['runner', 52], ['drone', 24], ['virus', 1]], phase: 'MINI-BOSS // SYSTEM VIRUS' },
+  { groups: [['drone', 30], ['glitched', 40], ['phantom', 14], ['spectre', 6]], phase: 'PHASE SHROUD' },
+  { groups: [['nullcore', 16], ['file', 56], ['hexbug', 14], ['spectre', 8]], mod: 'overclock' },
+  { groups: [['shielded', 38], ['drone', 34], ['runner', 30]], mod: 'hardened' },
+  { groups: [['nullcore', 18], ['leak', 1], ['file', 48], ['phantom', 14], ['spectre', 8]], phase: 'MINI-BOSS // MEMORY LEAK' },
+  { groups: [['file', 72], ['runner', 38], ['hexbug', 18], ['bloat', 6]], phase: 'SWARM STORM', mod: 'overclock' },
+  { groups: [['virus', 2], ['leak', 1], ['shielded', 34], ['juggernaut', 5], ['bloat', 6]], phase: 'DOUBLE TROUBLE', mod: 'hardened' },
+  { groups: [['nullcore', 26], ['drone', 38], ['runner', 36], ['spectre', 10]], mod: 'overclock' },
+  { groups: [['drone', 54], ['runner', 42], ['phantom', 16], ['spectre', 10]], phase: 'AIR ARMADA', mod: 'overclock' },
+  { groups: [['shielded', 42], ['nullcore', 22], ['glitched', 54], ['hexbug', 16], ['leech', 5]], mod: 'hellfire' },
+  { groups: [['virus', 2], ['leak', 2], ['file', 70], ['drone', 36], ['juggernaut', 5], ['leech', 5]], phase: 'VIRULENT SURGE', mod: 'hardened' },
+  { groups: [['leak', 2], ['nullcore', 24], ['drone', 40], ['bloat', 8]], phase: 'LEAK STORM', mod: 'hellfire' },
+  { groups: [['runner', 60], ['drone', 38], ['file', 56], ['phantom', 16], ['spectre', 12]], phase: 'BLITZ RUN', mod: 'overclock' },
+  { groups: [['nullcore', 26], ['shielded', 40], ['virus', 2], ['juggernaut', 6], ['bloat', 8]], phase: 'ARMOR COLUMN', mod: 'hardened' },
+  { groups: [['drone', 56], ['runner', 46], ['glitched', 60], ['rampager', 3]], phase: 'BERSERK LINE', mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 2], ['shielded', 38], ['warden', 1], ['leech', 6]], phase: 'FIREWALL RISING', mod: 'hardened' },
+  { groups: [['nullcore', 28], ['drone', 42], ['file', 68], ['juggernaut', 6], ['phantom', 14], ['rampager', 3]], phase: 'DENSE ASSAULT', mod: 'hellfire' },
+  { groups: [['runner', 66], ['drone', 42], ['hexbug', 20], ['bloat', 10]], phase: 'FULL SPRINT', mod: 'overclock' },
+  { groups: [['virus', 3], ['leak', 3], ['nullcore', 24], ['juggernaut', 6], ['rampager', 4]], phase: 'TRIPLE THREAT', mod: 'dawnfire' },
+  { groups: [['shielded', 46], ['drone', 44], ['runner', 46], ['file', 62], ['spectre', 14]], mod: 'overclock' },
+  { groups: [['nullcore', 26], ['virus', 3], ['leak', 3], ['drone', 42], ['warden', 2], ['leech', 7]], phase: 'PRE-FINAL ONSLAUGHT', mod: 'hardened' },
+  { groups: [['file', 76], ['nullcore', 26], ['drone', 40], ['phantom', 18], ['bloat', 10]], phase: 'GRID LOCK', mod: 'hellfire' },
+  { groups: [['shielded', 46], ['nullcore', 26], ['runner', 46], ['juggernaut', 7], ['rampager', 5]], mod: 'hellfire' },
+  { groups: [['virus', 4], ['leak', 4], ['drone', 44], ['hexbug', 20], ['spectre', 14]], phase: 'SIEGE WALL', mod: 'dawnfire' },
+  { groups: [['nullcore', 28], ['file', 76], ['glitched', 62], ['warden', 2], ['bloat', 12]], phase: 'DEAD STACK', mod: 'hardened' },
+  { groups: [['runner', 64], ['drone', 46], ['shielded', 42], ['phantom', 18], ['rampager', 6], ['leech', 8]], phase: 'LAST BREACH', mod: 'overclock' },
+  { groups: [['shielded', 42], ['nullcore', 26], ['warden', 3], ['overseer', 1], ['virus', 2], ['leak', 2], ['drone', 44], ['juggernaut', 6], ['phantom', 14], ['leech', 8]], phase: 'FINAL BOSS // CORE BREACH: ZERO' },
 ];
 const WAVES = { easy: EASY_WAVES, medium: MEDIUM_WAVES, hard: HARD_WAVES, insane: INSANE_WAVES, crimson: CRIMSON_WAVES };
 function missionWaves() { return WAVES[state.protocol] || EASY_WAVES; }
 
 // Pace pass: wider spawn gaps so waves stream in instead of dumping all at once.
-const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75, hexbug: 0.7, juggernaut: 2.2, phantom: 0.8, warden: 3.0 };
+const SPAWN_GAP = { file: 0.45, glitched: 0.75, runner: 0.65, shielded: 1.0, drone: 0.95, nullcore: 1.85, virus: 2.5, leak: 2.5, overseer: 2.75, hexbug: 0.7, juggernaut: 2.2, phantom: 0.8, warden: 3.0, spectre: 0.7, leech: 1.6, bloat: 1.9, rampager: 2.4 };
 const BASE_MAX = 100;
 
 // --- Foundry rules: free placement + clearance boxes ---------------------------------
@@ -432,6 +439,29 @@ function shapeFor(key, t) {
     add('circle', { class: 'e-ghost e-ghost-2', r: 11 });
     add('polygon', { class: 'e-body', points: '0,-9 8,0 0,9 -8,0' });
     add('circle', { class: 'e-core', r: 2.5 });
+  } else if (key === 'spectre') {
+    add('circle', { class: 'e-ghost e-shroud', r: 13 });
+    add('polygon', { class: 'e-body', points: '0,-10 7,0 0,10 -7,0' });
+    add('line', { class: 'e-plate', x1: -4, y1: 0, x2: 4, y2: 0 });
+    add('circle', { class: 'e-core', r: 2.4 });
+  } else if (key === 'leech') {
+    add('path', { class: 'e-siphon', d: 'M-14,-8 A16,16 0 0,1 -14,8' });
+    add('path', { class: 'e-siphon e-siphon-2', d: 'M14,-8 A16,16 0 0,0 14,8' });
+    add('circle', { class: 'e-body', r: 9 });
+    add('circle', { class: 'e-core', r: 3 });
+  } else if (key === 'bloat') {
+    add('circle', { class: 'e-ghost', r: 15 });
+    add('circle', { class: 'e-blister', cx: -6, cy: -5, r: 3 });
+    add('circle', { class: 'e-blister e-blister-2', cx: 7, cy: 3, r: 2.4 });
+    add('circle', { class: 'e-blister e-blister-3', cx: -2, cy: 7, r: 2 });
+    add('circle', { class: 'e-body', r: 11 });
+    add('circle', { class: 'e-core', r: 4 });
+  } else if (key === 'rampager') {
+    add('line', { class: 'e-trail', x1: -26, y1: 0, x2: -12, y2: 0 });
+    add('polygon', { class: 'e-body', points: '15,0 -9,9 -4,0 -9,-9' });
+    add('line', { class: 'e-spike', x1: -2, y1: -8, x2: 3, y2: -14 });
+    add('line', { class: 'e-spike', x1: -2, y1: 8, x2: 3, y2: 14 });
+    add('circle', { class: 'e-core', r: 2.6 });
   } else if (key === 'warden') {
     add('circle', { class: 'e-orbit', r: 24 });
     add('polygon', { class: 'e-ghost', points: hexPoints(0, 0, 20) });
@@ -575,6 +605,7 @@ function killEnemy(enemy, src) {
   fxRing(x, y, 'fx-ring-red');
   enemy.node.classList.add('dying');
   setTimeout(() => enemy.node.remove(), 300);
+  if (enemy.key === 'bloat' && !enemy.friendly) empPop(x, y); // death rattle — the grid goes dark around the corpse
   corpseBlossomFeed(enemy, x, y, src);
   graveWardenFeed(enemy, x, y);
   updateHud();
@@ -905,6 +936,29 @@ function tick(ts) {
   }
 }
 
+// RAMPAGE UNIT: berserk drive — the lower the hull, the higher the speed.
+function enrageMult(enemy) {
+  if (enemy.key !== 'rampager' || !enemy.maxHp) return 1;
+  return 1 + 0.85 * (1 - Math.max(0, enemy.hp) / enemy.maxHp);
+}
+
+// BLOATWARE death rattle: the corpse pops an EMP — towers near the blast go
+// OFFLINE for a few seconds (first real tower-disable in the roster).
+const BLOAT_EMP_RADIUS = 85;
+const BLOAT_EMP_SECONDS = 2.5;
+function empPop(x, y) {
+  fxRing(x, y, 'fx-ring-emp');
+  let hit = 0;
+  for (const tower of state.towers) {
+    if (Math.hypot(tower.x - x, tower.y - y) <= BLOAT_EMP_RADIUS) {
+      tower.offlineT = Math.max(tower.offlineT || 0, BLOAT_EMP_SECONDS);
+      fxRing(tower.x, tower.y, 'fx-ring-emp');
+      hit += 1;
+    }
+  }
+  if (hit) floatText(x, y - 20, `EMP POP — ${hit} OFFLINE`, 'emp-float');
+}
+
 function moveEnemy(enemy, dt) {
   if (enemy.friendly) { moveSummon(enemy, dt); return; }
   if (debugFreeze || state.mode !== 'waves') return;
@@ -945,6 +999,34 @@ function moveEnemy(enemy, dt) {
     enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * enemy.t.regen * dt);
     paintBars(enemy);
   }
+  // NULL SPECTRE: phase shroud cycles — cloaked spans drop every targeting lock.
+  if (enemy.t.cloak) {
+    enemy.cloakT = (enemy.cloakT === undefined ? enemy.t.cloak.every : enemy.cloakT) - dt;
+    if (enemy.cloakT <= 0) {
+      enemy.cloaked = !enemy.cloaked;
+      enemy.cloakT = enemy.cloaked ? enemy.t.cloak.span : enemy.t.cloak.every;
+      fxRing(...posOf(enemy), 'fx-ring-phantom');
+    }
+    enemy.node.classList.toggle('e-cloak', Boolean(enemy.cloaked));
+  }
+  // DATA LEECH: siphon field — every second, hostiles near the leech knit hull back.
+  if (enemy.t.heal) {
+    enemy.healT = (enemy.healT === undefined ? enemy.t.heal.every : enemy.healT) - dt;
+    if (enemy.healT <= 0) {
+      enemy.healT = enemy.t.heal.every;
+      let healed = 0;
+      for (const other of state.enemies) {
+        if (!other.alive || other.friendly || other === enemy || other.hp >= other.maxHp) continue;
+        const [ox, oy] = posOf(other);
+        if (Math.hypot(ox - enemy.fx, oy - enemy.fy) <= enemy.t.heal.radius) {
+          other.hp = Math.min(other.maxHp, other.hp + other.maxHp * enemy.t.heal.pct);
+          paintBars(other);
+          healed += 1;
+        }
+      }
+      if (healed) { fxRing(enemy.fx, enemy.fy, 'fx-ring-heal'); floatText(enemy.fx, enemy.fy - enemy.t.size - 8, `SIPHON +${healed}`, 'heal-float'); }
+    }
+  }
   if (enemy.t.blink) {
     enemy.blinkTimer = (enemy.blinkTimer === undefined ? enemy.t.blink.every : enemy.blinkTimer) - dt;
     if (enemy.blinkTimer <= 0) {
@@ -964,7 +1046,7 @@ function moveEnemy(enemy, dt) {
     banner('FIREWALL WARDEN', '// PACKET STORM — HEX CRAWLERS SPILLED', 'banner-red');
   }
   enemy.dist = Math.max(0, enemy.dist - (enemy.pull || 0) * dt);
-  enemy.dist += enemy.speed * haste * wardenYardMult(enemy) * tarMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
+  enemy.dist += enemy.speed * haste * enrageMult(enemy) * wardenYardMult(enemy) * tarMult(enemy) * (1 - (enemy.slow || 0)) * (1 - (enemy.gravSlow || 0)) * dt;
   const sampler = state.samplers[enemy.pathIdx];
   for (const event of state.gateEvents) {
     if (enemy.usedGates.has(event.index)) continue;
@@ -1008,7 +1090,7 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
-    const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'insane' ? 0.8 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, the SPIRAL pays 80%, and the dawn bleeds you for 70%
+    const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'insane' ? 0.7 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, the DOUBLED SPIRAL pays 70%, and the dawn bleeds you for 70%
     const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
     state.earned += bonus;
@@ -1020,7 +1102,7 @@ function runWaves(dt) {
     if (cleared >= missionWaves().length) { endMission(true); return; }
     banner(`WAVE ${cleared} CLEARED`, rigYield ? `// +$${bonus} SALVAGE · RIG YIELD $${rigYield}` : `// +$${bonus} SALVAGE`, 'banner-green');
     playSound();
-    state.intermission = state.protocol === 'crimson' ? 3 : state.protocol === 'insane' ? 3.5 : state.protocol === 'hard' ? 4.5 : 7; // HARD: 4.5s to rebuild — the swarm never waits. INSANE: 3.5s. CRIMSON: 3s
+    state.intermission = state.protocol === 'crimson' ? 3 : state.protocol === 'insane' ? 2.5 : state.protocol === 'hard' ? 4.5 : 7; // HARD: 4.5s to rebuild — the swarm never waits. DOUBLED INSANE: 2.5s. CRIMSON: 3s
     updateHud();
   }
   if (state.intermission > 0) {
@@ -1324,7 +1406,7 @@ function showSummonTip(summon, event) {
   const head = soul ? 'VENGEFUL SOUL' : drone ? 'STRIKE DRONE' : `RISEN ${t.name}`;
   const tag = soul ? 'GRAVE WARDEN CHOIR' : drone ? 'DRONE SPAWNER PAYLOAD' : 'CORPSE BLOSSOM SPAWN';
   const flavor = soul
-    ? 'The Warden\u2019s choir: a soul raised from the core marches the lane and detonates on the first hostile it touches for damage equal to its hull — 10 x TOLL CHARGES, minimum 50. Your towers ignore it.'
+    ? 'The Warden\u2019s choir: a soul raised from the core marches the lane and detonates on the first hostile it touches for damage equal to its hull — 10 x TOLL CHARGES, minimum 75. Your towers ignore it.'
     : drone
       ? 'One-way strike unit — rockets across the grid and detonates on the first hostile it intercepts for its full payload.'
       : 'A risen copy marches back up the lane and detonates on the first hostile it touches for damage equal to its hull. Your towers ignore it.';
@@ -1363,7 +1445,7 @@ const MODES = [
   { id: 'easy', label: 'EASY', sub: '20 WAVES // 6 BOSS WAVES // GENTLER BOSSES', ready: true },
   { id: 'medium', label: 'MEDIUM', sub: '30 WAVES // DENSER, FASTER, ANGRIER', ready: true },
   { id: 'hard', label: 'HARD', sub: '30 WAVES // COMPOUNDING HULLS · +15% SPEED · HELLFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
-  { id: 'insane', label: 'INSANE', sub: '30 WAVES // COMPOUNDING HULLS · +16% SPEED · DAWNFIRE SURGES // BOSS LEAKS NEAR-KILL THE CORE', ready: true },
+  { id: 'insane', label: 'INSANE', sub: '30 WAVES // DOUBLED: ~35X HULL · +22% SPEED · 4 NEW ELITE CLASSES // BOSS LEAKS NEAR-CORE YOU', ready: true },
   { id: 'cbz', label: 'CBZ', sub: 'PHASE GRID PROTOCOL', ready: false },
 ];
 
@@ -1445,7 +1527,7 @@ function startMission(map, skipVote = false, forcedProtocol = null) {
 function launchCombat(mode) {
   closeVote();
   state.protocol = mode;
-  if (mode === 'hard' || mode === 'insane' || mode === 'crimson') state.cash = Math.round(state.cash * (mode === 'crimson' ? 0.7 : mode === 'insane' ? 0.75 : 0.8)); // HELL strips 20% of opening salvage, the SPIRAL 25%, and the DAWN 30% — you deploy wounded
+  if (mode === 'hard' || mode === 'insane' || mode === 'crimson') state.cash = Math.round(state.cash * (mode === 'crimson' ? 0.7 : mode === 'insane' ? 0.65 : 0.8)); // HELL strips 20% of opening salvage, the DOUBLED SPIRAL 35%, and the DAWN 30% — you deploy wounded
   const proto = document.querySelector('#combat-protocol');
   if (proto) proto.textContent = String(mode).toUpperCase();
   state.mode = 'countdown';
@@ -1996,13 +2078,13 @@ function castRally(tower) {
 // The Warden reaches into the core and raises a vengeful soul on the lane of
 // the most advanced hostile. Like a Blossom risen it marches the track and
 // detonates on the first hostile it touches — but its hull is forged from the
-// yard itself: 10 x TOLL CHARGES (min 50). $900 a soul, 45s between hymns.
+// yard itself: 10 x TOLL CHARGES (min 75). $700 a soul, 35s between hymns.
 function launchWardenSoul(tower) {
   if (state.enemies.filter((item) => item.friendly && item.alive).length >= SUMMON_CAP) return false;
   const pool = state.enemies.filter((enemy) => enemy.alive && !enemy.friendly);
   if (!pool.length) return false;
   const prey = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
-  const hull = Math.max(50, 10 * (tower.tollCharges || 0));
+  const hull = Math.max(75, 10 * (tower.tollCharges || 0));
   const t = { name: 'VENGEFUL SOUL', tag: 'SUMMON', hp: hull, speed: 55, size: 12, bounty: 0, dmg: 0, color: '#bff1e2', ability: 'The Warden\u2019s choir — detonates on the first hostile it touches for damage equal to its hull. Hull = 10 x TOLL CHARGES.' };
   const g = svgNode('g', { class: 'enemy e-summon e-soul' });
   const chassis = svgNode('g', { class: 'e-chassis' });
@@ -2125,7 +2207,7 @@ function openTowerPanel(tower) {
       specials.push(`<div class="tp-abil-row"><span>TOLL CHARGES</span><b>${tower.tollCharges || 0}</b></div>`);
     }
     if (es.yardSlow) specials.push(`<div class="tp-abil-row"><span>GRAVE YARD</span><b>-${Math.round(es.yardSlow * 100)}% SPEED</b></div>`);
-    if (es.soul) specials.push(`<div class="tp-abil-row soul"><span>SOUL CHOIR</span><b>NEXT HULL ${Math.max(50, 10 * (tower.tollCharges || 0))} · $${es.soulCost || 900} PER SOUL</b></div>`);
+    if (es.soul) specials.push(`<div class="tp-abil-row soul"><span>SOUL CHOIR</span><b>NEXT HULL ${Math.max(75, 10 * (tower.tollCharges || 0))} · $${es.soulCost || 700} PER SOUL</b></div>`);
   }
   if (entry.id === 'relay') {
     const parts = [`+${Math.round((es.dmgBuff || 0) * 100)}% DMG`];
@@ -2231,6 +2313,11 @@ function updateTowers(dt) {
     tower.boost = tower.rallyT > 0 ? 1.5 : 1;
   }
   // Special chassis upkeep: Blossom curse pulses + ability cooldowns, rig nuke clock.
+  // Bloat EMP clock: offline towers drag back online as the timer drains.
+  for (const tower of state.towers) {
+    tower.offlineT = Math.max(0, (tower.offlineT || 0) - dt);
+    tower.node.classList.toggle('tw-offline', tower.offlineT > 0);
+  }
   for (const tower of state.towers) {
     if (tower.id === 'corpseblossom') {
       tower.screamCd = Math.max(0, (tower.screamCd || 0) - dt);
@@ -2311,6 +2398,7 @@ function updateTowers(dt) {
   // Fire control.
   const overclockMult = window.CBZPerks && CBZPerks.has('overclock') ? 1.05 : 1;
   for (const tower of state.towers) {
+    if (tower.offlineT > 0) continue; // Bloatware EMP — the gun is down
     const rate = effStats(tower).rate * tower.boost * overclockMult * relayMult(tower, 'rate');
     if (rate <= 0) continue;
     tower.cd -= dt;
@@ -2333,7 +2421,7 @@ function acquireTarget(tower) {
   const rng = es.infinite ? 9999 : Math.round(es.rng * relayMult(tower, 'range'));
   // Stickiness: pad AA guns ride their target until it dies or escapes the ring —
   // re-picking fresher flyers leaves every drone one burst short of dying.
-  if (tower.onPad && tower.target && tower.target.alive && tower.target.t.flying) {
+  if (tower.onPad && tower.target && tower.target.alive && tower.target.t.flying && !tower.target.cloaked) {
     const [sx, sy] = posOf(tower.target);
     if (Math.hypot(sx - tower.x, sy - tower.y) <= rng) return tower.target;
   }
@@ -2341,6 +2429,7 @@ function acquireTarget(tower) {
     if (!enemy.alive) return false;
     if (rule.air === 'only' && !enemy.t.flying) return false; // flak post: the ground war is beneath it
     if (enemy.friendly) return false; // Blossom risen + strike drones are OURS — guns never track friendlies
+    if (enemy.cloaked) return false; // NULL SPECTRE phase shroud — no gun holds a lock on a cloaked hull
     if (rule.air === 'no' && enemy.t.flying && !tower.onPad) return false;
     const [ex, ey] = posOf(enemy);
     return rng > 900 || Math.hypot(ex - tower.x, ey - tower.y) <= rng;

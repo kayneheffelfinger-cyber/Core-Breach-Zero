@@ -45,9 +45,9 @@ check('HELLFIRE SURGE defined (+65% HP / +20% speed)', SURGE_MODS && SURGE_MODS.
 check('legacy linear table intact for easy/medium', MODE_HP_SCALE && MODE_HP_SCALE.easy === 0.12 && MODE_HP_SCALE.medium === 0.14);
 check('beginWave uses compounding branch for hard', /growth\s*\?\s*Math\.pow\(1 \+ growth, index\)/.test(combat));
 check('spawnEnemy applies protocol speed multiplier', /speed: t\.speed \* \(state\.surgeSpeed \|\| 1\) \* \(MODE_SPEED\[state\.protocol\] \|\| 1\)/.test(combat));
-check('wave payout squeeze: hard 0.85x / insane 0.8x / crimson 0.7x', /hardMult = state\.protocol === 'hard' \? 0\.85 : state\.protocol === 'insane' \? 0\.8 : state\.protocol === 'crimson' \? 0\.7 : 1/.test(combat));
-check('rebuild window: hard 4.5s / insane 3.5s / crimson 3s', /state\.intermission = state\.protocol === 'crimson' \? 3 : state\.protocol === 'insane' \? 3\.5 : state\.protocol === 'hard' \? 4\.5 : 7/.test(combat));
-check('opening salvage stripped on lock-in (hard 0.8 / insane 0.75 / crimson 0.7)', /mode === 'insane' \|\| mode === 'crimson'\) state\.cash = Math\.round\(state\.cash \* \(mode === 'crimson' \? 0\.7 : mode === 'insane' \? 0\.75 : 0\.8\)\)/.test(combat));
+check('wave payout squeeze: hard 0.85x / insane 0.7x / crimson 0.7x', /hardMult = state\.protocol === 'hard' \? 0\.85 : state\.protocol === 'insane' \? 0\.7 : state\.protocol === 'crimson' \? 0\.7 : 1/.test(combat));
+check('rebuild window: hard 4.5s / insane 2.5s / crimson 3s', /state\.intermission = state\.protocol === 'crimson' \? 3 : state\.protocol === 'insane' \? 2\.5 : state\.protocol === 'hard' \? 4\.5 : 7/.test(combat));
+check('opening salvage stripped on lock-in (hard 0.8 / insane 0.65 / crimson 0.7)', /mode === 'insane' \|\| mode === 'crimson'\) state\.cash = Math\.round\(state\.cash \* \(mode === 'crimson' \? 0\.7 : mode === 'insane' \? 0\.65 : 0\.8\)\)/.test(combat));
 check('vote card copy warns about hell', combat.includes('COMPOUNDING HULLS · +15% SPEED · HELLFIRE SURGES'));
 
 console.log('--- HARD ladder integrity ---');
@@ -90,7 +90,7 @@ console.log('--- Deploy chain: update log, rewards, cache-bust ---');
 const appjs = read('app.js');
 const serverjs = read('server.js');
 const indexhtml = read('index.html');
-check('BUILD bumped to 2026.11.01', appjs.includes("const BUILD = '2026.11.01';"));
+check('BUILD bumped to 2026.11.02', appjs.includes("const BUILD = '2026.11.02';"));
 check('UPDATE LOG leads with IRON RAIN entry, then CRIMSON SIGNAL then HELL PROTOCOL', appjs.indexOf('IRON RAIN') < appjs.indexOf('CRIMSON SIGNAL') && appjs.indexOf('CRIMSON SIGNAL') < appjs.indexOf('HELL PROTOCOL') && appjs.indexOf('HELL PROTOCOL') < appjs.indexOf('RELAY NET'));
 const appRewards = extractLiteral(appjs, 'REWARDS');
 const serverRewards = extractLiteral(serverjs, 'REWARDS');
@@ -99,7 +99,7 @@ check('LOCAL hard boss + flawless bumped (18 NC / 65 XP / 100 NC flawless)', app
 check('server.js REWARDS.hard mirrors LOCAL exactly', JSON.stringify(appRewards.hard) === JSON.stringify(serverRewards.hard));
 check('easy/medium rewards untouched', appRewards.easy.winNC === 60 && appRewards.medium.winNC === 100);
 const busts = indexhtml.match(/\?v=([0-9a-z]+)/g) || [];
-check('all 6 index.html assets cache-busted to 20261024h', busts.length === 6 && busts.every((v) => v === '?v=20261024h'), busts.join(' '));
+check('all 6 index.html assets cache-busted to 20261024i', busts.length === 6 && busts.every((v) => v === '?v=20261024i'), busts.join(' '));
 check('play menu copy names the hell pass', appjs.includes('30 waves of pure hell'));
 
 console.log('--- Syntax gates ---');

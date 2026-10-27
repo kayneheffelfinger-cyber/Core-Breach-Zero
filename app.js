@@ -14,8 +14,18 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.11.01';
+const BUILD = '2026.11.02';
 const UPDATE_LOG = [
+  {
+    version: '2026.11.02', tag: 'SPIRAL ESCALATION',
+    items: [
+      ['INSANE', 'INSANE PROTOCOL DOUBLED — the spiral you beat last week is gone. The hull curve compounds at 1.135x per wave now (wave 30 arrives at ~35x roster hull, nearly double the old 20x), every hostile moves 22% faster, leaked commanders hit the core for 12x instead of 10x, opening salvage is stripped 35%, wave pay drops to 70%, and the rebuild window slams shut at 2.5 seconds. The ladder itself was rebuilt: +12-25% hostiles per wave and four elite classes woven through all thirty indices. DAWNFIRE still burns TRIPLE THREAT and SIEGE WALL.'],
+      ['NEW', 'FOUR NEW HOSTILES debut on the spiral. NULL SPECTRE (wave 5) — phase shroud drops it out of every targeting lock for seconds at a time; splash, veins, the bell and the nuke still catch it. DATA LEECH (wave 13) — siphon field knits 1.8% of max hull per second back into every hostile around it; kill the doctor first. BLOATWARE (wave 9) — death rattle: the corpse pops an EMP and every tower nearby goes OFFLINE for 2.5 seconds, the first real tower-disable in the game. RAMPAGE UNIT (wave 18) — berserk drive accelerates it up to +85% speed as it bleeds. HARD gets a late taste: leeches and bloatware join three of the final waves.'],
+      ['BAL', 'The power creep gets a trim, not a hammer. COMMAND RELAY: POWER GRID +15%→+12% ring damage, TARGET UPLINK +10%→+8% range, MORALE CORE +10%→+8% fire rate — the stacking network aura was quietly multiplying everything. CORPSE BLOSSOM: LIFEBLOOD summons rise at 38% hull instead of 45%, TRUE CORPSE BLOSSOM at 60% instead of 75%, and the vein pulse rolls down to 90 damage on a tighter window.'],
+      ['WARDEN', 'GRAVE WARDEN buffed across the yard: DEATH TOLL 90→100 damage, TOLLING HOURS 180→210, LAST TOLL 330→380 with the yard slow up to 55% and chaff stun to 1.6s, CHILL GRAVE 40→45%. The SOUL CHOIR sings cheaper: $700 per soul (was $900) on a 35s cooldown (was 45s), and every soul\u2019s hull now floors at 75 instead of 50.'],
+      ['RELIC', 'DAWNBRINGER repriced into legend territory — a relic this insane should cost like it. In-mission deploy cost 900→1,600 salvage (the priciest deployment in the game), the forge ladder doubles (1,600 / 2,800 / 4,500 / 7,000 salvage to SUNSLAUGHTER), and the declared value is now 250,000 NC + 2,500 BT. The card still says it will never be sold — the number is the point.'],
+    ],
+  },
   {
     version: '2026.11.01', tag: 'WAR CHEST',
     items: [
