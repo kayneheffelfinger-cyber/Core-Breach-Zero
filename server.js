@@ -48,17 +48,35 @@ const SHOP = {
   flakpost: { name: 'FLAK POST', unlock: 10, price: { nc: 1400, bt: 20 }, currency: 'mixed' },
   tarsprayer: { name: 'TAR SPRAYER', unlock: 12, price: { nc: 1750, bt: 25 }, currency: 'mixed' },
   relay: { name: 'COMMAND RELAY', unlock: 18, price: { nc: 4300, bt: 70 }, currency: 'mixed' },
+  veteran: { name: 'THE VETERAN', unlock: 40, price: { nc: 13500, bt: 180 }, currency: 'mixed' },
+  warbonds: { name: 'WAR BONDS', unlock: 14, price: { nc: 2800, bt: 40 }, currency: 'mixed' },
+  wardrums: { name: 'WAR DRUMS', unlock: 22, price: { nc: 3900, bt: 60 }, currency: 'mixed' },
 };
 
 // ULTIMATUM vault — lifetime TOTAL XP banks Ultimatum cores (50,000 XP per core);
 // cores buy ULTIMATUM cards. Mirrored in app.js LOCAL — keep in sync.
 const ULT_XP_PER_CORE = 50000;
 const ULT_CARDS = {
-  corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
-  gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
+  corpseblossom: { name: 'CORPSE BLOSSOM', cores: 2, unlock: 20 },
+  gravewarden: { name: 'GRAVE WARDEN', cores: 1, unlock: 20 },
+  deathwarrant: { name: 'DEATHWARRANT', cores: 3, unlock: 20 },
 };
 // ULTIMATUM-class towers: at most ONE may be armed in the loadout at a time.
-const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden']);
+const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'deathwarrant']);
+
+// --- GOLDEN SEALS: a sector gilds when all four protocols fall on it --------------
+// Gild every sector and the PARAGON materializes in the armory. Mirrored in
+// app.js (LOCAL + client) and shop.js — keep the derivation in sync.
+const GOLDEN_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];
+const GOLDEN_MAPS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
+const GOLDEN_REWARD = { nc: 2500, bt: 10 }; // one-time payout the first time a sector gilds
+function mapSeal(mapWins, mapId) {
+  const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  return GOLDEN_PROTOCOLS.every((p) => (wins[`${mapId}:${p}`] || 0) > 0);
+}
+function allSeals(mapWins) {
+  return GOLDEN_MAPS.every((mapId) => mapSeal(mapWins, mapId));
+}
 
 // Admin surface: accounts flagged by redeeming the admin key code (ADMINLOG101011)
 // or listed here by exact name. Admins see/purchase CLASSIFIED blueprints.
@@ -94,7 +112,7 @@ function achievementsFrom(mapWins) {
 }
 
 function defaultMeta() {
-  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0 };
+  return { nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, goldenClaimed: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0 };
 }
 
 // Perk loadout: id -> achievement that decrypts it. Mirrored in app.js LOCAL.
@@ -131,6 +149,11 @@ function sanitizeMeta(name) {
   // the Crimson relic included: the site admin holds the DAWNBRINGER without
   // waiting for the event window (mirrors app.js LOCAL sanitizeMeta — keep in sync).
   if (isAdmin(name) && !meta.owned.includes('dawnbreaker')) meta.owned.push('dawnbreaker');
+  // GOLDEN STANDARD — gild every sector and the PARAGON materializes in the
+  // armory, free and permanent. Derived from the win ledger, so legacy profiles
+  // that already qualify heal up on the next read.
+  if (allSeals(meta.mapWins) && !meta.owned.includes('paragon')) meta.owned.push('paragon');
+  if (!meta.goldenClaimed || typeof meta.goldenClaimed !== 'object') meta.goldenClaimed = {};
 }
 
 // Grant legacy accounts the Nexus wallet without touching their credentials.
@@ -271,7 +294,8 @@ async function handleApi(request, response, pathname) {
     if (!item) return sendJson(response, 404, { ok: false, error: 'Unknown blueprint.' });
     const meta = accounts[name].meta;
     if (meta.owned.includes(itemId)) return sendJson(response, 409, { ok: false, error: 'Blueprint already in your armory.' });
-    if (meta.level < item.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
+    // FULL CLEARANCE — admins buy the whole grid at any clearance level.
+    if (meta.level < item.unlock && !isAdmin(name)) return sendJson(response, 403, { ok: false, error: `Clearance level ${item.unlock} required.` });
     if (item.firstClear && !meta.firstClear) return sendJson(response, 403, { ok: false, error: 'Reward locked — beat Easy Mode to decrypt this blueprint.' });
     // Prices may be single-currency (number) or dual-currency ({ nc, bt }).
     const cost = typeof item.price === 'object' ? item.price : { [item.currency === 'bt' ? 'bt' : 'nc']: item.price || 0 };
@@ -326,11 +350,29 @@ async function handleApi(request, response, pathname) {
     if (flawless) { nc += table.flawlessNC; bt += table.flawlessBT; xp += table.flawlessXP; }
     let firstClear = false;
     if (win && !meta.firstClear) { meta.firstClear = true; firstClear = true; bt += table.firstClearBT; }
+    const rewards = {}; // golden seals / paragon attach below; payout fields fill at return
     // Achievement ledger: wins on known maps/protocols bump `${map}:${protocol}`.
     if (win && MAP_PROTOCOLS.includes(String(body.map || '')) && PROTOCOLS.includes(String(body.difficulty || ''))) {
       meta.mapWins = meta.mapWins && typeof meta.mapWins === 'object' ? meta.mapWins : {};
       const winKey = `${String(body.map)}:${String(body.difficulty)}`;
       meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
+      // GOLDEN SEALS — the first time a sector gilds (all four protocols beaten
+      // on it), the commander collects a one-time gilding bounty.
+      meta.goldenClaimed = meta.goldenClaimed && typeof meta.goldenClaimed === 'object' ? meta.goldenClaimed : {};
+      const golden = [];
+      for (const mapId of GOLDEN_MAPS) {
+        if (meta.goldenClaimed[mapId] || !mapSeal(meta.mapWins, mapId)) continue;
+        meta.goldenClaimed[mapId] = true;
+        nc += GOLDEN_REWARD.nc;
+        bt += GOLDEN_REWARD.bt;
+        golden.push(mapId);
+      }
+      if (golden.length) rewards.golden = golden;
+      // GOLDEN STANDARD — gild every sector and the PARAGON materializes.
+      if (allSeals(meta.mapWins) && !meta.owned.includes('paragon')) {
+        meta.owned.push('paragon');
+        rewards.paragon = true;
+      }
     }
     // Crimson Dawn relic — surviving the event grants the DAWNBRINGER blueprint,
     // one per commander, never purchasable (it exists in no shop price table).
@@ -355,8 +397,9 @@ async function handleApi(request, response, pathname) {
       meta.xp -= xpToNext(meta.level);
       meta.level += 1;
     }
+    Object.assign(rewards, { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before });
     saveAccounts();
-    return sendJson(response, 200, { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before }, unlocked, profile: profilePayload(accounts[name]) });
+    return sendJson(response, 200, { ok: true, rewards, unlocked, profile: profilePayload(accounts[name]) });
   }
 
   // Salvage codes — playtesting funds. One redemption per commander account per
@@ -436,7 +479,7 @@ async function handleApi(request, response, pathname) {
       const card = ULT_CARDS[cardId];
       if (!card) return sendJson(response, 404, { ok: false, error: 'Unknown Ultimatum card.' });
       if (meta.owned.includes(cardId)) return sendJson(response, 409, { ok: false, error: 'Ultimatum card already in your armory.' });
-      if (meta.level < card.unlock) return sendJson(response, 403, { ok: false, error: `Clearance level ${card.unlock} required.` });
+      if (meta.level < card.unlock && !isAdmin(name)) return sendJson(response, 403, { ok: false, error: `Clearance level ${card.unlock} required.` });
       if ((meta.ultCores || 0) < card.cores) return sendJson(response, 402, { ok: false, error: `Not enough Ultimatum cores — ${card.name} costs ${card.cores}.` });
       meta.ultCores -= card.cores;
       meta.owned.push(cardId);

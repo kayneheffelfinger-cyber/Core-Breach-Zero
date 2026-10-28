@@ -240,10 +240,12 @@ async function api(path, payload) {
     check('exchange never touched the level or owned towers', ultEx.data.profile.level === farmed.data.profile.level && ultEx.data.profile.owned.length === farmed.data.profile.owned.length, 'level/armory intact');
     const ultDupe = await api('/api/ultimatum', { token, action: 'exchange' });
     check('double exchange before the next 50k rejected 400', ultDupe.status === 400, JSON.stringify(ultDupe.data));
-    const ultBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
-    check('Ultimatum card: CORPSE BLOSSOM acquired for 1 core', ultBuy.data.ok && ultBuy.data.profile.owned.includes('corpseblossom') && ultBuy.data.profile.ultCores === 0, JSON.stringify(ultBuy.data));
-    const ultRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
-    check('second blossom rejected 409 (one per commander)', ultRebuy.status === 409, JSON.stringify(ultRebuy.data));
+    const ultBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
+    check('Ultimatum card: GRAVE WARDEN acquired for 1 core', ultBuy.data.ok && ultBuy.data.profile.owned.includes('gravewarden') && ultBuy.data.profile.ultCores === 0, JSON.stringify(ultBuy.data));
+    const ultRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
+    check('second warden rejected 409 (one per commander)', ultRebuy.status === 409, JSON.stringify(ultRebuy.data));
+    const blossomBroke = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('blossom with 0 cores 402 (2-core tier enforced)', blossomBroke.status === 402, JSON.stringify(blossomBroke.data));
     const ultUnknown = await api('/api/ultimatum', { token, action: 'buy', card: 'notacard' });
     check('unknown Ultimatum card 404', ultUnknown.status === 404, JSON.stringify(ultUnknown.data));
     const exeVault = await api('/api/ultimatum', { token, action: 'buy', card: 'executioner' });
@@ -255,6 +257,18 @@ async function api(path, payload) {
     check('civilian profile.admin stays false', civAdminFlag.data.ok && civAdminFlag.data.profile.admin === false, JSON.stringify(civAdminFlag.data));
     const civBlossom = await api('/api/shop/purchase', { token: civToken, itemId: 'corpseblossom' });
     check('civilian blossom purchase blocked 404', civBlossom.status === 404, JSON.stringify(civBlossom.data));
+    const civSpark = await api('/api/shop/purchase', { token: civToken, itemId: 'sparkcoil' });
+    check('civilian below clearance blocked 403 (L6 gate honest)', civSpark.status === 403, JSON.stringify(civSpark.data));
+    // FULL CLEARANCE SHOP — a fresh admin-key account sits BELOW the relay gate
+    // (the key's 5,000 XP lands ~L13 < L18) yet buys it anyway: the clearance
+    // check is bypassed for admins, while cores still gate the vault.
+    const adminFresh = await api('/api/register', { name: 'ADMINFRESH', email: 'adminfresh@test.io', passcode: 'test1234' });
+    const adminToken = adminFresh.data.token;
+    await api('/api/redeem', { token: adminToken, code: 'ADMINLOG101011' }); // admin flag + 10,000 NC + 1,000 BT
+    const adminRelay = await api('/api/shop/purchase', { token: adminToken, itemId: 'relay' });
+    check('FULL CLEARANCE: admin buys above clearance 200 (L18 relay below L13)', adminRelay.status === 200 && adminRelay.data.ok && adminRelay.data.profile.owned.includes('relay'), JSON.stringify(adminRelay.data));
+    const adminVault = await api('/api/ultimatum', { token: adminToken, action: 'buy', card: 'gravewarden' });
+    check('FULL CLEARANCE: admin vault buy below L20 blocked only by cores 402', adminVault.status === 402, JSON.stringify(adminVault.data));
     const civPerks = await api('/api/perks', { token: civToken, perks: ['salvage'] });
     check('civilian perk equip without HARDLINE rejected 403', civPerks.status === 403, JSON.stringify(civPerks.data));
     // DAWN CLEARANCE — the admin decrypts the DAWNBRINGER relic (no event win needed);
@@ -286,7 +300,7 @@ async function api(path, payload) {
   if (phase === '2') {
     const prof = await api('/api/profile', { token });
     const p = prof.data.profile || {};
-    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper') && p.owned.includes('zeroday') && p.owned.includes('corpseblossom'), JSON.stringify(p));
+    check('persisted after restart: full armory', p.owned && p.owned.includes('sentinel') && p.owned.includes('lazermortar') && p.owned.includes('virus') && p.owned.includes('shotgunner') && p.owned.includes('sniper') && p.owned.includes('zeroday') && p.owned.includes('gravewarden'), JSON.stringify(p));
     check('persisted firstClear flag', p.firstClear === true);
     check('persisted full loadout', Array.isArray(p.loadout) && p.loadout.length === 5, JSON.stringify(p.loadout));
     check('persisted redeemed ledger (4 codes, repeatable skips ledger)', Array.isArray(p.redeemed) && p.redeemed.length === 4, JSON.stringify(p.redeemed));
@@ -294,19 +308,30 @@ async function api(path, payload) {
     check('persisted mapWins spire + hard ledger', p.mapWins && p.mapWins['insane:easy'] === 1 && p.mapWins['insane:medium'] === 2 && p.mapWins['easy:hard'] === 1, JSON.stringify(p.mapWins));
     check('persisted lifetime XP + Ultimatum ledger', typeof p.totalXp === 'number' && p.totalXp >= 50000 && p.ultCores === 0 && p.ultClaims === 1, JSON.stringify({ totalXp: p.totalXp, ultCores: p.ultCores, ultClaims: p.ultClaims }));
     check('persisted uncapped clearance past LV 30', p.level > 30, `level=${p.level}`);
-    // --- INSANE ERA: second core tier (GRAVE WARDEN) + free L50 claim (EXECUTIONER) ---
-    const wardenBroke = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
-    check('grave warden with 0 cores 402 (2-core tier enforced)', wardenBroke.status === 402, JSON.stringify(wardenBroke.data));
+    // --- GOLDEN VETERANS: blossom reprices to 2 cores, DEATHWARRANT joins at 3 ---
+    const blossomBroke2 = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('blossom with 0 cores 402 (2-core tier enforced)', blossomBroke2.status === 402, JSON.stringify(blossomBroke2.data));
     for (let i = 0; i < 36; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // +180k lifetime XP — banks three more 50k cores (48 total redeems ≈ 245k)
     const farmed2 = await api('/api/profile', { token });
     check('second farm pushes lifetime XP past 200k', farmed2.data.profile.totalXp >= 200000, `totalXp=${farmed2.data.profile.totalXp}`);
     await api('/api/ultimatum', { token, action: 'exchange' });
-    const core2 = await api('/api/ultimatum', { token, action: 'exchange' });
-    check('two milestone exchanges bank cores 2-3 (claims 3)', core2.status === 200 && core2.data.profile.ultCores === 2 && core2.data.profile.ultClaims === 3, JSON.stringify(core2.data));
-    const wardenBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
-    check('grave warden costs exactly 2 cores 200', wardenBuy.status === 200 && wardenBuy.data.profile.owned.includes('gravewarden') && wardenBuy.data.profile.ultCores === 0, JSON.stringify(wardenBuy.data));
-    const wardenRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'gravewarden' });
-    check('grave warden rebuy 409', wardenRebuy.status === 409, JSON.stringify(wardenRebuy.data));
+    await api('/api/ultimatum', { token, action: 'exchange' });
+    const core3 = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('three milestone exchanges bank cores 2-4 (claims 4)', core3.status === 200 && core3.data.profile.ultCores === 3 && core3.data.profile.ultClaims === 4, JSON.stringify(core3.data));
+    const blossomBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('corpse blossom costs exactly 2 cores 200', blossomBuy.status === 200 && blossomBuy.data.profile.owned.includes('corpseblossom') && blossomBuy.data.profile.ultCores === 1, JSON.stringify(blossomBuy.data));
+    const blossomRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'corpseblossom' });
+    check('blossom rebuy 409', blossomRebuy.status === 409, JSON.stringify(blossomRebuy.data));
+    const warrantBroke = await api('/api/ultimatum', { token, action: 'buy', card: 'deathwarrant' });
+    check('deathwarrant with 1 core 402 (3-core tier enforced)', warrantBroke.status === 402, JSON.stringify(warrantBroke.data));
+    for (let i = 0; i < 12; i++) await api('/api/redeem', { token, code: 'ADMINLOG101011' }); // +60k — banks two more cores
+    await api('/api/ultimatum', { token, action: 'exchange' });
+    const core5 = await api('/api/ultimatum', { token, action: 'exchange' });
+    check('two more exchanges bank cores 5-6 (claims 6)', core5.status === 200 && core5.data.profile.ultCores === 3 && core5.data.profile.ultClaims === 6, JSON.stringify(core5.data));
+    const warrantBuy = await api('/api/ultimatum', { token, action: 'buy', card: 'deathwarrant' });
+    check('DEATHWARRANT costs exactly 3 cores 200', warrantBuy.status === 200 && warrantBuy.data.profile.owned.includes('deathwarrant') && warrantBuy.data.profile.ultCores === 0, JSON.stringify(warrantBuy.data));
+    const warrantRebuy = await api('/api/ultimatum', { token, action: 'buy', card: 'deathwarrant' });
+    check('deathwarrant rebuy 409', warrantRebuy.status === 409, JSON.stringify(warrantRebuy.data));
     // --- OPEN ROSTER: the headsman sells in the grid now, vault refuses him ---
     const wallet = await api('/api/profile', { token });
     const headsman = await api('/api/shop/purchase', { token, itemId: 'executioner' });
@@ -319,6 +344,8 @@ async function api(path, payload) {
     check('warden + headsman co-arm legal 200 (executioner left ULT_TOWERS)', bothApex.status === 200 && bothApex.data.ok && bothApex.data.profile.loadout.includes('executioner'), JSON.stringify(bothApex.data));
     const duoApex = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'corpseblossom', 'gravewarden'] });
     check('one-card rule lives: blossom + warden co-arm 400', duoApex.status === 400, JSON.stringify(duoApex.data));
+    const duoWarrant = await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'corpseblossom', 'deathwarrant'] });
+    check('one-card rule covers the warrant: blossom + deathwarrant co-arm 400', duoWarrant.status === 400, JSON.stringify(duoWarrant.data));
     await api('/api/loadout', { token, loadout: ['sentinel', 'lazermortar', 'virus', 'shotgunner', 'sniper'] });
     console.log(`PHASE2 RESULT: ${pass} passed, ${fail} failed`);
     process.exit(fail ? 1 : 0);

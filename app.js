@@ -14,8 +14,20 @@ document.querySelector('#server-port').textContent = `PORT ${port}`;
 document.querySelector('#preview-port').textContent = port;
 
 // --- Update log: every deployment to the grid, newest first ----------------------
-const BUILD = '2026.11.02';
+const BUILD = '2026.11.03';
 const UPDATE_LOG = [
+  {
+    version: '2026.11.03', tag: 'GOLDEN VETERANS',
+    items: [
+      ['GOLDEN', 'GOLDEN SEALS go live — beat EASY, MEDIUM, HARD and INSANE on a battle sector and it GILDS: a living gold border on the map card in recon AND squad bays. The first time a sector gilds, the commander collects a one-time gilding bounty: 2,500 NC + 10 BT. Gild all five sectors and the PARAGON materializes in the armory — free, singular, permanent: a gilded all-rounder that tracks air and ground and taxes every kill in its ring +15% bounty (the GOLDEN TITHE). It is never sold, only earned.'],
+      ['NEW', 'THE VETERAN decrypts at Clearance 40 — the tri-weapon hero, one per commander. Three switchable guns, each with its own gimmick: the BATTLE RIFLE heats up +20% per consecutive hit on the same hull (FIRE DISCIPLINE, max +60%), the SCATTERGUN empties a 32u blast ring through air and ground alike, and the LONGRIFLE pierces armor plating to lock the beefiest hull in reach — commanders pay a 1.4x surcharge. Switch guns free and instantly from the tower panel. Eight ladder tiers — the most upgrades ever bolted onto one chassis — and every tier benefits all three guns. Expensive: 13,500 NC + 180 BT, $700 to deploy.'],
+      ['NEW', 'Two more rigs join the standard grid. WAR BONDS (Clearance 14) — the compound war chest: deposit $500 into the bond, every cleared wave pays compound interest INTO the bond (12% base, 22% at GOLD STANDARD against a $12,000 cap), and WITHDRAW moves the whole chest back to your wallet whenever you need it. WAR DRUMS (Clearance 22) — the fragment beat: every gun inside the drum ring splashes 10-22% of its damage around whatever hull it just hit, and the WAR CHOIR tier teaches the drum to lob its own 140-damage frag shell every 4 seconds.'],
+      ['ULTIMATUM', 'The vault reprices and grows. CORPSE BLOSSOM now costs TWO cores; GRAVE WARDEN drops to ONE and is weighted to match (bell 330, yard -50%, hymns $850 on a 40s rest, hull floor 60). And the third apex card arrives: DEATHWARRANT — three cores. It locks the beefiest hostile in a 460u verdict ring, charges twelve seconds under a growing ring and a lock reticle, then fires 1,500 flat damage PLUS 25% of everything the target carries — the fatter the hull, the harder the hit — straight through armor and shields. SWIFT VERDICT cuts the cadence to 10s and FINAL SENTENCE unlocks the DEATH ECHO: the kill detonates for 20% of the sentenced hull across 90u.'],
+      ['FIX', 'RISEN HULLS scale with the wave at last — the summon pipeline was forging copies from the roster’s paper hull instead of the scaled one, so a 50,000-HP Firewall Warden rose as a 1,800-HP shadow. Risen copies now rise at their true scaled hull — and they MOW: instead of dying on the first hostile they touch, they plow through up to four (every touch deals the risen’s full hull, each mow costs a quarter of it).'],
+      ['FIX', 'Summon intel trimmed to what a commander actually needs — hovering any risen copy, strike drone or vengeful soul now shows exactly the name, the tag and the live hull. The allegiance line and contact-payload rows are gone; the only number that matters is the HP.'],
+      ['SHOP', 'FULL CLEARANCE means FULL clearance — the site admin now sees and buys the ENTIRE blueprint grid and vault at any clearance level (the old code promised it, the wiring never delivered). Civilian commanders still earn every gate the honest way. The shop also ships five new decals and the Golden Seal badge system.'],
+    ],
+  },
   {
     version: '2026.11.02', tag: 'SPIRAL ESCALATION',
     items: [
@@ -398,6 +410,26 @@ function achievementsFrom(mapWins) {
     warmachine: Boolean(bigWins >= 15),
   };
 }
+
+// --- GOLDEN SEALS: a sector gilds when all four protocols fall on it --------------
+// Beat EASY + MEDIUM + HARD + INSANE on a battle map to gild it. Gild all five
+// and the PARAGON materializes. Mirrored in server.js + LOCAL — keep in sync.
+const GOLDEN_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];
+const GOLDEN_MAPS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
+const GOLDEN_REWARD = { nc: 2500, bt: 10 }; // one-time payout the first time a sector gilds
+function mapSeal(mapWins, mapId) {
+  const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+  return GOLDEN_PROTOCOLS.every((p) => (wins[`${mapId}:${p}`] || 0) > 0);
+}
+function allSeals(mapWins) {
+  return GOLDEN_MAPS.every((mapId) => mapSeal(mapWins, mapId));
+}
+// The client-side read: golden state for map cards comes from the live profile.
+function mapIsGolden(mapId) {
+  const shop = window.CBZShop;
+  const profile = shop && shop.profile ? shop.profile() : null;
+  return Boolean(profile && mapSeal(profile.mapWins, mapId));
+}
 const PERKS = [
   {
     id: 'overdrive', name: 'OVERDRIVE PROTOCOL', ach: 'overdrive',
@@ -476,6 +508,9 @@ const LOCAL = (() => {
     flakpost: { name: 'FLAK POST', unlock: 10, price: { nc: 1400, bt: 20 }, currency: 'mixed' },
     tarsprayer: { name: 'TAR SPRAYER', unlock: 12, price: { nc: 1750, bt: 25 }, currency: 'mixed' },
     relay: { name: 'COMMAND RELAY', unlock: 18, price: { nc: 4300, bt: 70 }, currency: 'mixed' },
+    veteran: { name: 'THE VETERAN', unlock: 40, price: { nc: 13500, bt: 180 }, currency: 'mixed' },
+    warbonds: { name: 'WAR BONDS', unlock: 14, price: { nc: 2800, bt: 40 }, currency: 'mixed' },
+    wardrums: { name: 'WAR DRUMS', unlock: 22, price: { nc: 3900, bt: 60 }, currency: 'mixed' },
   };
   const REWARDS = {
     easy: { waveNC: 8, waveXP: 12, bossNC: 10, bossBT: 1, bossXP: 30, winNC: 60, winXP: 80, flawlessNC: 25, flawlessBT: 2, flawlessXP: 50, firstClearBT: 5 },
@@ -494,7 +529,7 @@ const LOCAL = (() => {
   }
   const readAccounts = () => readJson(ACCOUNTS_KEY, {});
   const readSessions = () => readJson(SESSIONS_KEY, {});
-  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0 });
+  const defaultMeta = () => ({ nc: 750, bt: 0, xp: 0, level: 1, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, goldenClaimed: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0 });
 
   // Mirror of server.js PERK_ACH + admin surface — keep in sync.
   const PERK_ACH = {
@@ -512,10 +547,11 @@ const LOCAL = (() => {
   // Mirrors server.js ULT_* — keep in sync.
   const ULT_XP_PER_CORE = 50000;
   const ULT_CARDS = {
-    corpseblossom: { name: 'CORPSE BLOSSOM', cores: 1, unlock: 20 },
-    gravewarden: { name: 'GRAVE WARDEN', cores: 2, unlock: 20 },
+    corpseblossom: { name: 'CORPSE BLOSSOM', cores: 2, unlock: 20 },
+    gravewarden: { name: 'GRAVE WARDEN', cores: 1, unlock: 20 },
+    deathwarrant: { name: 'DEATHWARRANT', cores: 3, unlock: 20 },
   };
-  const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden']);
+  const ULT_TOWERS = new Set(['corpseblossom', 'gravewarden', 'deathwarrant']);
   // Enforce access rules on a LOCAL meta: perk-slot default + economy migrations.
   // ULTIMATUM era: legacy metas get their lifetime XP ledger reconciled from the
   // level history — the ledger never sits below what the clearance history implies,
@@ -533,6 +569,10 @@ const LOCAL = (() => {
     // the Crimson relic included: the site admin holds the DAWNBRINGER without
     // waiting for the event window (mirrors server.js sanitizeMeta — keep in sync).
     if ((meta.admin || isAdminName(account.name)) && !meta.owned.includes('dawnbreaker')) meta.owned.push('dawnbreaker');
+    // GOLDEN STANDARD — gild every sector and the PARAGON materializes in the
+    // armory, free and permanent (mirrors server.js sanitizeMeta — keep in sync).
+    if (allSeals(meta.mapWins) && !meta.owned.includes('paragon')) meta.owned.push('paragon');
+    if (!meta.goldenClaimed || typeof meta.goldenClaimed !== 'object') meta.goldenClaimed = {};
   }
 
   function randomHex(bytes) {
@@ -636,7 +676,8 @@ const LOCAL = (() => {
       if (!item) throw new Error('Unknown blueprint.');
       const meta = account.meta;
       if (meta.owned.includes(String(body.itemId || ''))) throw new Error('Blueprint already in your armory.');
-      if (meta.level < item.unlock) throw new Error(`Clearance level ${item.unlock} required.`);
+      // FULL CLEARANCE — admins buy the whole grid at any clearance level.
+      if (meta.level < item.unlock && !(meta.admin || isAdminName(account.name))) throw new Error(`Clearance level ${item.unlock} required.`);
       if (item.firstClear && !meta.firstClear) throw new Error('Reward locked — beat Easy Mode to decrypt this blueprint.');
       const cost = typeof item.price === 'object' ? item.price : { [item.currency === 'bt' ? 'bt' : 'nc']: item.price || 0 };
       if ((cost.nc || 0) > 0 && meta.nc < cost.nc) throw new Error('Not enough Nexus Coins.');
@@ -688,10 +729,28 @@ const LOCAL = (() => {
       let firstClear = false;
       if (win && !meta.firstClear) { meta.firstClear = true; firstClear = true; bt += table.firstClearBT; }
       // Achievement ledger: wins on known maps/protocols bump `${map}:${protocol}`.
+      const rewards = {}; // golden seals / paragon attach below; payout fields fill at return
       if (win && BATTLE_MAPS[String(body.map || '')] && REWARDS[String(body.difficulty || '')]) {
         meta.mapWins = meta.mapWins && typeof meta.mapWins === 'object' ? meta.mapWins : {};
         const winKey = `${String(body.map)}:${String(body.difficulty)}`;
         meta.mapWins[winKey] = (meta.mapWins[winKey] || 0) + 1;
+        // GOLDEN SEALS — the first time a sector gilds, the commander collects
+        // a one-time gilding bounty (mirrors server.js — keep in sync).
+        meta.goldenClaimed = meta.goldenClaimed && typeof meta.goldenClaimed === 'object' ? meta.goldenClaimed : {};
+        const golden = [];
+        for (const mapId of GOLDEN_MAPS) {
+          if (meta.goldenClaimed[mapId] || !mapSeal(meta.mapWins, mapId)) continue;
+          meta.goldenClaimed[mapId] = true;
+          nc += GOLDEN_REWARD.nc;
+          bt += GOLDEN_REWARD.bt;
+          golden.push(mapId);
+        }
+        if (golden.length) rewards.golden = golden;
+        // GOLDEN STANDARD — gild every sector and the PARAGON materializes.
+        if (allSeals(meta.mapWins) && !meta.owned.includes('paragon')) {
+          meta.owned.push('paragon');
+          rewards.paragon = true;
+        }
       }
       // Crimson Dawn relic — surviving the event grants the DAWNBRINGER blueprint,
       // one per commander, never purchasable. It exists in no shop price table.
@@ -719,7 +778,8 @@ const LOCAL = (() => {
       const accounts = readAccounts();
       accounts[account.name] = account;
       writeJson(ACCOUNTS_KEY, accounts);
-      return { ok: true, rewards: { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before }, unlocked, profile: profilePayload(account) };
+      Object.assign(rewards, { nc, bt, xp, bonusNc, firstClear, relic, levelsGained: meta.level - before });
+      return { ok: true, rewards, unlocked, profile: profilePayload(account) };
     }
     if (path === '/api/redeem') {
       // Salvage-code redemption — mirrors server.js exactly (same codes, same grants).
@@ -792,7 +852,8 @@ const LOCAL = (() => {
         const card = ULT_CARDS[cardId];
         if (!card) throw new Error('Unknown Ultimatum card.');
         if (meta.owned.includes(cardId)) throw new Error('Ultimatum card already in your armory.');
-        if (meta.level < card.unlock) throw new Error(`Clearance level ${card.unlock} required.`);
+        // FULL CLEARANCE — admins buy any vault card at any clearance level.
+        if (meta.level < card.unlock && !(meta.admin || isAdminName(account.name))) throw new Error(`Clearance level ${card.unlock} required.`);
         if ((meta.ultCores || 0) < card.cores) throw new Error(`Not enough Ultimatum cores — ${card.name} costs ${card.cores}.`);
         meta.ultCores -= card.cores;
         meta.owned.push(cardId);
@@ -2371,7 +2432,8 @@ function protocolRow(room, roomLead) {
 function renderRoomMapCard(map, room, roomLead) {
   const selected = room.map === map.id;
   return `<article class="room-map-entry">
-    <button class="map-card${map.id === 'cbz' ? ' map-cbz' : ''}${selected ? ' selected' : ''}" type="button" data-map="${map.id}" aria-pressed="${selected}" ${roomLead && !room.started ? '' : 'disabled'}>
+    <button class="map-card${map.id === 'cbz' ? ' map-cbz' : ''}${mapIsGolden(map.id) ? ' map-golden' : ''}${selected ? ' selected' : ''}" type="button" data-map="${map.id}" aria-pressed="${selected}" ${roomLead && !room.started ? '' : 'disabled'}>
+      ${goldenBadge(map.id)}
       <span class="map-diff">${map.difficulty}</span>
       <strong>${escapeHtml(map.name)}</strong>
       <small>${escapeHtml(map.sector)}</small>
@@ -2879,12 +2941,16 @@ function renderMapSelect() {
   playSound();
   document.querySelector('#dialog-kicker').textContent = '// MAP RECON';
   document.querySelector('#dialog-title').textContent = 'SELECT A MAP';
-  body.innerHTML = `<p class="dialog-copy">Recon flyovers only — no hostiles, no objectives. Walk each sector's grid before combat systems come online.</p><div class="map-grid">${Object.values(BATTLE_MAPS).map(mapCard).join('')}</div>`;
+  body.innerHTML = `<p class="dialog-copy">Recon flyovers only — no hostiles, no objectives. Walk each sector's grid before combat systems come online. Beat EASY, MEDIUM, HARD and INSANE on a sector to gild it with a GOLDEN SEAL — first gild pays 2,500 NC + 10 BT, and gilding all five decrypts the PARAGON.</p><div class="map-grid">${Object.values(BATTLE_MAPS).map(mapCard).join('')}</div>`;
   body.querySelectorAll('[data-map]').forEach((card) => card.addEventListener('click', () => openBattlefield(card.dataset.map)));
 }
 
+function goldenBadge(mapId) {
+  return mapIsGolden(mapId) ? '<span class="map-gold-badge">★ GOLDEN SEAL</span>' : '';
+}
+
 function mapCard(map) {
-  return `<button class="map-card${map.id === 'cbz' ? ' map-cbz' : ''}" type="button" data-map="${map.id}"><span class="map-diff">${map.difficulty}</span><strong>${escapeHtml(map.name)}</strong><small>${escapeHtml(map.sector)}</small><span class="map-mech">${escapeHtml(map.mechanic)}</span><em>${escapeHtml(map.hint)}</em></button>`;
+  return `<button class="map-card${map.id === 'cbz' ? ' map-cbz' : ''}${mapIsGolden(map.id) ? ' map-golden' : ''}" type="button" data-map="${map.id}">${goldenBadge(map.id)}<span class="map-diff">${map.difficulty}</span><strong>${escapeHtml(map.name)}</strong><small>${escapeHtml(map.sector)}</small><span class="map-mech">${escapeHtml(map.mechanic)}</span><em>${escapeHtml(map.hint)}</em></button>`;
 }
 
 function openBattlefield(mapId) {

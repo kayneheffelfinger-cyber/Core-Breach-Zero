@@ -66,7 +66,7 @@ sleep 0.5
 $B find first "[data-menu=\"shop\"]" click; sleep 0.8
 ok "relic card declares 250,000 NC + 2,500 BT" "$($B eval "Boolean([...document.querySelectorAll('.tower-card')].some((c) => c.textContent.includes('250,000 NC + 2,500 BT')))")"
 $B find first "[data-cat=\"__ult\"]" click; sleep 0.8
-ok "warden vault sings \$700 souls / 35s" "$($B eval "Boolean((document.querySelector('#shop-ultimatum') || {textContent:''}).textContent.includes('700 PER SOUL') && (document.querySelector('#shop-ultimatum') || {textContent:''}).textContent.includes('35s COOLDOWN'))")"
+ok "warden vault sings \$850 souls / 40s" "$($B eval "Boolean((document.querySelector('#shop-ultimatum') || {textContent:''}).textContent.includes('850 PER SOUL') && (document.querySelector('#shop-ultimatum') || {textContent:''}).textContent.includes('40s COOLDOWN'))")"
 fi
 
 echo "--- flow 1: wave 5 PHASE SHROUD — spectre cloaks under live fire (INSANE x2)"

@@ -280,12 +280,29 @@ const TOWER_RULES = {
   gravewarden: { air: 'no' },  // yard keeper — never targets; the bell tolls for everything inside
   executioner: { air: 'yes' }, // headsman rail — tracks anything with a hull; commanders pay full price
   dawnbreaker: { air: 'yes' },  // CRIMSON RELIC — dawn-forged lance tracks air natively
+  veteran: { air: 'no' },       // TRI-WEAPON hero — the rifle needs a pad for AA; the other two guns see everything
+  warbonds: { air: 'no' },      // war chest — never targets; the bond compounds every cleared wave
+  wardrums: { air: 'no' },      // support aura — never targets; the beat frags what the guns hit
+  deathwarrant: { air: 'yes' }, // ANNIHILATOR — the verdict locks the beefiest hull in reach, air or ground
+  paragon: { air: 'yes' },      // GOLDEN STANDARD — the gilded barrel tracks anything with a hull
   missilesilo: { air: 'yes' },  // MISSILE SILO — warheads track air and ground without a pad
   dronespawner: { air: 'no' },  // spawner — never targets; strike drones hit anything they intercept
 };
 
 // One-off rigs: only a single unit of these chassis may deploy per commander.
 const UNIQUE_TOWERS = new Set(['zeroday', 'corpseblossom', 'dronespawner', 'gravewarden']); // limit-1 rigs; the headsman now musters three
+
+// --- THE VETERAN: one chassis, three switchable guns ------------------------------
+// Every gun MULTIPLIES the chassis stats, so all eight ladder tiers benefit all
+// three weapons. The switch is instant and free from the tower panel. Each gun
+// keeps its own gimmick: FIRE DISCIPLINE heats the rifle on repeated hulls, the
+// SCATTERGUN empties a blast ring air + ground, the LONGRIFLE pierces armor and
+// locks the beefiest hull in reach (commanders pay a 1.4x surcharge).
+const VETERAN_GUNS = [
+  { name: 'BATTLE RIFLE', dmg: 1, rate: 1, rng: 1 },
+  { name: 'SCATTERGUN', dmg: 0.55, rate: 0.85, rng: 0.72, splash: 32, air: 'yes' },
+  { name: 'LONGRIFLE', dmg: 3.4, rate: 0.35, rng: 1.65, targeting: 'maxhp', air: 'yes', armorPierce: true, bossMult: 1.4 },
+];
 
 // Per-blueprint deploy caps: entry.limit is a real COUNT now — the headsman
 // musters up to three rails, the one-off rigs stay at one. Mirrored by the
@@ -549,7 +566,7 @@ function spawnEnemy(key, pathIdx) {
 function damageEnemy(enemy, amount, opts = {}) {
   if (enemy.friendly && !opts.friendlyFire) return; // Blossom summons shrug off friendly grid fire
   let left = amount;
-  if (!opts.phase) {
+  if (!opts.phase && !opts.armorPierce) {
     // Null Beacon collapse modules shred deeper into armor; base weak still halves it.
     const armorMult = enemy.weak ? Math.max(0.05, 0.5 - 0.15 * (enemy.shredLv || 0)) : 1;
     const armor = (enemy.t.armor || 0) * armorMult;
@@ -595,12 +612,13 @@ function killEnemy(enemy, src) {
   }
   // Zero Day tier-5 skim: enemy bounties pay +10% while the rig runs that tier.
   const skim = state.towers.some((tower) => tower.id === 'zeroday' && (effStats(tower).bounty || 0) > 0) ? 1.1 : 1;
-  const payout = Math.round(enemy.t.bounty * skim);
+  const [x, y] = posOf(enemy);
+  // PARAGON: the golden standard taxes every kill inside its ring.
+  const payout = Math.round(enemy.t.bounty * skim * paragonTithe(x, y));
   state.cash += payout;
   state.earned += payout;
   state.kills += 1;
   if (enemy.t.boss) state.bossesKilled += 1;
-  const [x, y] = posOf(enemy);
   floatText(x, y - enemy.t.size - 6, `+$${payout}`, 'cash-float');
   fxRing(x, y, 'fx-ring-red');
   enemy.node.classList.add('dying');
@@ -658,8 +676,11 @@ function spawnSummon(enemy, tower, stained) {
   if (state.enemies.filter((item) => item.friendly && item.alive).length >= SUMMON_CAP) return;
   const t = enemy.t;
   const es = effStats(tower);
-  const bonus = stained ? 50 + (es.stainedPct ? Math.round(t.hp * 0.1) : 0) : 0;
-  const hp = Math.max(1, Math.round(t.hp * (es.summonHp || 0.3)) + bonus);
+  // GOLDEN VETERANS fix — risen hulls forge from the SCALED hull (wave curve +
+  // surge mods included), not the roster base: a wave-30 Firewall Warden now
+  // rises at 60% of ~50,000, not 60% of its 2,400 paper hull.
+  const bonus = stained ? 50 + (es.stainedPct ? Math.round(enemy.maxHp * 0.1) : 0) : 0;
+  const hp = Math.max(1, Math.round(enemy.maxHp * (es.summonHp || 0.3)) + bonus);
   const g = svgNode('g', { class: `enemy e-summon e-${enemy.key}` });
   const chassis = svgNode('g', { class: 'e-chassis' });
   for (const node of shapeFor(enemy.key, t)) chassis.appendChild(node);
@@ -673,7 +694,7 @@ function spawnSummon(enemy, tower, stained) {
     hp, maxHp: hp, shield: 0, maxShield: t.shield || 0,
     pathIdx: enemy.pathIdx, dist: enemy.dist || 0,
     speed: t.speed * 0.85, alive: true, friendly: true, reverse: true,
-    usedGates: new Set(), angle: 0,
+    pierce: true, hitLog: {}, usedGates: new Set(), angle: 0,
   };
   if (t.flying) {
     // Dead flyers rise where they fell and fly the route BACK to the breach gate.
@@ -710,8 +731,11 @@ function despawnSummon(summon) {
   summon.node.remove();
 }
 
-// Summons kamikaze: the first hostile they touch takes damage equal to the
-// summon's full hull, then the corpse collapses.
+// Summons mow the lane: every hostile they touch takes damage equal to the
+// summon's full hull. Kamikaze rigs (strike drones, the Warden's souls)
+// collapse on first contact — but Blossom risen copies PIERCE now: each mow
+// costs the risen a quarter of its hull, so a fresh copy cuts through four
+// hostiles instead of dying on the first bump.
 function contactDamage(summon) {
   const [sx, sy] = [summon.fx, summon.fy];
   for (const enemy of state.enemies) {
@@ -722,9 +746,14 @@ function contactDamage(summon) {
     } else if (enemy.pathIdx !== summon.pathIdx || Math.abs(enemy.dist - summon.dist) > 12) {
       continue;
     }
+    if (summon.pierce && state.clock - (summon.hitLog[enemy.nid] || -9) < 0.8) continue; // no re-hit spam on the same hull
     damageEnemy(enemy, summon.maxHp, { src: 'summon' });
-    despawnSummon(summon);
-    return;
+    if (!summon.pierce) { despawnSummon(summon); return; }
+    summon.hitLog[enemy.nid] = state.clock;
+    summon.hp -= summon.maxHp * 0.25;
+    fxRing(sx, sy, 'fx-ring-virus');
+    paintBars(summon);
+    if (summon.hp <= 0) { despawnSummon(summon); return; }
   }
 }
 
@@ -1090,6 +1119,19 @@ function runWaves(dt) {
       rigYield += income;
       floatText(tower.x, tower.y - 40, `+$${income} RIG`, 'cash-float');
     }
+    // WAR BONDS: the war chest compounds — interest rolls INTO the bond itself
+    // (it never touches the wallet until the commander withdraws).
+    for (const tower of state.towers) {
+      if (tower.id !== 'warbonds') continue;
+      const es = effStats(tower);
+      if (!es.bond || !(tower.bank > 0)) continue;
+      const cap = es.bondCap || 3000;
+      const interest = Math.min(Math.max(0, cap - tower.bank), Math.round(tower.bank * es.bond));
+      if (interest <= 0) continue;
+      tower.bank += interest;
+      floatText(tower.x, tower.y - 40, `+$${interest} BOND`, 'cash-float');
+      if (state.panelTower === tower) openTowerPanel(tower);
+    }
     const hardMult = state.protocol === 'hard' ? 0.85 : state.protocol === 'insane' ? 0.7 : state.protocol === 'crimson' ? 0.7 : 1; // HELL PAYS WORSE — salvage is blood in HARD, the DOUBLED SPIRAL pays 70%, and the dawn bleeds you for 70%
     const bonus = Math.round((30 + (state.waveIndex + 1) * 7) * hardMult) + rigYield;
     state.cash += bonus;
@@ -1395,8 +1437,9 @@ function hideTip(enemy) {
   state.tipTarget = null;
 }
 
-// Friendly intel — Blossom risen copies and strike drones get their own readout
-// (hostiles show bounty/core damage; friendlies show contact payload instead).
+// Friendly intel — Blossom risen copies and strike drones get their own readout.
+// GOLDEN VETERANS: the card is trimmed to what a commander actually needs —
+// name, tag and the live hull. No allegiance chatter, no payload rows.
 function showSummonTip(summon, event) {
   ensureTip();
   state.tipTarget = summon;
@@ -1405,20 +1448,9 @@ function showSummonTip(summon, event) {
   const drone = summon.key === 'drone';
   const head = soul ? 'VENGEFUL SOUL' : drone ? 'STRIKE DRONE' : `RISEN ${t.name}`;
   const tag = soul ? 'GRAVE WARDEN CHOIR' : drone ? 'DRONE SPAWNER PAYLOAD' : 'CORPSE BLOSSOM SPAWN';
-  const flavor = soul
-    ? 'The Warden\u2019s choir: a soul raised from the core marches the lane and detonates on the first hostile it touches for damage equal to its hull — 10 x TOLL CHARGES, minimum 75. Your towers ignore it.'
-    : drone
-      ? 'One-way strike unit — rockets across the grid and detonates on the first hostile it intercepts for its full payload.'
-      : 'A risen copy marches back up the lane and detonates on the first hostile it touches for damage equal to its hull. Your towers ignore it.';
   state.tip.innerHTML = `
     <div class="tip-head summon"><b>${head}</b><span class="tip-tag">${tag}</span></div>
-    <div class="tip-hp"><div class="tip-hp-track"><div class="tip-hp-fill" style="width:${(summon.hp / summon.maxHp) * 100}%"></div></div><span>${Math.ceil(summon.hp)}/${summon.maxHp} HP</span></div>
-    <div class="tip-rows">
-      <div><span>CONTACT DMG</span><b>${Math.ceil(summon.maxHp)} · FULL HULL</b></div>
-      <div><span>ALLEGIANCE</span><b>YOURS</b></div>
-      <div><span>TARGETING</span><b>TOWERS IGNORE IT</b></div>
-    </div>
-    <p class="tip-ability">${flavor}</p>`;
+    <div class="tip-hp"><div class="tip-hp-track"><div class="tip-hp-fill" style="width:${(summon.hp / summon.maxHp) * 100}%"></div></div><span>${Math.ceil(summon.hp)}/${summon.maxHp} HP</span></div>`;
   state.tip.hidden = false;
   moveTip(event);
 }
@@ -1578,6 +1610,8 @@ function paintPayout(panel, data) {
     r.bt > 0 ? `<div class="payout-row payout-bt"><span>BREACH TOKENS</span><b>+${r.bt} BT</b></div>` : '',
     r.firstClear ? '<div class="payout-row payout-bt"><span>FIRST CLEARANCE BONUS</span><b>+5 BT</b></div>' : '',
     ...(data.unlocked || []).map((id) => `<div class="payout-row payout-ach"><span>ACHIEVEMENT UNLOCKED</span><b>${escapeHtml(String(id).toUpperCase())}</b></div>`),
+    ...(r.golden || []).map((mapId) => `<div class="payout-row payout-gold"><span>GOLDEN SEAL — ${escapeHtml(String(mapId).toUpperCase())}</span><b>+2,500 NC · +10 BT</b></div>`),
+    r.paragon ? '<div class="payout-row payout-gold"><span>PARAGON DECRYPTED</span><b>ALL SECTORS GOLDEN</b></div>' : '',
     r.bonusNc > 0 ? `<div class="payout-row payout-nc"><span>SCRAP FOUNDRY YIELD</span><b>+${r.bonusNc} NC</b></div>` : '',
     `<div class="payout-row payout-xp"><span>COMBAT XP</span><b>+${r.xp} XP</b></div>`,
     r.levelsGained > 0 ? `<div class="payout-row payout-lvl"><span>CLEARANCE LEVEL UP</span><b>LV ${data.profile.level} ▲${r.levelsGained > 1 ? ` ×${r.levelsGained}` : ''}</b></div>` : '',
@@ -1855,6 +1889,10 @@ function placeTower(entry, x, y) {
   if (entry.id === 'gravewarden') { tower.bellCd = 2.5; tower.tollCharges = 0; tower.soulCd = 0; }
   if (entry.id === 'zeroday') tower.nukeCd = 0;
   if (entry.id === 'relay') tower.rallyCd = 0;
+  if (entry.id === 'veteran') { tower.gun = 0; tower.heat = 0; tower.heatNid = null; }
+  if (entry.id === 'warbonds') tower.bank = 0;
+  if (entry.id === 'wardrums') tower.lobCd = 4;
+  if (entry.id === 'deathwarrant') { tower.warrantCd = 6; tower.charge = null; }
   const pad = padAt(x, y);
   if (pad) {
     tower.onPad = true;
@@ -1997,6 +2035,45 @@ function kindKit(entry, chassis, head) {
       chassis.appendChild(svgNode('circle', { class: 'tw-kit-halo wide', cy: -17, r: 8 }));
       chassis.appendChild(svgNode('circle', { class: 'tw-kit-beacon', cy: -17, r: 1.8 }));
       break;
+    case 'veteran':
+      // THE VETERAN: ammo crate on the deck, tri-rail clip on the head.
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-ammo', x: -13, y: 7, width: 10, height: 6 }));
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-ammo tw-kit-ammo-2', x: 3, y: 8, width: 8, height: 5 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-trirail', x: 2, y: -4.5, width: 18, height: 2 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-trirail', x: 2, y: 2.5, width: 18, height: 2 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-beret', cx: -1, cy: -6, r: 2.2 }));
+      break;
+    case 'warbonds':
+      // WAR BONDS: a vault drum with a coin slot and a ledger plate.
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-vault', r: 8 }));
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-slot', x: -4, y: -1.4, width: 8, height: 2.8 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-ledger', x: 3, y: -5, width: 13, height: 10 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-ledline', x1: 6, y1: -1.5, x2: 13, y2: -1.5 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-ledline', x1: 6, y1: 1.5, x2: 13, y2: 1.5 }));
+      break;
+    case 'wardrums':
+      // WAR DRUMS: a deep war drum with two beating sticks on the head.
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-drumhead', r: 9 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-drumhub', r: 2.6 }));
+      chassis.appendChild(svgNode('rect', { class: 'tw-kit-drumrim', x: -10, y: 6, width: 20, height: 4 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-stick', x1: 4, y1: -8, x2: 16, y2: -3 }));
+      head.appendChild(svgNode('line', { class: 'tw-kit-stick s2', x1: 4, y1: 8, x2: 16, y2: 3 }));
+      break;
+    case 'deathwarrant':
+      // THE DEATHWARRANT: an obsidian verdict spire with a lock diamond.
+      chassis.appendChild(svgNode('polygon', { class: 'tw-kit-spire', points: '0,-18 7,-2 0,8 -7,-2' }));
+      chassis.appendChild(svgNode('polygon', { class: 'tw-kit-lockgem', points: hexPoints(0, -4, 3.4) }));
+      head.appendChild(svgNode('polygon', { class: 'tw-kit-verdict', points: '18,0 13,-4 8,0 13,4' }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-verdictbar', x: 2, y: -1.4, width: 12, height: 2.8 }));
+      break;
+    case 'paragon':
+      // PARAGON: a gilded laurel halo around a golden barrel.
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-laurel', r: 12 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-laurel inner', r: 9 }));
+      chassis.appendChild(svgNode('circle', { class: 'tw-kit-crown', cy: -13, r: 2.4 }));
+      head.appendChild(svgNode('rect', { class: 'tw-kit-goldbarrel', x: 4, y: -2, width: 17, height: 4 }));
+      head.appendChild(svgNode('circle', { class: 'tw-kit-goldtip', cx: 22, cy: 0, r: 2.2 }));
+      break;
     default:
       break; // dawnbreaker rides its own forge-built rig above
   }
@@ -2021,6 +2098,20 @@ function effStats(tower) {
   for (let i = 0; i < trackLevel(tower); i++) {
     const tier = towerTrack(tower)[i];
     if (tier && tier.sets) Object.assign(stats, tier.sets);
+  }
+  // THE VETERAN: the active gun multiplies the chassis — every ladder tier
+  // benefits all three weapons, and the panel/aim/fire paths all read the merge.
+  if (tower.id === 'veteran') {
+    const gun = VETERAN_GUNS[tower.gun || 0] || VETERAN_GUNS[0];
+    stats.dmg = Math.round(stats.dmg * gun.dmg);
+    stats.rate = Math.round(stats.rate * gun.rate * 100) / 100;
+    stats.rng = Math.round(stats.rng * gun.rng);
+    if (gun.splash) stats.splash = gun.splash;
+    if (gun.targeting) stats.targeting = gun.targeting;
+    if (gun.air) stats.air = gun.air;
+    stats.armorPierce = Boolean(gun.armorPierce);
+    stats.bossMult = gun.bossMult || 1;
+    stats.gunName = gun.name;
   }
   return { ...stats, infinite: tower.entry.stats.rng >= 999 };
 }
@@ -2084,7 +2175,7 @@ function launchWardenSoul(tower) {
   const pool = state.enemies.filter((enemy) => enemy.alive && !enemy.friendly);
   if (!pool.length) return false;
   const prey = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
-  const hull = Math.max(75, 10 * (tower.tollCharges || 0));
+  const hull = Math.max(60, 10 * (tower.tollCharges || 0));
   const t = { name: 'VENGEFUL SOUL', tag: 'SUMMON', hp: hull, speed: 55, size: 12, bounty: 0, dmg: 0, color: '#bff1e2', ability: 'The Warden\u2019s choir — detonates on the first hostile it touches for damage equal to its hull. Hull = 10 x TOLL CHARGES.' };
   const g = svgNode('g', { class: 'enemy e-summon e-soul' });
   const chassis = svgNode('g', { class: 'e-chassis' });
@@ -2138,6 +2229,18 @@ function castSoul(tower) {
   playSound();
   openTowerPanel(tower);
   updateHud();
+}
+
+// --- PARAGON: the golden standard taxes every kill in its ring --------------------
+function paragonTithe(x, y) {
+  let mult = 1;
+  for (const tower of state.towers) {
+    if (tower.id !== 'paragon') continue;
+    const es = effStats(tower);
+    if (!es.tithe) continue;
+    if (Math.hypot(x - tower.x, y - tower.y) <= es.rng) mult += es.tithe;
+  }
+  return mult;
 }
 
 // Tar Sprayer slick: walkers drag through the tar field — flyers skim over it.
@@ -2207,7 +2310,7 @@ function openTowerPanel(tower) {
       specials.push(`<div class="tp-abil-row"><span>TOLL CHARGES</span><b>${tower.tollCharges || 0}</b></div>`);
     }
     if (es.yardSlow) specials.push(`<div class="tp-abil-row"><span>GRAVE YARD</span><b>-${Math.round(es.yardSlow * 100)}% SPEED</b></div>`);
-    if (es.soul) specials.push(`<div class="tp-abil-row soul"><span>SOUL CHOIR</span><b>NEXT HULL ${Math.max(75, 10 * (tower.tollCharges || 0))} · $${es.soulCost || 700} PER SOUL</b></div>`);
+    if (es.soul) specials.push(`<div class="tp-abil-row soul"><span>SOUL CHOIR</span><b>NEXT HULL ${Math.max(60, 10 * (tower.tollCharges || 0))} · $${es.soulCost || 850} PER SOUL</b></div>`);
   }
   if (entry.id === 'relay') {
     const parts = [`+${Math.round((es.dmgBuff || 0) * 100)}% DMG`];
@@ -2220,6 +2323,29 @@ function openTowerPanel(tower) {
     specials.push(`<div class="tp-abil-row"><span>EXECUTE</span><b>COMMANDERS BELOW ${Math.round((es.execute || 0.15) * 100)}% HULL</b></div>`);
     specials.push(`<div class="tp-abil-row"><span>CHAFF PAYOUT</span><b>${Math.round((es.chaffPct || 0.15) * 100)}% DMG</b></div>`);
   }
+  if (entry.id === 'veteran') {
+    const guns = VETERAN_GUNS.map((g, i) => `<i class="${i === (tower.gun || 0) ? 'on' : ''}">${g.name}</i>`).join(' ');
+    specials.push(`<div class="tp-abil-row vet"><span>WEAPON RACK</span><b>${guns}</b></div>`);
+    if (es.gunName === 'BATTLE RIFLE') specials.push(`<div class="tp-abil-row"><span>FIRE DISCIPLINE</span><b>+${(tower.heat || 0) * 20}% HEAT · +20%/HIT MAX +60%</b></div>`);
+    if (es.gunName === 'SCATTERGUN') specials.push(`<div class="tp-abil-row"><span>BLAST RING</span><b>${es.splash || 32}U · AIR + GROUND</b></div>`);
+    if (es.gunName === 'LONGRIFLE') specials.push(`<div class="tp-abil-row"><span>ARMOR PIERCE</span><b>MAX-HULL LOCK · COMMANDERS ×1.4</b></div>`);
+  }
+  if (entry.id === 'warbonds') {
+    specials.push(`<div class="tp-abil-row bond"><span>BOND BALANCE</span><b>$${Math.round(tower.bank || 0)} / $${formatCash(es.bondCap || 3000)}</b></div>`);
+    specials.push(`<div class="tp-abil-row"><span>WAVE INTEREST</span><b>+${Math.round((es.bond || 0) * 100)}% COMPOUND INTO THE BOND</b></div>`);
+  }
+  if (entry.id === 'wardrums') {
+    specials.push(`<div class="tp-abil-row"><span>FRAG ROUNDS</span><b>+${Math.round((es.frag || 0) * 100)}% OF GUN DMG · ${es.fragRadius || 35}U RING</b></div>`);
+    if (es.lob) specials.push(`<div class="tp-abil-row"><span>WAR CHOIR LOB</span><b>${es.lobDmg || 140} DMG SHELL · 4s</b></div>`);
+  }
+  if (entry.id === 'deathwarrant') {
+    specials.push(`<div class="tp-abil-row warrant"><span>NEXT VERDICT</span><b>${tower.charge ? `${Math.ceil(tower.charge.t)}s CHARGE` : `${Math.ceil(tower.warrantCd || 0)}s TO LOCK`}</b></div>`);
+    specials.push(`<div class="tp-abil-row"><span>PAYLOAD</span><b>${Math.round(es.dmg)} + ${Math.round((es.warrantPct || 0.25) * 100)}% TARGET MAX HULL · PHASE</b></div>`);
+    if (es.echo) specials.push(`<div class="tp-abil-row"><span>DEATH ECHO</span><b>KILL BLAST · 20% HULL · 90U</b></div>`);
+  }
+  if (entry.id === 'paragon') {
+    specials.push(`<div class="tp-abil-row gold"><span>GOLDEN TITHE</span><b>+${Math.round((es.tithe || 0.15) * 100)}% BOUNTY ON KILLS IN RING</b></div>`);
+  }
   if (entry.id === 'zeroday') specials.push(`<div class="tp-abil-row"><span>WAVE INCOME</span><b>$${es.income || 0}/WAVE</b></div>`);
   const abilities = [];
   if (entry.id === 'corpseblossom' && trackLevel(tower) >= 4) {
@@ -2231,11 +2357,19 @@ function openTowerPanel(tower) {
   }
   if (entry.id === 'gravewarden' && trackLevel(tower) >= 6) {
     const cd = Math.ceil(tower.soulCd || 0);
-    abilities.push(`<button class="tp-ability soul" type="button" id="tp-soul" ${cd > 0 ? 'disabled' : ''}>SUMMON SOUL — $${effStats(tower).soulCost || 900}${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
+    abilities.push(`<button class="tp-ability soul" type="button" id="tp-soul" ${cd > 0 ? 'disabled' : ''}>SUMMON SOUL — $${effStats(tower).soulCost || 850}${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
   }
   if (entry.id === 'relay' && trackLevel(tower) >= 5) {
     const cd = Math.ceil(tower.rallyCd || 0);
     abilities.push(`<button class="tp-ability rally" type="button" id="tp-rally" ${cd > 0 ? 'disabled' : ''}>RALLY CRY — $${effStats(tower).rallyCost || 600}${cd > 0 ? ` — ${cd}s` : ' — READY'}</button>`);
+  }
+  if (entry.id === 'veteran') {
+    const nextGun = VETERAN_GUNS[((tower.gun || 0) + 1) % VETERAN_GUNS.length].name;
+    abilities.push(`<button class="tp-ability vet" type="button" id="tp-gun">SWITCH GUN → ${nextGun}</button>`);
+  }
+  if (entry.id === 'warbonds') {
+    abilities.push(`<button class="tp-ability deposit" type="button" id="tp-deposit">DEPOSIT $500 INTO THE BOND</button>`);
+    abilities.push(`<button class="tp-ability withdraw" type="button" id="tp-withdraw" ${(tower.bank || 0) > 0 ? '' : 'disabled'}>WITHDRAW $${formatCash(Math.round(tower.bank || 0))}</button>`);
   }
   const panel = document.createElement('div');
   panel.className = `tower-panel tw-${entry.cat}`;
@@ -2277,6 +2411,12 @@ function openTowerPanel(tower) {
   if (soul) soul.addEventListener('click', () => castSoul(tower));
   const rally = panel.querySelector('#tp-rally');
   if (rally) rally.addEventListener('click', () => castRally(tower));
+  const gunBtn = panel.querySelector('#tp-gun');
+  if (gunBtn) gunBtn.addEventListener('click', () => switchGun(tower));
+  const depositBtn = panel.querySelector('#tp-deposit');
+  if (depositBtn) depositBtn.addEventListener('click', () => bondDeposit(tower));
+  const withdrawBtn = panel.querySelector('#tp-withdraw');
+  if (withdrawBtn) withdrawBtn.addEventListener('click', () => bondWithdraw(tower));
   refreshPanelAfford();
 }
 
@@ -2382,6 +2522,65 @@ function updateTowers(dt) {
     }
     if (tower.id === 'zeroday') tower.nukeCd = Math.max(0, (tower.nukeCd || 0) - dt);
     if (tower.id === 'relay') tower.rallyCd = Math.max(0, (tower.rallyCd || 0) - dt);
+    if (tower.id === 'wardrums') {
+      // WAR CHOIR: the drum lobs its own frag shell on a 4s cadence (tier 5).
+      tower.lobCd = Math.max(0, (tower.lobCd || 0) - dt);
+      const es = effStats(tower);
+      if (es.lob && tower.lobCd <= 0) {
+        const pool = state.enemies.filter((enemy) => {
+          if (!enemy.alive || enemy.friendly) return false;
+          const [px, py] = posOf(enemy);
+          return Math.hypot(px - tower.x, py - tower.y) <= es.rng;
+        });
+        if (pool.length) {
+          tower.lobCd = 4;
+          const prey = pool.reduce((best, enemy) => (enemy.dist > best.dist ? enemy : best));
+          const [lx, ly] = posOf(prey);
+          const shell = svgNode('circle', { class: 'fx-shell', r: 4, cx: tower.x, cy: tower.y });
+          state.layers.fx.appendChild(shell);
+          state.projectiles.push({ kind: 'shell', x: tower.x, y: tower.y, tx: lx, ty: ly, speed: 240, dmg: es.lobDmg || 140, splash: es.lobSplash || 50, node: shell });
+          fxRing(tower.x, tower.y, 'fx-ring-amber');
+        }
+      }
+    }
+    if (tower.id === 'deathwarrant') {
+      // THE DEATHWARRANT: one verdict at a time. Locks the beefiest hull in
+      // reach, charges 10-12s under a growing ring + lock reticle, then erases
+      // it — flat payload + a fraction of the target's max hull, phase damage.
+      tower.warrantCd = Math.max(0, (tower.warrantCd || 0) - dt);
+      const es = effStats(tower);
+      if (tower.charge) {
+        const target = state.enemies.find((enemy) => enemy.alive && !enemy.friendly && enemy.nid === tower.charge.nid);
+        const ring = tower.charge.fx.ring;
+        const lock = tower.charge.fx.lock;
+        const line = tower.charge.fx.line;
+        if (target) {
+          const [px, py] = posOf(target);
+          tower.charge.x = px;
+          tower.charge.y = py;
+          if (lock) lock.setAttribute('transform', `translate(${px.toFixed(1)} ${py.toFixed(1)})`);
+          if (line) { line.setAttribute('x2', px.toFixed(1)); line.setAttribute('y2', py.toFixed(1)); }
+        }
+        tower.charge.t -= dt;
+        if (ring) {
+          ring.setAttribute('cx', tower.x);
+          ring.setAttribute('cy', tower.y);
+          ring.setAttribute('r', (6 + 30 * (1 - Math.max(0, tower.charge.t) / (es.warrantCd || 12))).toFixed(1));
+        }
+        if (line) { line.setAttribute('x1', tower.x); line.setAttribute('y1', tower.y); }
+        if (!target) {
+          // The sentenced hull died mid-charge — the verdict transfers to the
+          // next beefiest hull in reach, or holds fully wound until one shows.
+          const next = acquireWarrantTarget(tower, es);
+          if (next) tower.charge.nid = next.nid;
+        } else if (tower.charge.t <= 0) {
+          fireWarrant(tower, target, es);
+        }
+      } else if (tower.warrantCd <= 0) {
+        const target = acquireWarrantTarget(tower, es);
+        if (target) beginWarrantCharge(tower, target, es);
+      }
+    }
     if (tower.id === 'tarsprayer') {
       // TAR SPRAYER: re-inks the slick every tick — walkers inside drag, flyers skim.
       const es = effStats(tower);
@@ -2470,6 +2669,137 @@ function aimHead(tower, target) {
   if (tower.head) tower.head.setAttribute('transform', `rotate(${angle.toFixed(1)})`);
 }
 
+// --- WAR DRUMS aura: FRAG ROUNDS ----------------------------------------------------
+// Every gun standing inside a drum ring splashes a fraction of its damage
+// around the hull it just hit. Single-target chassis call fragBurst after
+// their main hit; guns that already splash have nothing to gain and skip it.
+function fragBurst(tower, target, dealt) {
+  if (!target || !target.alive) return;
+  let frag = 0;
+  let radius = 35;
+  for (const drum of state.towers) {
+    if (drum.id !== 'wardrums' || drum === tower) continue;
+    const es = effStats(drum);
+    if (!es.frag) continue;
+    if (Math.hypot(tower.x - drum.x, tower.y - drum.y) <= es.rng) {
+      frag = Math.max(frag, es.frag);
+      radius = Math.max(radius, es.fragRadius || 35);
+    }
+  }
+  if (!frag) return;
+  const [tx, ty] = posOf(target);
+  let hit = 0;
+  for (const enemy of state.enemies) {
+    if (!enemy.alive || enemy === target || enemy.friendly) continue;
+    const [px, py] = posOf(enemy);
+    if (Math.hypot(px - tx, py - ty) <= radius) { damageEnemy(enemy, Math.max(1, Math.round(dealt * frag)), { src: 'frag' }); hit += 1; }
+  }
+  if (hit) fxRing(tx, ty, 'fx-ring-amber');
+}
+
+// --- DEATHWARRANT: the apex verdict --------------------------------------------------
+function acquireWarrantTarget(tower, es) {
+  const rng = es.rng || 460;
+  const pool = state.enemies.filter((enemy) => {
+    if (!enemy.alive || enemy.friendly || enemy.cloaked) return false;
+    const [px, py] = posOf(enemy);
+    return Math.hypot(px - tower.x, py - tower.y) <= rng;
+  });
+  if (!pool.length) return null;
+  return pool.reduce((best, enemy) => (enemy.maxHp > best.maxHp ? enemy : best));
+}
+
+function beginWarrantCharge(tower, target, es) {
+  const ring = svgNode('circle', { class: 'fx-warrant-ring', cx: tower.x, cy: tower.y, r: 6 });
+  const lock = svgNode('g', { class: 'fx-warrant-lock' });
+  lock.appendChild(svgNode('path', { d: 'M0 -14 L14 0 L0 14 L-14 0 Z' }));
+  const [px, py] = posOf(target);
+  lock.setAttribute('transform', `translate(${px.toFixed(1)} ${py.toFixed(1)})`);
+  const line = svgNode('line', { class: 'fx-warrant-line', x1: tower.x, y1: tower.y, x2: px.toFixed(1), y2: py.toFixed(1) });
+  state.layers.fx.appendChild(line);
+  state.layers.fx.appendChild(ring);
+  state.layers.fx.appendChild(lock);
+  tower.charge = { nid: target.nid, x: px, y: py, t: es.warrantCd || 12, fx: { ring, lock, line } };
+  tower.node.classList.add('tw-charging');
+  floatText(tower.x, tower.y - 52, 'VERDICT LOCKED', 'core-float');
+  playSound('alarm');
+}
+
+function dropWarrantCharge(tower) {
+  if (tower.charge) {
+    for (const el of Object.values(tower.charge.fx)) el.remove();
+    tower.charge = null;
+  }
+  tower.node.classList.remove('tw-charging');
+}
+
+function fireWarrant(tower, target, es) {
+  dropWarrantCharge(tower);
+  const payload = Math.round(es.dmg + target.maxHp * (es.warrantPct || 0.25));
+  const [tx, ty] = posOf(target);
+  damageEnemy(target, payload, { phase: true, src: 'warrant' });
+  fireLine(tower, target, 'fx-warrant', 7.5);
+  fireLine(tower, target, 'fx-warrant-core', 2.6);
+  fxRing(tx, ty, 'fx-ring-white');
+  fxRing(tx, ty, 'fx-ring-crimson');
+  floatText(tx, ty - target.t.size - 12, `ANNIHILATED −${payload}`, 'core-float');
+  tower.warrantCd = es.warrantCd || 12;
+  if (es.echo && !target.alive) {
+    // DEATH ECHO — the kill detonates: everything near the corpse eats a
+    // fraction of what the sentenced hull carried.
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || enemy.friendly) continue;
+      const [px, py] = posOf(enemy);
+      if (Math.hypot(px - tx, py - ty) <= 90) damageEnemy(enemy, Math.round(target.maxHp * 0.2), { phase: true, src: 'echo' });
+    }
+    fxRing(tx, ty, 'fx-ring-amber');
+  }
+  playSound();
+}
+
+// --- THE VETERAN: instant free gun switch -------------------------------------------
+function switchGun(tower) {
+  tower.gun = ((tower.gun || 0) + 1) % VETERAN_GUNS.length;
+  tower.heat = 0;
+  tower.heatNid = null;
+  paintTowerRange(tower);
+  fxRing(tower.x, tower.y, 'fx-ring-white');
+  floatText(tower.x, tower.y - 44, `${effStats(tower).gunName || 'BATTLE RIFLE'} UP`, 'up-float');
+  playSound();
+  openTowerPanel(tower);
+}
+
+// --- WAR BONDS: deposit + withdraw ----------------------------------------------------
+function bondDeposit(tower) {
+  const es = effStats(tower);
+  const cap = es.bondCap || 3000;
+  if ((tower.bank || 0) >= cap) { playSound('alarm'); showToast(`The bond is full — $${formatCash(cap)} cap. Withdraw or upgrade the ledger.`); return; }
+  if (state.cash < 500) { playSound('alarm'); showToast('Need $500 salvage to feed the bond.'); return; }
+  const amount = Math.min(500, cap - (tower.bank || 0));
+  state.cash -= amount;
+  tower.bank = (tower.bank || 0) + amount;
+  floatText(tower.x, tower.y - 44, `+$${amount} BONDED`, 'cash-float');
+  playSound();
+  updateHud();
+  openTowerPanel(tower);
+}
+
+function bondWithdraw(tower) {
+  const amount = Math.round(tower.bank || 0);
+  if (amount <= 0) return;
+  tower.bank = 0;
+  state.cash += amount;
+  floatText(tower.x, tower.y - 44, `+$${amount} WITHDRAWN`, 'cash-float');
+  fxRing(tower.x, tower.y, 'fx-ring-amber');
+  playSound();
+  updateHud();
+  openTowerPanel(tower);
+}
+
+function formatCash(value) {
+  return Number(value || 0).toLocaleString('en-US');
+}
+
 function fireLine(tower, target, cls, width = 2) {
   const [ex, ey] = posOf(target);
   const line = svgNode('line', { class: `fx-line ${cls}`, x1: tower.x, y1: tower.y, x2: ex, y2: ey, 'stroke-width': width });
@@ -2489,6 +2819,7 @@ function fireTower(tower, target) {
     case 'sentinel': {
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-tracer');
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'lazermortar': {
@@ -2524,6 +2855,7 @@ function fireTower(tower, target) {
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-sniper', 1.6);
       fxRing(tx, ty, 'fx-ring-red');
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'shredder': {
@@ -2531,12 +2863,14 @@ function fireTower(tower, target) {
       // spits a ragged amber chip-stream instead of a clean tracer.
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-chip', 1.8);
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'sparkcoil': {
       // Filler zapper: instant arc, jagged cyan spark instead of a clean tracer.
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-spark', 1.8);
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'flakpost': {
@@ -2553,6 +2887,7 @@ function fireTower(tower, target) {
         }
       }
       fxRing(tx, ty, 'fx-ring-amber');
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'missilesilo': {
@@ -2581,6 +2916,7 @@ function fireTower(tower, target) {
       state.layers.fx.appendChild(slash);
       setTimeout(() => slash.remove(), 160);
       fxRing(tx, ty, 'fx-ring-virus');
+      fragBurst(tower, target, dmg);
       break;
     }
     case 'executioner': {
@@ -2588,9 +2924,11 @@ function fireTower(tower, target) {
       // the round; bosses pay full price — and a marked commander below the
       // execute threshold just dies. The final boss is beyond the blade.
       const es = effStats(tower);
-      damageEnemy(target, target.t.boss ? dmg : Math.max(1, Math.round(dmg * (es.chaffPct || 0.15))));
+      const headsmanShot = target.t.boss ? dmg : Math.max(1, Math.round(dmg * (es.chaffPct || 0.15)));
+      damageEnemy(target, headsmanShot);
       fireLine(tower, target, 'fx-sniper', 2.6);
       fxRing(tx, ty, 'fx-ring-red');
+      fragBurst(tower, target, headsmanShot);
       if (target.alive && target.t.boss && target.key !== 'overseer' && target.hp <= target.maxHp * (es.execute || 0.15)) {
         damageEnemy(target, 999999999, { phase: true, src: 'execute' });
         floatText(tx, ty - target.t.size - 12, 'EXECUTED', 'core-float');
@@ -2618,9 +2956,51 @@ function fireTower(tower, target) {
       }
       break;
     }
+    case 'veteran': {
+      // One chassis, three guns. FIRE DISCIPLINE heats the rifle on repeated
+      // hulls, the SCATTERGUN empties the whole blast ring at once, and the
+      // LONGRIFLE pierces armor to delete the beefiest hull in reach.
+      const es = effStats(tower);
+      if (es.gunName === 'SCATTERGUN') {
+        const blast = es.splash || 32;
+        for (const enemy of state.enemies) {
+          if (!enemy.alive) continue;
+          const [px, py] = posOf(enemy);
+          if (Math.hypot(px - tx, py - ty) <= blast) damageEnemy(enemy, dmg);
+        }
+        const aim = Math.atan2(ty - tower.y, tx - tower.x);
+        const span = Math.hypot(tx - tower.x, ty - tower.y);
+        for (const off of [-0.22, 0, 0.22]) {
+          const px = tower.x + Math.cos(aim + off) * span;
+          const py = tower.y + Math.sin(aim + off) * span;
+          const pellet = svgNode('line', { class: 'fx-line fx-pellet', x1: tower.x, y1: tower.y, x2: px, y2: py, 'stroke-width': 2.5 });
+          state.layers.fx.appendChild(pellet);
+          setTimeout(() => pellet.remove(), 300);
+        }
+        fxRing(tx, ty, 'fx-ring-amber');
+        break;
+      }
+      if (es.gunName === 'LONGRIFLE') {
+        const shot = target.t.boss ? Math.round(dmg * (es.bossMult || 1.4)) : dmg;
+        damageEnemy(target, shot, { armorPierce: true });
+        fireLine(tower, target, 'fx-sniper', 2);
+        fxRing(tx, ty, 'fx-ring-red');
+        fragBurst(tower, target, shot);
+        break;
+      }
+      // BATTLE RIFLE — fire discipline heats up on the same hull.
+      if (tower.heatNid === target.nid) tower.heat = Math.min(3, (tower.heat || 0) + 1);
+      else { tower.heatNid = target.nid; tower.heat = 0; }
+      const shot = Math.round(dmg * (1 + (tower.heat || 0) * 0.2));
+      damageEnemy(target, shot);
+      fireLine(tower, target, 'fx-tracer');
+      fragBurst(tower, target, shot);
+      break;
+    }
     default: {
       damageEnemy(target, dmg);
       fireLine(tower, target, 'fx-tracer');
+      fragBurst(tower, target, dmg);
       break;
     }
   }

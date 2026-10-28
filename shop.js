@@ -6,6 +6,16 @@ window.CBZShop = (() => {
   // Clearance is UNCAPPED since the ULTIMATUM era — levels climb forever.
   const xpToNext = (level) => Math.round(55 * Math.pow(level, 0.86));
 
+  // --- GOLDEN SEALS: a sector gilds when all four protocols fall on it -------------
+  // Gild all five sectors and the PARAGON materializes in the armory.
+  const GOLDEN_PROTOCOLS = ['easy', 'medium', 'hard', 'insane'];
+  const GOLDEN_MAPS = ['easy', 'medium', 'hard', 'insane', 'cbz'];
+  const mapSeal = (mapWins, mapId) => {
+    const wins = mapWins && typeof mapWins === 'object' ? mapWins : {};
+    return GOLDEN_PROTOCOLS.every((p) => (wins[`${mapId}:${p}`] || 0) > 0);
+  };
+  const allSeals = (mapWins) => GOLDEN_MAPS.every((mapId) => mapSeal(mapWins, mapId));
+
   const CATEGORIES = {
     all: { label: 'ALL LINES' },
     offense: { label: 'OFFENSE' },
@@ -135,6 +145,22 @@ window.CBZShop = (() => {
         { label: 'MIRV PROTOCOL', cost: 2800, sets: { dmg: 650, splash: 80, rng: 340, cluster: 1 }, info: 'DMG 500 → 650 · SPLASH 75 → 80 · RNG 300 → 340 · MIRV CLUSTER BOMBLETS' },
       ],
       icon: ic('<path d="M12 34h16"/><path d="M14 34V14l6-8 6 8v20"/><path d="M17 20h6"/><circle cx="20" cy="26" r="2.4"/><path d="M8 34h24" stroke-dasharray="3 3"/>') },
+    { id: 'veteran', name: 'THE VETERAN', cat: 'offense', unlock: 40, price: { nc: 13500, bt: 180 }, cost: 700, currency: 'mixed', limit: 1,
+      tagline: 'Tri-weapon hero — one chassis, three switchable guns, and the longest ladder the Nexus has ever minted.',
+      stats: { dmg: 60, rate: 1.2, rng: 170, tgt: 'TRI-WEAPON // 3 SWITCHABLE GUNS · AA ON PADS · ONE PER COMMANDER' },
+      special: '>> The old soldier carries three guns and knows when each one sings. The BATTLE RIFLE heats up +20% per consecutive hit on the same hull (max +60%), the SCATTERGUN empties a 32u blast ring through air and ground alike, and the LONGRIFLE pierces armor plating to lock the beefiest hull in reach — commanders pay a 1.4x surcharge. Switch guns free and instantly from the tower panel. Eight ladder tiers — the most upgrades ever bolted onto one chassis, and every tier benefits all three guns.',
+      art: 'assets/towers/veteran.png',
+      track: [
+        { label: 'FIELD SIGHTS', cost: 200, sets: { rng: 190 }, info: 'RNG 170 → 190' },
+        { label: 'CHROME BARREL', cost: 420, sets: { dmg: 80 }, info: 'DMG 60 → 80' },
+        { label: 'ASSAULT RECEIVER', cost: 700, sets: { rate: 1.5 }, info: 'RATE 1.2 → 1.5' },
+        { label: 'AP ROUNDS', cost: 1100, sets: { dmg: 105 }, info: 'DMG 80 → 105' },
+        { label: 'VETERAN INSTINCTS', cost: 1600, sets: { rng: 220, rate: 1.7 }, info: 'RNG 190 → 220 · RATE 1.5 → 1.7' },
+        { label: 'WARFACE', cost: 2400, sets: { dmg: 135 }, info: 'DMG 105 → 135' },
+        { label: 'MASTER MARKSMAN', cost: 3600, sets: { dmg: 165, rng: 250 }, info: 'DMG 135 → 165 · RNG 220 → 250' },
+        { label: 'BATTLE-HARDENED', cost: 5200, sets: { dmg: 200, rate: 2, rng: 280 }, info: 'DMG 165 → 200 · RATE 1.7 → 2 · RNG 250 → 280 — 8 TIERS, THE LONGEST LADDER' },
+      ],
+      icon: ic('<path d="M10 34h20"/><path d="M14 34v-6h12v6"/><path d="M20 28V14"/><path d="M12 14h16"/><circle cx="20" cy="10" r="2.4"/><path d="M8 20h4M28 20h4"/>') },
     { id: 'zeroday', name: 'ZERO DAY-EXPLOIT RIG', cat: 'support', unlock: 15, price: { nc: 3600, bt: 30 }, cost: 350, currency: 'mixed', limit: 1,
       tagline: 'Passive breach engine — no guns, just money printed every wave.',
       stats: { dmg: 0, rate: 0, rng: 0, income: 120, tgt: 'ECONOMY RIG // PAYS EVERY WAVE · ONE PER COMMANDER' },
@@ -149,6 +175,19 @@ window.CBZShop = (() => {
         { label: 'NUCLEAR FALL OUT', cost: 500, sets: { income: 970 }, info: 'INCOME 870 → 970/WAVE · NUKE ABILITY: $500 CAST · 300s COOLDOWN' },
       ],
       icon: ic('<rect x="8" y="10" width="24" height="18" rx="1"/><path d="M12 15h10M12 19h16M12 23h6"/><path d="M16 28v4M24 28v4M12 32h16"/><circle cx="27" cy="15" r="1.6" fill="currentColor" stroke="none"/>') },
+    { id: 'warbonds', name: 'WAR BONDS', cat: 'support', unlock: 14, price: { nc: 2800, bt: 40 }, cost: 300, currency: 'mixed', limit: 1,
+      tagline: 'Compound war chest — deposit salvage, watch it grow every cleared wave, withdraw whenever.',
+      stats: { dmg: 0, rate: 0, rng: 0, bond: 0.12, bondCap: 3000, tgt: 'ECONOMY // WAR BONDS · DEPOSIT + COMPOUND INTEREST · ONE PER COMMANDER' },
+      special: '>> The ZERO DAY rig prints flat salvage every wave — WAR BONDS makes your money WORK instead. Deposit $500 into the bond from the tower panel; every cleared wave pays compound interest straight into the bond (12% base), and WITHDRAW moves the whole war chest back to your wallet whenever you need it. The longer the run, the harder the bond works — GOLD STANDARD compounds 22% against a $12,000 cap. Only one war chest deploys per commander.',
+      art: 'assets/towers/warbonds.png',
+      track: [
+        { label: 'GREEN STAMPS', cost: 250, sets: { bond: 0.15 }, info: 'WAVE INTEREST 12% → 15%' },
+        { label: 'WIDE LEDGER', cost: 450, sets: { bondCap: 5000 }, info: 'BOND CAP $3,000 → $5,000' },
+        { label: 'COMPOUND ENGINE', cost: 900, sets: { bond: 0.18 }, info: 'WAVE INTEREST 15% → 18%' },
+        { label: 'WAR CHEST', cost: 1600, sets: { bondCap: 8000 }, info: 'BOND CAP $5,000 → $8,000' },
+        { label: 'GOLD STANDARD', cost: 2800, sets: { bond: 0.22, bondCap: 12000 }, info: 'INTEREST 18% → 22% · BOND CAP $8,000 → $12,000' },
+      ],
+      icon: ic('<circle cx="20" cy="20" r="11"/><path d="M16 16h8M16 20h8M16 24h5"/><path d="M20 9v3M20 28v3M9 20h3M28 20h3"/>') },
     { id: 'relay', name: 'COMMAND RELAY', cat: 'support', unlock: 18, price: { nc: 4300, bt: 70 }, cost: 400, currency: 'mixed', limit: 1,
       tagline: 'Network pylon — no guns, it just makes every gun inside its ring better.',
       stats: { dmg: 0, rate: 0, rng: 170, dmgBuff: 0.1, tgt: 'AURA // BUFFS EVERY TOWER IN THE RING · ONE PER COMMANDER' },
@@ -162,6 +201,19 @@ window.CBZShop = (() => {
         { label: 'RALLY CRY', cost: 2400, sets: { rally: 1, rallyCost: 600, rallyCd: 45 }, info: 'ABILITY: $600 CAST · RING TOWERS +50% FIRE RATE FOR 6s · 45s COOLDOWN' },
       ],
       icon: ic('<path d="M20 34V16"/><circle cx="20" cy="12" r="2.2"/><path d="M13 15a10 10 0 0 1 3-6M27 15a10 10 0 0 0-3-6"/><path d="M9 19a15 15 0 0 1 4-9M31 19a15 15 0 0 0-4-9"/><path d="M12 34h16"/>') },
+    { id: 'wardrums', name: 'WAR DRUMS', cat: 'support', unlock: 22, price: { nc: 3900, bt: 60 }, cost: 420, currency: 'mixed', limit: 1,
+      tagline: 'Fragment beat — no gun of its own, but every gun in the ring suddenly splashes.',
+      stats: { dmg: 0, rate: 0, rng: 150, frag: 0.1, fragRadius: 35, tgt: 'SUPPORT AURA // FRAG ROUNDS — NEARBY GUNS SPLASH · ONE PER COMMANDER' },
+      special: '>> The drum beats and the whole network throws shrapnel: every tower inside the ring splashes 10% of its damage around whatever hull it just hit (35u frag ring). The ladder deepens the beat — wider ring, fatter frag, a 55u cluster ring — and WAR CHOIR teaches the drum to lob its own 140-damage frag shell every 4 seconds. Splash guns have nothing to gain; single-target guns become artillery. Only one drumline deploys per commander.',
+      art: 'assets/towers/wardrums.png',
+      track: [
+        { label: 'DEEPER SKINS', cost: 380, sets: { frag: 0.14 }, info: 'FRAG SPLASH 10% → 14% OF GUN DMG' },
+        { label: 'WIDER BEAT', cost: 700, sets: { rng: 190 }, info: 'DRUM RING 150 → 190' },
+        { label: 'CLUSTER BEAT', cost: 1200, sets: { fragRadius: 55 }, info: 'FRAG RING 35U → 55U' },
+        { label: 'IRON RHYTHM', cost: 2000, sets: { frag: 0.18 }, info: 'FRAG SPLASH 14% → 18%' },
+        { label: 'WAR CHOIR', cost: 3400, sets: { frag: 0.22, lob: 1, lobDmg: 140, lobSplash: 50 }, info: 'FRAG 18% → 22% · THE DRUM LOBS ITS OWN 140 DMG / 50U SHELL EVERY 4s' },
+      ],
+      icon: ic('<circle cx="20" cy="18" r="9"/><ellipse cx="20" cy="18" rx="9" ry="3"/><path d="M11 18v8M29 18v8M20 27v4M13 31h14"/><path d="M8 10l4 4M32 10l-4 4"/>') },
     { id: 'dawnbreaker', name: 'DAWNBRINGER', cat: 'special', unlock: 1, price: { nc: 250000, bt: 2500 }, cost: 1600, currency: 'mixed', event: true, limit: 1,
       tagline: 'CRIMSON RELIC — a dawn-forged solar lance that treats armor as a rumor.',
       stats: { dmg: 330, rate: 0.8, rng: 320, tgt: 'SINGLE / AIR + GROUND · IGNORES ARMOR · ONE PER COMMANDER' }, art: 'assets/towers/dawnbreaker.png',
@@ -173,10 +225,36 @@ window.CBZShop = (() => {
         { label: 'SUNSLAUGHTER', cost: 7000, sets: { dmg: 1250, splash: 40 }, info: 'DMG 950 → 1250 · SOLAR BURN SPLASH 40U' },
       ],
       icon: ic('<circle cx="20" cy="20" r="6"/><path d="M20 4v6M20 30v6M4 20h6M30 20h6M8.6 8.6l4.3 4.3M27.1 27.1l4.3 4.3M31.4 8.6l-4.3 4.3M12.9 27.1l-4.3 4.3"/>') },
+    { id: 'paragon', name: 'PARAGON', cat: 'special', unlock: 1, price: 0, cost: 500, currency: 'nc', golden: true, limit: 1,
+      tagline: 'GOLDEN STANDARD — the trophy rig. Materializes only when every sector on the grid wears its Golden Seal.',
+      stats: { dmg: 90, rate: 1, rng: 200, tithe: 0.15, tgt: 'GOLDEN STANDARD // AIR + GROUND · +15% BOUNTY IN RING · ONE PER COMMANDER' },
+      special: '>> The reward for a perfect campaign: beat EASY, MEDIUM, HARD and INSANE on all five battle sectors to gild them, and the PARAGON materializes in your armory — free, singular, permanent. Its gilded barrel tracks air and ground without a pad, and the GOLDEN TITHE taxes every hostile killed inside its ring for +15% bounty (20% at the crown). It is never sold, only earned.',
+      art: 'assets/towers/paragon.png',
+      track: [
+        { label: 'GILDED BARREL', cost: 300, sets: { dmg: 120 }, info: 'DMG 90 → 120' },
+        { label: 'AUREATE SCOPE', cost: 600, sets: { rng: 230 }, info: 'RNG 200 → 230' },
+        { label: 'ROYAL WARRANT', cost: 1200, sets: { rate: 1.2, dmg: 150 }, info: 'RATE 1 → 1.2 · DMG 120 → 150' },
+        { label: 'SOVEREIGN LOAD', cost: 2200, sets: { dmg: 190 }, info: 'DMG 150 → 190' },
+        { label: 'CROWN JEWEL', cost: 4000, sets: { dmg: 240, tithe: 0.2, rng: 260 }, info: 'DMG 190 → 240 · TITHE 15% → 20% · RNG 230 → 260' },
+      ],
+      icon: ic('<circle cx="20" cy="22" r="6"/><path d="M20 5l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/><path d="M8 34h24" stroke-dasharray="2 3"/>') },
+    { id: 'deathwarrant', name: 'DEATHWARRANT', cat: 'special', unlock: 20, cost: 900, limit: 1, ultimatum: true,
+      tagline: 'ULTIMATUM CARD — the apex verdict. One shot. Every ten seconds. The biggest thing on the field simply stops existing.',
+      stats: { dmg: 1500, rate: 0, rng: 460, warrantPct: 0.25, warrantCd: 12, tgt: 'ANNIHILATOR // ONE VERDICT EVERY 12s · HIGHEST-HULL LOCK · ONE PER COMMANDER' },
+      special: '>> The DEATHWARRANT does not fight a battle — it executes a sentence. It locks the beefiest hostile in reach (air or ground, a 460u verdict ring), charges for twelve seconds under a growing ring and a lock reticle, then fires: 1,500 flat damage PLUS 25% of everything the target carries — the fatter the hull, the harder the hit — straight through armor and shields as phase damage. If the sentenced hull dies, DEATH ECHO detonates the corpse for 20% of its max hull across 90u. It fires nothing else. It never has to.',
+      art: 'assets/towers/deathwarrant.png',
+      track: [
+        { label: 'BLACK SITE OPTICS', cost: 800, sets: { rng: 520 }, info: 'VERDICT RING 460 → 520' },
+        { label: 'HEAVY PAYLOAD', cost: 1800, sets: { dmg: 2200 }, info: 'FLAT PAYLOAD 1,500 → 2,200' },
+        { label: 'GRAVE SENTENCE', cost: 3200, sets: { warrantPct: 0.3 }, info: 'TARGET MAX-HULL CUT 25% → 30%' },
+        { label: 'SWIFT VERDICT', cost: 5000, sets: { warrantCd: 10 }, info: 'VERDICT CADENCE 12s → 10s' },
+        { label: 'FINAL SENTENCE', cost: 8000, sets: { dmg: 3200, warrantPct: 0.35, echo: 1 }, info: 'PAYLOAD 2,200 → 3,200 · CUT 30% → 35% · DEATH ECHO UNLOCKED' },
+      ],
+      icon: ic('<path d="M20 6l8 14-8 14-8-14z"/><path d="M20 14l4 6-4 6-4-6z"/><circle cx="20" cy="20" r="1.6" fill="currentColor" stroke="none"/>') },
     { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cat: 'special', unlock: 20, cost: 350, limit: 1, ultimatum: true,
       tagline: 'ULTIMATUM CARD — the grave warden. Anything that dies near it rises and walks the lane backwards.',
       stats: { dmg: 0, rate: 0, rng: 180, summon: 30, tgt: 'SPAWNER // NO ATTACK · ONE PER COMMANDER' },
-      special: '>> The apex tier of the Nexus. When anything dies inside its ring, a weakened copy rises and marches back down the track, detonating on the first hostile it touches for damage equal to its hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain. Obtained only in the ULTIMATUM vault: one card armed at a time.',
+      special: '>> The apex tier of the Nexus. When anything dies inside its ring, a weakened copy rises at its TRUE scaled hull and marches back down the track — mowing through up to four hostiles instead of dying on the first bump: every hostile it touches takes damage equal to the risen\u2019s full hull, and each mow costs the risen a quarter of that hull. Its own kills feed the Blood Lust bar — purge it for a burst of stored pain. Obtained only in the ULTIMATUM vault: two cores, one card armed at a time.',
       art: 'assets/towers/corpseblossom.png',
       track: [
         { label: 'LARGER BRANCHES', cost: 140, sets: { rng: 200 }, info: 'RNG 180 → 200' },
@@ -189,15 +267,15 @@ window.CBZShop = (() => {
     { id: 'gravewarden', name: 'GRAVE WARDEN', cat: 'special', unlock: 20, cost: 400, limit: 1, ultimatum: true,
       tagline: 'ULTIMATUM CARD — the second apex rig. A walled yard where the dead pay toll, the bell never rests, and the core gives up its souls.',
       stats: { dmg: 0, rate: 0, rng: 180, tgt: 'AURA // YARD CONTROL · ONE PER COMMANDER' },
-      special: '>> The Warden keeps a walled yard: everything hostile inside drags its heels once the CHILL GRAVE is laid, and every death inside the yard rings the bell sooner. When the DEATH TOLL sounds, the whole yard takes the pulse and chaff is stunned where it stands. Tier 6 raises the SOUL CHOIR: the Warden pulls vengeful souls out of the core itself — hulls forged from the yard\u2019s toll — and the choir does not sing for free. Commanders are beneath its notice. Obtained only in the ULTIMATUM vault: one card armed at a time.',
+      special: '>> The Warden keeps a walled yard: everything hostile inside drags its heels once the CHILL GRAVE is laid, and every death inside the yard rings the bell sooner. When the DEATH TOLL sounds, the whole yard takes the pulse and chaff is stunned where it stands. Tier 6 raises the SOUL CHOIR: the Warden pulls vengeful souls out of the core itself — hulls forged from the yard\u2019s toll — and the choir does not sing for free. Commanders are beneath its notice. Repriced to ONE core and weighted to match: the bell rings a touch softer, the yard drags a touch less, and the hymns cost $850 on a 40s rest. Obtained only in the ULTIMATUM vault: one card armed at a time.',
       art: 'assets/towers/gravewarden.png',
       track: [
         { label: 'WIDER YARD', cost: 200, sets: { rng: 200 }, info: 'RNG 180 → 200' },
         { label: 'DEATH TOLL', cost: 600, sets: { bell: 100 }, info: 'BELL PULSE: 100 DMG EVERY 8s · 0.8s STUN · YARD KILLS RING IT SOONER' },
-        { label: 'CHILL GRAVE', cost: 900, sets: { yardSlow: 0.45 }, info: 'YARD HOSTILES MOVE 45% SLOWER — WALKERS AND FLYERS ALIKE' },
-        { label: 'TOLLING HOURS', cost: 1600, sets: { bell: 210, bellEvery: 5.5, rng: 220 }, info: 'BELL 100 → 210 DMG · CADENCE 8s → 5.5s · RNG 200 → 220' },
-        { label: 'LAST TOLL', cost: 3200, sets: { bell: 380, bellEvery: 4, yardSlow: 0.55, tollStun: 1.6, rng: 245 }, info: 'BELL 210 → 380 DMG · CADENCE 4s · YARD -55% SPEED · STUN 1.6s' },
-        { label: 'SOUL CHOIR', cost: 5200, sets: { soul: 1, soulCost: 700, soulCd: 35 }, info: 'SUMMON A VENGEFUL SOUL FROM THE CORE · HULL = 10 x TOLL CHARGES (MIN 75) · $700 PER SOUL · 35s COOLDOWN' },
+        { label: 'CHILL GRAVE', cost: 900, sets: { yardSlow: 0.4 }, info: 'YARD HOSTILES MOVE 40% SLOWER — WALKERS AND FLYERS ALIKE' },
+        { label: 'TOLLING HOURS', cost: 1600, sets: { bell: 190, bellEvery: 6, rng: 220 }, info: 'BELL 100 → 190 DMG · CADENCE 8s → 6s · RNG 200 → 220' },
+        { label: 'LAST TOLL', cost: 3200, sets: { bell: 330, bellEvery: 4.5, yardSlow: 0.5, tollStun: 1.4, rng: 245 }, info: 'BELL 190 → 330 DMG · CADENCE 4.5s · YARD -50% SPEED · STUN 1.4s' },
+        { label: 'SOUL CHOIR', cost: 5200, sets: { soul: 1, soulCost: 850, soulCd: 40 }, info: 'SUMMON A VENGEFUL SOUL FROM THE CORE · HULL = 10 x TOLL CHARGES (MIN 60) · $850 PER SOUL · 40s COOLDOWN' },
       ],
       icon: ic('<circle cx="20" cy="21" r="8"/><path d="M20 13v-4M16 9h8"/><circle cx="20" cy="21" r="2.2" fill="currentColor" stroke="none"/><path d="M8 21c2-2 4-2 6 0M26 21c2-2 4-2 6 0"/>') },
     { id: 'executioner', name: 'EXECUTIONER', cat: 'special', unlock: 50, price: { nc: 12000, bt: 150 }, cost: 450, currency: 'mixed', limit: 3,
@@ -232,10 +310,12 @@ window.CBZShop = (() => {
   // Mirrors server.js ULT_* — keep in sync.
   const ULT_XP_PER_CORE = 50000;
   const ULT_CARDS = [
-    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cores: 1, unlock: 20,
-      blurb: 'The CLASSIFIED vault is open. One core — fifty thousand lifetime XP — and the grave warden walks your lanes. First of the Ultimatum cards.' },
-    { id: 'gravewarden', name: 'GRAVE WARDEN', cores: 2, unlock: 20,
-      blurb: 'The second apex rig: a walled yard where the dead pay toll. Two cores bank the Warden — the bell never rests, and nothing hostile walks his yard at full speed.' },
+    { id: 'corpseblossom', name: 'CORPSE BLOSSOM', cores: 2, unlock: 20,
+      blurb: 'The apex reanimator reprices to TWO cores — and earns it: risen copies now forge from their true scaled hull and MOW through four hostiles instead of dying on the first bump.' },
+    { id: 'gravewarden', name: 'GRAVE WARDEN', cores: 1, unlock: 20,
+      blurb: 'One core banks the Warden: a walled yard where the dead pay toll. Weighted to match the cheaper seal — a softer bell, a lighter yard, and hymns at $850 on a 40s rest.' },
+    { id: 'deathwarrant', name: 'DEATHWARRANT', cores: 3, unlock: 20,
+      blurb: 'The apex verdict. Three cores buy a single annihilation rig: it locks the beefiest hull on the field, charges twelve seconds, then erases it — flat payload plus a quarter of everything the target carries, straight through armor and shields.' },
   ];
 
   let profile = { name: '', level: 1, xp: 0, xpNext: xpToNext(1), nc: 0, bt: 0, firstClear: false, owned: ['sentinel'], loadout: ['sentinel'], mapWins: {}, achievements: {}, equippedPerks: [], totalXp: 0, ultCores: 0, ultClaims: 0, admin: false };
@@ -298,14 +378,19 @@ window.CBZShop = (() => {
   }
 
   function visibility(entry) {
+    // FULL CLEARANCE — the site admin sees and buys the entire grid at any level.
+    const clearanceOk = isAdminProfile(profile) || profile.level >= entry.unlock;
     // ULTIMATUM cards never render in the blueprint grid — they live in the vault tab.
     if (entry.ultimatum) return profile.owned.includes(entry.id) ? 'owned' : 'ultimatum';
     // CRIMSON RELIC: event = relic blueprints — never purchasable, they materialize
     // in the armory only when the commander survives the event.
     if (profile.owned.includes(entry.id)) return 'owned';
     if (entry.event) return 'event-locked';
+    // GOLDEN STANDARD: the PARAGON is never sold — it materializes when every
+    // sector wears its Golden Seal (auto-granted server-side; this is the UI).
+    if (entry.golden && !allSeals(profile.mapWins)) return 'gold-locked';
     if (entry.reward && !profile.firstClear) return 'reward-locked';
-    if (profile.level >= entry.unlock) return 'buy';
+    if (clearanceOk) return 'buy';
     if (profile.level >= entry.unlock - HORIZON) return 'locked';
     return 'hidden';
   }
@@ -380,8 +465,12 @@ window.CBZShop = (() => {
     const corrupt = entry.stats.corrupt ? `<div class="tc-meter"><span>CONTAGION</span><div class="tm-track"><i style="width:${pct(entry.stats.corrupt, 80)}"></i></div><b>${entry.stats.corrupt}/S · 5S</b></div>` : '';
     const slow = entry.stats.slow ? `<div class="tc-meter"><span>SLICK</span><div class="tm-track"><i style="width:${pct(entry.stats.slow * 100, 50)}"></i></div><b>SLOW ${Math.round(entry.stats.slow * 100)}%</b></div>` : '';
     const buff = entry.stats.dmgBuff ? `<div class="tc-meter"><span>NETWORK</span><div class="tm-track"><i style="width:${pct((entry.stats.dmgBuff || 0) * 100, 30)}"></i></div><b>+${Math.round((entry.stats.dmgBuff || 0) * 100)}% DMG</b></div>` : '';
+    const bond = entry.stats.bond ? `<div class="tc-meter"><span>BOND</span><div class="tm-track"><i style="width:${pct(entry.stats.bond * 100, 25)}"></i></div><b>+${Math.round(entry.stats.bond * 100)}%/WAVE · $${format(entry.stats.bondCap || 3000)} CAP</b></div>` : '';
+    const frag = entry.stats.frag ? `<div class="tc-meter"><span>FRAG</span><div class="tm-track"><i style="width:${pct(entry.stats.frag * 100, 25)}"></i></div><b>+${Math.round(entry.stats.frag * 100)}% SPLASH · ${entry.stats.fragRadius || 35}U</b></div>` : '';
+    const warrant = entry.stats.warrantPct ? `<div class="tc-meter"><span>VERDICT</span><div class="tm-track"><i style="width:${pct(entry.stats.warrantPct * 100, 40)}"></i></div><b>${format(entry.stats.dmg)} + ${Math.round(entry.stats.warrantPct * 100)}% MAX HULL</b></div>` : '';
+    const tithe = entry.stats.tithe ? `<div class="tc-meter"><span>TITHE</span><div class="tm-track"><i style="width:${pct(entry.stats.tithe * 100, 25)}"></i></div><b>+${Math.round(entry.stats.tithe * 100)}% BOUNTY</b></div>` : '';
     const row = (label, value, cap, suffix = '') => (value ? `<div class="tc-meter"><span>${label}</span><div class="tm-track"><i style="width:${pct(value, cap)}"></i></div><b>${value >= 999 ? 'INF' : value}${suffix}</b></div>` : '');
-    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}${corrupt}${slow}${buff}`;
+    return `${row('DMG', entry.stats.dmg, caps.dmg)}${row('RATE', entry.stats.rate, caps.rate, '/s')}${row('RNG', entry.stats.rng, caps.rng)}${splash}${income}${summon}${drone}${corrupt}${slow}${buff}${bond}${frag}${warrant}${tithe}`;
   }
 
   function cardHtml(entry) {
@@ -426,6 +515,20 @@ window.CBZShop = (() => {
           <p class="tc-special">${entry.special}</p>
           ${trackHtml(entry)}
           <div class="tc-lock"><span>MISSION REWARD</span><b>BEAT EASY MODE</b></div>
+        </article>`;
+    }
+    if (vis === 'gold-locked') {
+      return `
+        <article class="tower-card state-locked state-gold cat-${entry.cat}" data-id="${entry.id}">
+          <div class="tc-top"><span class="tc-cat">${CATEGORIES[entry.cat].label}</span><span class="tc-unlock">GOLDEN STANDARD</span></div>
+          <div class="tc-icon">${artHtml(entry) || entry.icon}</div>
+          <h4>${entry.name}</h4>
+          <p class="tc-tagline">${entry.tagline}</p>
+          <div class="tc-stats">${meters(entry)}</div>
+          <div class="tc-target">${entry.stats.tgt}</div>
+          <p class="tc-special">${entry.special}</p>
+          ${trackHtml(entry)}
+          <div class="tc-lock gold-lock"><span>PERFECT CAMPAIGN</span><b>GILD ALL 5 SECTORS</b></div>
         </article>`;
     }
     const owned = vis === 'owned';
@@ -534,7 +637,7 @@ window.CBZShop = (() => {
     const cards = ULT_CARDS.map((card) => {
       const tower = towerById(card.id);
       const owned = profile.owned.includes(card.id);
-      const locked = profile.level < card.unlock;
+      const locked = !isAdminProfile(profile) && profile.level < card.unlock;
       const armedHere = owned && profile.loadout.includes(card.id);
       const arming = !owned && (profile.ultCores || 0) >= card.cores && armedCard === card.id;
       const action = owned
